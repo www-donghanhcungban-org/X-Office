@@ -116,7 +116,7 @@ khoá `(method, path)`; `Ctx` có `base` (gốc dự án), `framework` (thư m�
 
 ### F-008 Văn phòng (`#/office`, `views/office.js`, `office/*.js`)
 - S-015 Given vòng đang chạy có lần chạy xanh của `executor` và lần đỏ của `executor-deep` trên task còn mở, When mở màn, Then bàn "Thực thi" hiện "đang làm" kèm ID task, bàn "Thực thi sâu" hiện "đang sửa (đỏ)"; bảng văn bản dưới canvas nêu đúng như vậy; việc `loop defer` nằm ở "Việc cần người".
-- S-016 When chọn kiểu văn phòng (Công ty công nghệ, Studio sáng tạo, Thư viện yên tĩnh, Văn phòng ban đêm, Cyberpunk, Quán cà phê, Vũ trụ) hoặc mùa (Tự động, Tắt, Noel, Tết), Then cảnh vẽ lại ngay, lựa chọn nhớ trong `localStorage` (lỗi lưu → vẫn chạy với mặc định).
+- S-016 When chọn kiểu văn phòng (Công ty công nghệ, Studio sáng tạo, Thư viện yên tĩnh, Văn phòng ban đêm, Cyberpunk, Quán cà phê, Vũ trụ, Bệnh viện) hoặc mùa (Tự động, Tắt, Noel, Tết), Then cảnh vẽ lại ngay, lựa chọn nhớ trong `localStorage` (lỗi lưu → vẫn chạy với mặc định).
 - S-017 Given `prefers-reduced-motion: reduce`, When mở màn, Then chuyển động tắt mặc định (bật lại bằng tay được); rời màn thì vòng vẽ và hỏi lại dữ liệu (10 s) dừng.
 - Vẽ bằng Canvas 2D tự viết (không thư viện ngoài, đúng CSP §2); kiểu văn phòng là dữ liệu trong `office/themes.js` — thêm kiểu không sửa mã vẽ. Canvas có `role="img"` + `aria-label` tóm tắt; mọi thông tin của cảnh có bản văn bản tương đương.
 

@@ -1,6 +1,7 @@
 // Kiểu văn phòng = DỮ LIỆU (bảng màu + cửa sổ + đồ đạc + hiệu ứng nền); một bộ dựng (scene.js) vẽ mọi kiểu.
 // Thêm kiểu: thêm một mục vào THEMES — không sửa mã vẽ. Toạ độ theo phòng 16×12, cao 4 (scene.js ROOM).
-// Đồ đạc dùng chung: plant, shelf, sofa, lamp, board, rack, counter, cafetable, console, pipe, neon, cooler, rug, holo.
+// Đồ đạc dùng chung: plant, shelf, sofa, lamp, board, rack, counter, cafetable, console, pipe, neon, cooler, rug, holo,
+// bed, cross.
 
 export const THEMES = [
   {
@@ -176,6 +177,31 @@ export const THEMES = [
       { kind: "rack", x: 15.0, y: 3.4, color: "#475569" }, { kind: "rack", x: 15.0, y: 4.8, color: "#475569" },
       { kind: "plant", x: 0.4, y: 10.6, color: "#4ade80" },
       { kind: "cooler", x: 15.0, y: 10.4 },
+    ],
+  },
+  {
+    id: "hospital",
+    name: "Bệnh viện",
+    bg: "#e6f4f1",
+    floor: ["#dcefeb", "#d2e8e3"],
+    wall: "#f7fbfa",
+    trim: "#14b8a6",
+    desk: "#f8fafc",
+    leg: "#94a3b8",
+    chair: "#0d9488",
+    screen: "#0f172a",
+    glow: "#2dd4bf",
+    window: "sky",
+    ambient: "none",
+    label: ["#ffffff", "#134e4a", "#14b8a6"],
+    props: [
+      { kind: "rug", x: 10.4, y: 5.8, w: 5.4, d: 6.0, color: "#c7e6df" },
+      { kind: "cross", x: 13.4, y: 0.05, color: "#dc2626" },
+      { kind: "cross", x: 0.05, y: 9.8, side: "left", color: "#16a34a" },
+      { kind: "bed", x: 12.8, y: 6.3 }, { kind: "bed", x: 12.8, y: 8.3 }, { kind: "bed", x: 12.8, y: 10.3 },
+      { kind: "shelf", x: 12.2, y: 0.3, color: "#e2e8f0" },
+      { kind: "cooler", x: 15.0, y: 3.4 },
+      { kind: "plant", x: 0.4, y: 10.6 }, { kind: "plant", x: 15.0, y: 4.8 },
     ],
   },
 ];

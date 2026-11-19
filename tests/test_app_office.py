@@ -153,7 +153,7 @@ class OfficeThemesStaticTest(unittest.TestCase):
     def test_required_themes_and_seasons(self) -> None:
         text = (ROOT / "scripts" / "app" / "office" / "themes.js").read_text(encoding="utf-8")
         ids = set(re.findall(r'^\s{4}id: "([\w-]+)"', text, re.M))
-        self.assertEqual(ids, {"tech", "studio", "library", "night", "cyberpunk", "cafe", "space"})
+        self.assertEqual(ids, {"tech", "studio", "library", "night", "cyberpunk", "cafe", "space", "hospital"})
         for season in ("auto", "off", "noel", "tet"):
             self.assertIn(f'id: "{season}"', text)
 
@@ -162,7 +162,7 @@ class OfficeThemesStaticTest(unittest.TestCase):
         scene = (ROOT / "scripts" / "app" / "office" / "scene.js").read_text(encoding="utf-8")
         kinds = set(re.findall(r'kind: "(\w+)"', themes))
         drawn = set(re.findall(r"^const BOX_PROPS = \{([^}]*)\}", scene, re.M)[0].replace(" ", "").split(","))
-        drawn = {k.split(":")[0] for k in drawn} | {"rug", "board", "neon", "pipe"}  # flatProp vẽ 4 loại phẳng
+        drawn = {k.split(":")[0] for k in drawn} | {"rug", "board", "neon", "pipe", "cross"}  # flatProp vẽ 5 loại phẳng
         self.assertEqual(kinds - drawn, set())
 
 

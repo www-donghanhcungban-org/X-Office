@@ -180,7 +180,17 @@ function cooler(p, out) {
   out.push(box(p.x + 0.08, p.y + 0.08, 1.1, 0.44, 0.44, 0.6, "#7dd3fc", { top: "#bae6fd" }));
 }
 
-const BOX_PROPS = { plant, shelf, sofa, lamp, rack, counter, cafetable, console: consoleDesk, holo, cooler };
+function bed(p, out, th) {
+  out.push(box(p.x, p.y, 0, 2.4, 1.0, 0.45, "#cbd5e1"));
+  out.push(box(p.x + 0.05, p.y + 0.05, 0.45, 2.3, 0.9, 0.18, "#bfdbfe", { top: "#dbeafe" }));
+  out.push(box(p.x + 1.7, p.y + 0.15, 0.63, 0.5, 0.7, 0.14, "#ffffff"));
+  out.push(box(p.x + 0.1, p.y + 0.08, 0.63, 1.5, 0.84, 0.1, th.trim, { bias: 0.01 }));
+  out.push(box(p.x + 2.3, p.y, 0.45, 0.1, 1.0, 0.6, "#94a3b8"));
+  out.push(box(p.x - 0.35, p.y + 0.2, 0, 0.08, 0.08, 1.9, "#9ca3af"));
+  out.push(box(p.x - 0.45, p.y + 0.12, 1.55, 0.26, 0.2, 0.32, "#e0f2fe", { glow: th.glow }));
+}
+
+const BOX_PROPS = { plant, shelf, sofa, lamp, rack, counter, cafetable, console: consoleDesk, holo, cooler, bed };
 
 function flatProp(iso, p, th) {
   if (p.kind === "rug") iso.panel({ plane: "floor", c: 0.01, a: p.x, b: p.y, w: p.w, h: p.d, color: p.color });
@@ -197,6 +207,12 @@ function flatProp(iso, p, th) {
     iso.panel({ ...f, b: 3.0, w: p.w, h: 0.5, color: "#0b0414" });
     iso.panel({ ...f, a: f.a + 0.15, b: 3.12, w: p.w - 0.3, h: 0.08, color: p.color, glow: p.color });
     iso.panel({ ...f, a: f.a + 0.15, b: 3.3, w: (p.w - 0.3) * 0.6, h: 0.08, color: th.glow, glow: th.glow });
+  }
+  if (p.kind === "cross") {
+    const f = p.side === "left" ? { plane: "left", c: 0.03, a: p.y } : { plane: "back", c: 0.03, a: p.x };
+    iso.panel({ ...f, b: 2.4, w: 1.2, h: 1.2, color: "#ffffff", stroke: th.trim });
+    iso.panel({ ...f, a: f.a + 0.45, b: 2.55, w: 0.3, h: 0.9, color: p.color, glow: p.color });
+    iso.panel({ ...f, a: f.a + 0.15, b: 2.85, w: 0.9, h: 0.3, color: p.color, glow: p.color });
   }
   if (p.kind === "pipe") {
     iso.panel({ plane: "back", c: 0.02, a: 0, b: 3.55, w: ROOM.W, h: 0.14, color: shade(th.wall, 0.25) });
