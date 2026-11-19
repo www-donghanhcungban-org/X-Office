@@ -286,7 +286,9 @@ export async function render(main, { api, h, error }) {
   }
 
   function label() {
-    const text = describe(data.seats, themeById(prefs.theme).name, SCALES.find((x) => x.id === prefs.scale)?.name);
+    const text = loaded
+      ? describe(data.seats, themeById(prefs.theme).name, SCALES.find((x) => x.id === prefs.scale)?.name)
+      : "Văn phòng — chưa có dữ liệu agent (đang tải hoặc máy chủ lỗi)."; // không khai "không ai đang làm" khi chưa biết
     canvas.setAttribute("aria-label", text);
     keys.textContent = three
       ? "Khi khung cảnh có focus: mũi tên xoay góc nhìn; kéo chuột để xoay."

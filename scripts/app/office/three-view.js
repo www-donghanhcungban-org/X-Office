@@ -177,8 +177,13 @@ export function createThreeView(stage) {
       el.hidden = false;
       let left = ((p.x + 1) / 2) * rect.w, top = ((1 - p.y) / 2) * rect.h;
       if (t.kind === "room") {
-        // Nhãn phòng là biển chỉ dẫn, không bám người: kẹp trọn trong khung (khung hẹp + xoay sát biên không cắt chữ).
+        // Nhãn phòng là biển chỉ dẫn: phòng ngoài hình (tới bàn/tới phòng khác, phóng to) → ẩn, không ghim mép đè lên
+        // phòng khác; phòng còn trong hình mà nhãn chạm mép (khung hẹp, xoay sát biên) → kẹp trọn để không cắt chữ.
         const hw = el.offsetWidth / 2 + 2;
+        if (left < -hw || left > rect.w + hw || top < 0 || top - el.offsetHeight > rect.h) {
+          el.hidden = true;
+          return;
+        }
         left = Math.min(rect.w - hw, Math.max(hw, left));
         top = Math.min(rect.h - 2, Math.max(el.offsetHeight + 2, top));
       }

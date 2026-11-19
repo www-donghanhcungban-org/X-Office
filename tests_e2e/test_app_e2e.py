@@ -442,20 +442,23 @@ class OfficeTest(AppCase):
         go(page, "office", "Văn phòng")
         page.uncheck("#office-motion")
         frames = "() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))"
-        # Dữ liệu: chữ nhãn phòng ≥ 4,5:1 trên màu nhấn của MỌI kiểu; neo nhãn nằm trong chính phòng (x, y) ở mọi bố cục.
+        # Dữ liệu: chữ nhãn phòng ≥ 4,5:1 trên màu nhấn của MỌI kiểu. Neo nhãn: điểm sàn cùng hình chiếu isometric
+        # (x − z, y − z) KHÔNG rơi vào phòng khác — nhãn treo cao sau vách thấp (lỗi PR #10) chiếu đè lên phòng phía sau.
         data = page.evaluate(
             "async () => { const iso = await import('/office/iso.js'), th = await import('/office/themes.js'),"
             " sc = await import('/office/scene.js'), pl = await import('/office/plans.js');"
             " const out = {contrast: th.THEMES.map(t => [t.id, iso.contrast(iso.inkOn(t.trim), t.trim)]), anchors: [],"
             " desks: []};"
-            " for (const s of ['company', 'corp']) for (const l of ['open', 'connected', 'private']) {"
-            " const p = pl.planFor(s, l); for (const r of p.rooms) { const [x, y] = sc.roomLabelAt(r);"
-            " out.anchors.push([r.id, x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.d]); }"
+            " for (const s of ['company', 'corp']) { const p = pl.planFor(s, 'open');"
+            " for (const r of p.rooms) { const [x, y, z] = sc.roomLabelAt(r), fx = x - z, fy = y - z;"
+            " const other = p.rooms.find(o => o !== r && fx > o.x && fx < o.x + o.w && fy > o.y && fy < o.y + o.d);"
+            " out.anchors.push([s, r.id, other ? other.id : null]); }"
             " out.desks.push([...p.desks, ...p.extraDesks].map(d => d.join(','))); } return out; }"
         )
         self.assertEqual(len(data["contrast"]), 8)
         self.assertTrue(all(c >= 4.5 for _, c in data["contrast"]), data["contrast"])
-        self.assertTrue(all(ok for _, ok in data["anchors"]), data["anchors"])
+        self.assertEqual(len(data["anchors"]), 16)
+        self.assertEqual([a for a in data["anchors"] if a[2]], [])
         for desks in data["desks"]:  # 28 bàn khác nhau; 5 bàn agent là 5 ô đầu lưới (hàng trước), minh hoạ theo sau
             self.assertEqual(len(set(desks)), 28)
             order = sorted(desks, key=lambda d: (float(d.split(",")[1]), float(d.split(",")[0])))
@@ -488,6 +491,13 @@ class OfficeTest(AppCase):
         page.route("**/api/office*", handle)
         third = page.locator("main tbody tr th button").nth(2)
         third.focus()
+        page.evaluate("() => window.scrollTo(0, 0)")  # người dùng cuộn lên xem cảnh, focus vẫn ở nút thứ 3
+        self.assertTrue(  # tiền điều kiện: nút đang ngoài tầm nhìn — focus() thiếu preventScroll sẽ kéo cuộn
+            page.evaluate(
+                "() => document.querySelectorAll('main tbody tr th button')[2].getBoundingClientRect().top"
+                " > window.innerHeight"
+            )
+        )
         before = page.evaluate("() => window.scrollY")
         state = "() => document.querySelector('main tbody tr td span').textContent"
         old_state = page.evaluate(state)
@@ -513,10 +523,16 @@ class OfficeTest(AppCase):
         z0 = page.evaluate(zoom)
         canvas2d.focus()
         page.keyboard.press("Control+Minus")
-        page.keyboard.press("Alt+ArrowLeft")
         self.assertEqual(page.evaluate(zoom), z0)
         page.keyboard.press("Minus")
         self.assertLess(page.evaluate(zoom), z0)
+        # Alt/Ctrl/⌘ + mũi tên không bị canvas giành (không preventDefault); mũi tên trơn thì có.
+        keyed = (
+            "(sel) => [{altKey: true}, {ctrlKey: true}, {metaKey: true}, {}].map(m => document.querySelector(sel)"
+            ".dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowLeft', bubbles: true, cancelable: true, ...m})))"
+        )
+        self.assertEqual(page.evaluate(keyed, "canvas.office-canvas"), [True, True, True, False])
+        self.check_pan_bounds(page, canvas2d, frames)
         # 3D công ty: mọi kiểu — nhãn phòng (HTML) đạt axe color-contrast; gợi ý phím đổi theo bộ vẽ.
         page.select_option("#office-renderer", "3d")
         page.locator("canvas.office-3d").wait_for()
@@ -525,6 +541,12 @@ class OfficeTest(AppCase):
         )
         self.assertIn("xoay", page.text_content("#office-keys") or "")
         self.assertEqual(page.get_attribute("canvas.office-3d", "aria-describedby"), "office-keys")
+        self.assertEqual(page.evaluate(keyed, "canvas.office-3d"), [True, True, True, False])
+        self.check_room_labels_apart(page, frames)
+        page.click(".office-rooms button[data-room='']")
+        page.wait_for_function(
+            "() => document.querySelectorAll('.office-labels .office-tag[data-kind=room]:not([hidden])').length === 8"
+        )
         for theme in page.eval_on_selector_all("#office-theme option", "os => os.map(o => o.value)"):
             page.select_option("#office-theme", theme)
             page.evaluate(frames)
@@ -533,6 +555,79 @@ class OfficeTest(AppCase):
             self.assertEqual([v["id"] for v in bad], [], (theme, bad))
         page.select_option("#office-renderer", "2d")
         assert_clean(self, page, watch, self.origin)
+
+    def test_office_without_data_and_bad_prefs(self) -> None:
+        """Lần tải đầu lỗi: bộ đếm, chú thích và tên khung cảnh nói "chưa có dữ liệu" (không khai "không ai đang làm").
+        Lựa chọn đã lưu không hợp lệ → mặc định; bộ vẽ 3D đã lưu mở thẳng 3D, có gợi ý phím gắn aria-describedby."""
+        ctx = self.new_context("desktop")
+        ctx.add_init_script(
+            "try { localStorage.setItem('xt-office', JSON.stringify({scale: 'huge', theme: 'nope', renderer: '3d',"
+            " motion: false})); } catch (e) {}"
+        )
+        page, watch = self.open_app(ctx)
+        page.route("**/api/office*", lambda r: r.fulfill(status=500, json={"error": "lỗi thử"}))
+        go(page, "office", "Văn phòng")
+        page.locator("canvas.office-3d").wait_for()
+        self.assertEqual(page.input_value("#office-scale"), "team")
+        self.assertEqual(page.input_value("#office-theme"), "night")
+        self.assertIn("Chưa có dữ liệu agent", page.text_content(".office-counters") or "")
+        legend = "() => document.querySelector('.office-counters').nextElementSibling.nextElementSibling.textContent"
+        self.assertTrue(page.evaluate(legend))
+        self.assertIn("chưa có dữ liệu", page.get_attribute("canvas.office-3d", "aria-label") or "")
+        self.assertEqual(page.get_attribute("canvas.office-3d", "aria-describedby"), "office-keys")
+        self.assertIn("xoay", page.text_content("#office-keys") or "")
+        watch.take()  # lỗi 500 là chủ ý của test
+
+    def check_pan_bounds(self, page: Page, canvas2d: Any, frames: str) -> None:
+        """Biên dời 2D theo cỡ cảnh đã phóng; thu nhỏ thì góc nhìn được kẹp lại (cảnh không biến khỏi khung)."""
+
+        # Biên dời 2D theo cỡ cảnh đã phóng: ở 4× vẫn dời tiếp quá một khung (biên cũ ±1 khung dừng ở ~28 lần ←);
+        # thu nhỏ hết cỡ thì góc nhìn được kẹp lại — cảnh vẫn trong khung (không phải canvas trống).
+        page.select_option("#office-season", "off")
+        for _ in range(12):
+            page.click("button[aria-label='Phóng to']")
+        page.keyboard.press("0")
+        canvas2d.focus()
+        for _ in range(32):
+            page.keyboard.press("ArrowLeft")
+        page.evaluate(frames)
+        at32 = canvas2d.screenshot()
+        for _ in range(12):
+            page.keyboard.press("ArrowLeft")
+        page.evaluate(frames)
+        self.assertNotEqual(at32, canvas2d.screenshot())
+        for _ in range(12):
+            page.click("button[aria-label='Thu nhỏ']")
+        page.evaluate(frames)
+        drawn = (
+            "() => { const c = document.querySelector('canvas.office-canvas'), g = c.getContext('2d');"
+            " const d = g.getImageData(0, 0, c.width, c.height).data; let n = 0;"
+            " for (let i = 0; i < d.length; i += 16) if (d[i] !== d[0] || d[i + 1] !== d[1] || d[i + 2] !== d[2]) n++;"
+            " return n / (d.length / 16); }"
+        )
+        self.assertGreater(page.evaluate(drawn), 0.05)
+        page.keyboard.press("0")
+        for _ in range(4):
+            page.click("button[aria-label='Phóng to']")
+
+    def check_room_labels_apart(self, page: Page, frames: str) -> None:
+        """3D, tới bàn: nhãn phòng ngoài hình ẩn; nhãn còn hiện nằm trọn trong khung, không chồng nhau."""
+
+        # Tới bàn ở 3D: nhãn phòng ngoài hình ẩn đi — nhãn còn hiện nằm trọn trong khung và không chồng nhau.
+        page.locator("main tbody tr th button").first.click()
+        page.evaluate(frames)
+        boxes = page.evaluate(
+            "() => { const s = document.querySelector('.office-stage').getBoundingClientRect();"
+            " return [...document.querySelectorAll('.office-labels .office-tag[data-kind=room]')].filter(e => !e.hidden)"
+            ".map(e => { const r = e.getBoundingClientRect(); return [e.textContent, r.left - s.left, r.top - s.top,"
+            " r.right - s.left, r.bottom - s.top, s.width, s.height]; }); }"
+        )
+        self.assertLess(len(boxes), 8)  # khung chỉ còn bàn agent — không phải mọi phòng
+        for name, x0, y0, x1, y1, w, h in boxes:
+            self.assertTrue(x0 >= -1 and y0 >= -1 and x1 <= w + 1 and y1 <= h + 1, (name, x0, y0, x1, y1))
+        for i, a in enumerate(boxes):
+            for b in boxes[i + 1 :]:
+                self.assertFalse(a[1] < b[3] and b[1] < a[3] and a[2] < b[4] and b[2] < a[4], (a[0], b[0]))
 
 
 class OfficeMotionTest(AppCase):
