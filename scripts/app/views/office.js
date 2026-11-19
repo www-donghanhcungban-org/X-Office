@@ -2,7 +2,8 @@
 // Bộ vẽ mặc định: Canvas 2D tự viết (không thư viện); tuỳ chọn 3D: three.js vendor, tải lười khi chọn (office/three-view.js).
 // Bản văn bản tương đương ngay dưới canvas; chuyển động tắt khi prefers-reduced-motion.
 import { THEMES, SEASONS, resolveSeason, themeById } from "../office/themes.js";
-import { drawScene, describe, LAYOUTS, STATE_TEXT } from "../office/scene.js";
+import { drawScene, describe, LAYOUTS, STATE_TEXT, npcSeated } from "../office/scene.js";
+import { SCALES, planFor } from "../office/plans.js";
 
 const PREF_KEY = "xt-office";
 const POLL_MS = 10000;
@@ -34,18 +35,28 @@ function check(h, id, label, value) {
   return [el, h("label", { for: id }, label)];
 }
 
-function seatRows(h, seats) {
-  return seats.map((s) => h("tr", null,
-    h("th", { scope: "row" }, s.label),
+// Hàng bảng: tên agent là nút "tới bàn" (camera bay tới bàn đó) — cùng hành vi cho chuột và bàn phím.
+function seatRows(h, seats, goSeat) {
+  return seats.map((s, i) => h("tr", null,
+    h("th", { scope: "row" }, (() => {
+      const b = h("button", { type: "button", class: "link", "aria-label": "Tới bàn " + s.label }, s.label);
+      b.addEventListener("click", () => goSeat(i));
+      return b;
+    })()),
     h("td", null, h("span", { class: "office-state office-" + s.state }, STATE_TEXT[s.state] || s.state)),
     h("td", null, s.task ? s.task.id + (s.task.title ? " — " + s.task.title : "") : "—")));
 }
 
 export async function render(main, { api, h, error }) {
   const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const prefs = { renderer: "2d", layout: "open", theme: "night", season: "auto", names: true, motion: true, quality: "high", zoom: 1, ...loadPrefs() };
+  const prefs = {
+    renderer: "2d", scale: "team", layout: "open", theme: "night", season: "auto", names: true, npc: true, motion: true,
+    quality: "high", zoom: 1, ...loadPrefs(),
+  };
+  const view = { focus: null, seat: null, pan: { x: 0, y: 0 } }; // không lưu: mở lại màn là toàn cảnh
   if (reduce) prefs.motion = false; // hệ thống xin giảm chuyển động thắng lựa chọn đã lưu; bật lại tay chỉ cho phiên này
   const [rendererLabel, rendererSel] = select(h, "office-renderer", "Bộ vẽ", RENDERERS, prefs.renderer);
+  const [scaleLabel, scaleSel] = select(h, "office-scale", "Quy mô", SCALES, prefs.scale);
   const [layoutLabel, layoutSel] = select(h, "office-layout", "Bố cục", LAYOUTS, prefs.layout);
   const [themeLabel, themeSel] = select(h, "office-theme", "Kiểu văn phòng", THEMES, prefs.theme);
   const [seasonLabel, seasonSel] = select(h, "office-season", "Mùa", SEASONS, prefs.season);
@@ -53,6 +64,9 @@ export async function render(main, { api, h, error }) {
     [{ id: "high", name: "Cao" }, { id: "low", name: "Thấp (máy yếu)" }], prefs.quality);
   const [namesBox, namesLabel] = check(h, "office-names", "Nhãn tên", prefs.names);
   const [motionBox, motionLabel] = check(h, "office-motion", "Chuyển động", prefs.motion);
+  const [npcBox, npcLabel] = check(h, "office-npc", "Nhân viên minh hoạ", prefs.npc);
+  const rooms = h("div", { class: "office-rooms", role: "group", "aria-label": "Tới phòng" });
+  const counters = h("p", { class: "office-counters" });
   const zoomOut = h("button", { type: "button", "aria-label": "Thu nhỏ" }, "−");
   const zoomIn = h("button", { type: "button", "aria-label": "Phóng to" }, "+");
   const refresh = h("button", { type: "button" }, "Làm mới");
@@ -69,11 +83,12 @@ export async function render(main, { api, h, error }) {
     h("h1", null, "Văn phòng"),
     h("p", { class: "muted" }, "Trạng thái suy ra từ bằng chứng trên đĩa (PLAN, .autopilot/runs.jsonl, việc chờ người) — không phải tín hiệu thời gian thực."),
     h("div", { class: "office-bar", role: "group", "aria-label": "Tuỳ chọn văn phòng" },
-      h("span", null, rendererLabel, rendererSel), h("span", null, layoutLabel, layoutSel),
+      h("span", null, rendererLabel, rendererSel), h("span", null, scaleLabel, scaleSel), h("span", null, layoutLabel, layoutSel),
       h("span", null, themeLabel, themeSel), h("span", null, seasonLabel, seasonSel), h("span", null, qualityLabel, qualitySel),
-      h("span", null, namesBox, namesLabel), h("span", null, motionBox, motionLabel),
+      h("span", null, namesBox, namesLabel), h("span", null, npcBox, npcLabel), h("span", null, motionBox, motionLabel),
       h("span", null, zoomOut, zoomIn, refresh)),
-    msg, rmsg, stage, summary,
+    rooms, msg, rmsg, stage, counters, summary,
+    h("p", { class: "muted" }, "Người có nhãn là agent thật của vòng; người không nhãn là nhân viên minh hoạ (chỉ để trang trí, không mang trạng thái)."),
     h("h2", null, "Ai đang làm gì"),
     h("table", null, h("thead", null, h("tr", null, h("th", { scope: "col" }, "Bàn"), h("th", { scope: "col" }, "Trạng thái"), h("th", { scope: "col" }, "Task"))), table),
     h("h2", null, "Việc cần người"), human,
@@ -86,7 +101,7 @@ export async function render(main, { api, h, error }) {
   function apply(d) {
     data = d;
     dirty = true;
-    table.replaceChildren(...seatRows(h, d.seats));
+    table.replaceChildren(...seatRows(h, d.seats, goSeat));
     human.replaceChildren(d.pending_human.length
       ? h("ul", null, d.pending_human.map((x) => h("li", null, h("strong", null, x.id), x.reason ? " — " + x.reason : "")))
       : h("p", null, "Không có việc chờ người."));
@@ -95,6 +110,7 @@ export async function render(main, { api, h, error }) {
         " " + (r.task ? r.task.id : "?") + " · " + r.agent + (r.at ? " · " + r.at : "")))
       : [h("li", { class: "muted" }, "Chưa có lần chạy Gate nào (loop record).")]));
     summary.textContent = "Vòng: " + d.loop.verdict + " · task mở " + d.tasks.open + ", xong " + d.tasks.done + ".";
+    count();
     label();
   }
 
@@ -123,9 +139,45 @@ export async function render(main, { api, h, error }) {
 
   function sceneOpts(t) {
     return {
-      theme: themeById(prefs.theme), season: resolveSeason(prefs.season), layout: prefs.layout, seats: data.seats,
-      names: prefs.names, motion: prefs.motion, t, zoom: prefs.zoom, quality: prefs.quality,
+      theme: themeById(prefs.theme), season: resolveSeason(prefs.season), scale: prefs.scale, layout: prefs.layout,
+      seats: data.seats, names: prefs.names, npc: prefs.npc, motion: prefs.motion, t, zoom: prefs.zoom, pan: view.pan,
+      focus: view.focus, focusSeat: view.seat, quality: prefs.quality,
     };
+  }
+
+  // Bộ đếm: agent thật + nhân viên minh hoạ (số bàn có người minh hoạ của mặt bằng) · đang làm · đang chờ.
+  function count() {
+    const plan = planFor(prefs.scale, prefs.layout);
+    const npc = prefs.npc ? npcSeated(plan) : 0;
+    const working = data.seats.filter((s) => s.state === "work" || s.state === "fail").length;
+    const waiting = data.seats.filter((s) => s.state === "wait").length;
+    counters.textContent = data.seats.length + " agent" + (npc ? " + " + npc + " nhân viên minh hoạ" : "") +
+      " · đang làm " + working + " · đang chờ " + waiting;
+  }
+
+  function setFocus(focus, seat) {
+    view.focus = focus;
+    view.seat = seat;
+    view.pan = { x: 0, y: 0 };
+    for (const b of rooms.querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.room === (focus || "")));
+    dirty = true;
+    if (three) three.dirty = true;
+  }
+
+  function goSeat(i) {
+    setFocus(null, i);
+    stage.scrollIntoView({ block: "nearest" });
+  }
+
+  // Nút "Tới phòng": Toàn cảnh + mọi phòng của mặt bằng hiện tại (quy mô nhóm nhỏ chỉ có Toàn cảnh).
+  function roomButtons() {
+    const plan = planFor(prefs.scale, prefs.layout);
+    const list = [{ id: "", name: "Toàn cảnh" }, ...plan.rooms];
+    rooms.replaceChildren(h("span", { class: "muted" }, "Tới phòng: "), ...list.map((r) => {
+      const b = h("button", { type: "button", "data-room": r.id, "aria-pressed": String(r.id === (view.focus || "")) }, r.name);
+      b.addEventListener("click", () => setFocus(r.id || null, null));
+      return b;
+    }));
   }
 
   function frame(t) {
@@ -191,7 +243,7 @@ export async function render(main, { api, h, error }) {
   }
 
   function label() {
-    const text = describe(data.seats, themeById(prefs.theme).name);
+    const text = describe(data.seats, themeById(prefs.theme).name, SCALES.find((x) => x.id === prefs.scale)?.name);
     canvas.setAttribute("aria-label", text);
     if (three) three.canvas.setAttribute("aria-label", text);
   }
@@ -203,7 +255,15 @@ export async function render(main, { api, h, error }) {
 
   async function changed() {
     prefs.renderer = rendererSel.value;
+    const rescale = prefs.scale !== scaleSel.value || prefs.layout !== layoutSel.value;
+    prefs.scale = scaleSel.value;
     prefs.layout = layoutSel.value;
+    prefs.npc = npcBox.checked;
+    if (rescale) {
+      setFocus(null, null);
+      roomButtons();
+    }
+    count();
     prefs.theme = themeSel.value;
     prefs.season = seasonSel.value;
     prefs.quality = qualitySel.value;
@@ -213,12 +273,33 @@ export async function render(main, { api, h, error }) {
     await useRenderer();
     label();
   }
-  for (const el of [rendererSel, layoutSel, themeSel, seasonSel, qualitySel, namesBox, motionBox]) el.addEventListener("change", changed);
-  zoomIn.addEventListener("click", () => { prefs.zoom = Math.min(2, +(prefs.zoom + 0.15).toFixed(2)); persist(); dirty = true; });
-  zoomOut.addEventListener("click", () => { prefs.zoom = Math.max(0.6, +(prefs.zoom - 0.15).toFixed(2)); persist(); dirty = true; });
+  for (const el of [rendererSel, scaleSel, layoutSel, themeSel, seasonSel, qualitySel, namesBox, npcBox, motionBox]) {
+    el.addEventListener("change", changed);
+  }
+  const zoomBy = (f) => {
+    prefs.zoom = Math.min(4, Math.max(0.5, +(prefs.zoom * f).toFixed(2)));
+    persist();
+    dirty = true;
+    if (three) three.dirty = true;
+  };
+  zoomIn.addEventListener("click", () => zoomBy(1.25));
+  zoomOut.addEventListener("click", () => zoomBy(0.8));
+  // 2D: kéo để dời góc nhìn (3D: kéo để xoay — three-view.js tự xử lý trên canvas của nó).
+  let drag = null;
+  canvas.addEventListener("pointerdown", (e) => {
+    drag = { x: e.clientX, y: e.clientY, pan: { ...view.pan } };
+    canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener("pointermove", (e) => {
+    if (!drag) return;
+    view.pan = { x: drag.pan.x + e.clientX - drag.x, y: drag.pan.y + e.clientY - drag.y };
+    dirty = true;
+  });
+  for (const ev of ["pointerup", "pointercancel"]) canvas.addEventListener(ev, () => { drag = null; });
   refresh.addEventListener("click", load);
   if (window.ResizeObserver) new ResizeObserver(() => { if (stage.isConnected) size(); }).observe(stage);
 
+  roomButtons();
   await load();
   await useRenderer();
   requestAnimationFrame(tick);

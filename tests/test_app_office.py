@@ -254,12 +254,26 @@ class OfficeThemesStaticTest(unittest.TestCase):
             self.assertIn(f'id: "{season}"', text)
 
     def test_every_prop_kind_is_drawn(self) -> None:
-        themes = (ROOT / "scripts" / "app" / "office" / "themes.js").read_text(encoding="utf-8")
-        scene = (ROOT / "scripts" / "app" / "office" / "scene.js").read_text(encoding="utf-8")
-        kinds = set(re.findall(r'kind: "(\w+)"', themes))
-        drawn = set(re.findall(r"^const BOX_PROPS = \{([^}]*)\}", scene, re.M)[0].replace(" ", "").split(","))
-        drawn = {k.split(":")[0] for k in drawn} | {"rug", "board", "neon", "pipe", "cross"}  # flatProp vẽ 5 loại phẳng
+        office = ROOT / "scripts" / "app" / "office"
+        scene = (office / "scene.js").read_text(encoding="utf-8")
+        kinds = set()
+        for name in ("themes.js", "plans.js"):
+            kinds |= set(re.findall(r'kind: "(\w+)"', (office / name).read_text(encoding="utf-8")))
+        body = re.findall(r"^const BOX_PROPS = \{([^}]*)\}", scene, re.M)[0]
+        drawn = {k.split(":")[0].strip() for k in body.split(",") if k.strip()}
+        drawn |= set(re.findall(r'p\.kind === "(\w+)"', scene))  # flatProp: loại phẳng (thảm, bảng, logo, hồ bơi…)
         self.assertEqual(kinds - drawn, set())
+
+    def test_scales_and_company_rooms(self) -> None:
+        """Ba quy mô; mặt bằng công ty có đủ phòng chức năng; bàn agent thật đứng trước bàn minh hoạ."""
+        plans = (ROOT / "scripts" / "app" / "office" / "plans.js").read_text(encoding="utf-8")
+        self.assertEqual(
+            re.findall(r'^\s{2}\{ id: "(\w+)", name: "[^"]+" \},', plans, re.M), ["team", "company", "corp"]
+        )
+        rooms = set(re.findall(r'\{ id: "(\w+)", name: "[^"]+", x:', plans))
+        self.assertEqual(rooms, {"reception", "director", "meeting", "server", "pantry", "nap", "work", "garden"})
+        self.assertIn("desks: COMPANY_DESKS.slice(0, 5)", plans)
+        self.assertIn("extraDesks: COMPANY_DESKS.slice(5)", plans)
 
 
 if __name__ == "__main__":

@@ -122,8 +122,13 @@ khoá `(method, path)`; `Ctx` có `base` (gốc dự án), `framework` (thư m�
 góc nhìn, nhãn tên bám nhân vật; không có WebGL → thông báo và quay về 2D. Chọn lại 2D → giải phóng canvas WebGL.
 - S-019 When chọn "Bố cục" (Mở chung, Nhiều phòng liên thông, Mỗi người một phòng), Then vách kính có cửa thông
 được vẽ ở cả 2D lẫn 3D.
+- S-020 When chọn "Quy mô" (Nhóm nhỏ — 1 phòng, Công ty — nhiều phòng, Tập đoàn — toà nhà), Then mặt bằng đổi: công ty có
+lễ tân, giám đốc, phòng họp, server, pantry, ngủ trưa, khu làm việc mở và vườn hồ bơi giữa sân cỏ; tập đoàn là toà nhà
+nhiều tầng mặt kính với mặt bằng công ty ở tầng thượng. Nút "Tới phòng" đưa camera tới từng phòng (2D lẫn 3D); bấm tên agent
+trong bảng → tới bàn của agent; kéo trên canvas 2D để dời góc nhìn. Người không nhãn là nhân viên minh hoạ (tắt được), bộ đếm
+tách "agent" và "nhân viên minh hoạ" — chỉ agent mang trạng thái.
 - Bộ vẽ mặc định là Canvas 2D tự viết; 3D dùng three.js vendor ([ADR-0082](../adr/0082-office-view-renderers.md)). Kiểu văn
-phòng là dữ liệu trong `office/themes.js`, bố cục trong `LAYOUTS` của `office/scene.js` — thêm kiểu không sửa mã vẽ. Canvas có `role="img"` + `aria-label` tóm tắt; mọi thông tin của cảnh có bản văn bản tương đương.
+phòng là dữ liệu trong `office/themes.js`, quy mô/mặt bằng trong `office/plans.js`, bố cục trong `LAYOUTS` của `office/scene.js` — thêm kiểu không sửa mã vẽ. Canvas có `role="img"` + `aria-label` tóm tắt; mọi thông tin của cảnh có bản văn bản tương đương.
 
 ## 5. Ca biên
 | Nhóm | Ca cụ thể | Hành vi mong đợi | Scenario |

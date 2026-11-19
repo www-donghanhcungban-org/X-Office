@@ -3,9 +3,11 @@
 // xoay, nút +/− để phóng. Chỉ được import khi người dùng chọn "3D" (tải lười ~2 MB); không có WebGL → ném lỗi để màn
 // quay về 2D. Toạ độ thế giới (x, y, z lên) → three (x, z, y).
 import * as THREE from "../vendor/three/three.module.js";
-import { compose, ROOM } from "./scene.js";
+import { compose, viewCorners } from "./scene.js";
 
-const FLOOR_LAYER = 0.0008; // tách lớp mặt phẳng chồng nhau theo thứ tự phát (thay cho thứ tự painter của 2D)
+// Mặt phẳng chồng nhau (cửa sổ trên tường, thảm trên sàn) nằm đúng toạ độ; thứ tự phát (như painter của 2D) được giữ
+// bằng polygonOffset — dịch độ sâu, không dịch hình — nên toạ độ lớn (mặt tiền toà nhà) không bị đẩy lệch.
+const MAX_OFFSET_UNITS = 4000;
 const AZ = [0.17, 1.4]; // giới hạn góc xoay ngang (rad): luôn nhìn từ phía hai bức tường mở
 const EL = [0.35, 1.1];
 
@@ -80,11 +82,11 @@ export function createThreeView(stage) {
 
   const scene = new THREE.Scene();
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 200);
-  const target = new THREE.Vector3(ROOM.W / 2, ROOM.H / 3, ROOM.D / 2);
+  const target = new THREE.Vector3(8, 1.3, 6);
   const view = { az: Math.PI / 4, el: Math.atan(1 / Math.SQRT2), w: 800, h: 540 };
   scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8a9a, 1.7));
   const sun = new THREE.DirectionalLight(0xffffff, 1.6);
-  sun.position.set(ROOM.W + 6, 14, ROOM.D + 2);
+  sun.position.set(22, 14, 14);
   sun.target.position.copy(target);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
@@ -129,7 +131,10 @@ export function createThreeView(stage) {
 
   function syncPanel(f, seq, glowOn) {
     const m = panels.next();
-    const lift = (f.c > 0 ? f.c * 2 : 0) + (f.plane === "floor" && f.c === 0 ? 0 : seq * FLOOR_LAYER);
+    const lift = 0;
+    m.material.polygonOffset = true;
+    m.material.polygonOffsetFactor = -1;
+    m.material.polygonOffsetUnits = -Math.min(seq, MAX_OFFSET_UNITS);
     m.rotation.set(0, 0, 0);
     if (f.plane === "back") m.position.set(f.a + f.w / 2, f.b + f.h / 2, f.c + lift);
     else if (f.plane === "left") {
@@ -165,8 +170,15 @@ export function createThreeView(stage) {
     for (let i = list.length; i < tagEls.length; i++) tagEls[i].hidden = true;
   }
 
-  function place(zoom) {
-    const span = (ROOM.W + ROOM.D) * 0.62;
+  // Camera nhìn hộp `v` (thế giới x,y,z → three x,z,y); mặt trời + vùng bóng đổ phủ cả mặt bằng `plan`.
+  function place(zoom, v, plan) {
+    target.set((v.x0 + v.x1) / 2, (v.z0 + v.z1) / 3, (v.y0 + v.y1) / 2);
+    const span = Math.max((v.x1 - v.x0 + v.y1 - v.y0) * 0.62, (v.z1 - v.z0) * 1.6, 4);
+    const half = Math.max(plan.W, plan.D) * 0.75 + 4;
+    Object.assign(sun.shadow.camera, { left: -half, right: half, top: half, bottom: -half, far: half * 4 });
+    sun.shadow.camera.updateProjectionMatrix();
+    sun.target.position.set(plan.W / 2, 0, plan.D / 2);
+    sun.position.set(plan.W / 2 + half * 0.8, half * 1.1 + (v.z1 || 0), plan.D / 2 + half * 0.5);
     const aspect = view.w / view.h;
     camera.left = (-span * aspect) / 2;
     camera.right = (span * aspect) / 2;
@@ -224,7 +236,7 @@ export function createThreeView(stage) {
       sun.castShadow = glowOn;
       scene.background = parseColor(opts.theme.bg).color;
       const sink = new Collector();
-      compose(sink, opts, false);
+      const { plan } = compose(sink, opts, false);
       sink.boxes.forEach((b) => syncBox(b, glowOn));
       sink.panels.forEach((f, i) => syncPanel(f, i + 1, glowOn));
       sink.dots.forEach((d) => {
@@ -241,7 +253,7 @@ export function createThreeView(stage) {
         setMat(m.material, r.color);
       });
       for (const p of [boxes, panels, dots, rings]) p.finish();
-      place(opts.zoom);
+      place(opts.zoom, viewCorners(opts).box, plan);
       renderer.render(scene, camera);
       syncTags(sink.tags);
       api.dirty = false;

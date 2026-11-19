@@ -8,6 +8,12 @@ Bản < 3.20.0: [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md) (T-3651; `changel
 
 ### Added
 
+- Màn Văn phòng thêm tuỳ chọn **Quy mô**: nhóm nhỏ (1 phòng), công ty (khu 44×22 có lễ tân, giám đốc, phòng họp, server,
+  pantry, ngủ trưa, khu làm việc mở 28 bàn, vườn hồ bơi, sân cỏ và hàng cây), tập đoàn (toà nhà 4 tầng mặt kính, mặt bằng
+  công ty ở tầng thượng). Nút "Tới phòng" và "tới bàn" (bấm tên agent) đưa camera tới phòng/bàn ở cả 2D lẫn 3D; kéo để dời
+  góc nhìn ở 2D; phóng tới 4×. Nhân viên minh hoạ (không nhãn, tắt được) lấp bàn trống; bộ đếm tách agent thật và nhân viên
+  minh hoạ. Mặt bằng là dữ liệu (`scripts/app/office/plans.js`). Bộ vẽ 3D giữ thứ tự lớp mặt phẳng bằng `polygonOffset`.
+
 - App cục bộ `xt.py app` thêm màn **Văn phòng** (`#/office`, F-008, `GET /api/office`): các agent của vòng (điều phối,
   `executor`, `executor-deep`, reviewer, researcher) ngồi bàn trong một văn phòng isometric; trạng thái suy từ verdict vòng
   và `.autopilot/runs.jsonl` (đang làm, đang sửa khi Gate đỏ, chờ người, xong, rảnh), kèm feed lần chạy gần đây và việc chờ
