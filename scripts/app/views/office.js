@@ -369,6 +369,7 @@ export async function render(main, { api, h, error }) {
 
   roomButtons();
   count(); // trước lần tải đầu: "chưa có dữ liệu" + chú thích theo lựa chọn
+  label(); // tên khung "chưa có dữ liệu" + gợi ý phím ngay từ đầu (đích của aria-describedby không rỗng khi API chậm)
   await load();
   await useRenderer();
   requestAnimationFrame(tick);

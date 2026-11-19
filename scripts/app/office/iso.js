@@ -99,15 +99,20 @@ export class Iso {
   }
 
   // Nhãn bo góc ở điểm thế giới (x,y,z), neo đáy-giữa.
-  // `kind` (agent/state/room) chỉ dùng cho bộ vẽ 3D (thuộc tính data-kind của nhãn HTML) — 2D bỏ qua.
-  tag(x, y, z, text, bg, fg, border) {
-    const ctx = this.ctx;
+  // `kind` (agent/state/room) và `id` (phòng của nhãn phòng) chỉ dùng cho bộ vẽ 3D (nhãn HTML) — 2D bỏ qua.
+  // Hộp màn hình {l, t, r, b, sx, size} của nhãn — dùng chung cho vẽ và cho tránh chồng nhãn.
+  tagBox(x, y, z, text) {
     const [sx, sy] = this.p(x, y, z);
     const size = Math.max(10, Math.round(this.view.scale * 0.42));
-    ctx.font = "600 " + size + "px system-ui, sans-serif";
-    const tw = ctx.measureText(text).width;
-    const pw = tw + size, ph = size * 1.6;
-    const left = sx - pw / 2, top = sy - ph;
+    this.ctx.font = "600 " + size + "px system-ui, sans-serif";
+    const pw = this.ctx.measureText(text).width + size, ph = size * 1.6;
+    return { l: sx - pw / 2, t: sy - ph, r: sx + pw / 2, b: sy, sx, size };
+  }
+
+  tag(x, y, z, text, bg, fg, border) {
+    const ctx = this.ctx;
+    const { l: left, t: top, r, b, sx, size } = this.tagBox(x, y, z, text);
+    const pw = r - left, ph = b - top;
     ctx.beginPath();
     ctx.roundRect(left, top, pw, ph, size * 0.5);
     ctx.fillStyle = bg;
@@ -144,6 +149,11 @@ export class Iso {
     ctx.fillStyle = color;
     ctx.fill();
   }
+}
+
+// Hai hộp {l, t, r, b} chồng lên nhau (cách nhau dưới `gap` px).
+export function overlaps(a, b, gap = 2) {
+  return a.l < b.r + gap && b.l < a.r + gap && a.t < b.b + gap && b.t < a.b + gap;
 }
 
 // Thứ tự vẽ (painter): xa trước gần sau theo tâm x+y, rồi đáy z.

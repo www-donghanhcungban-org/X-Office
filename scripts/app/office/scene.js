@@ -1,5 +1,5 @@
 // Dựng + vẽ văn phòng từ (kiểu, mùa, dữ liệu /api/office). Không trạng thái toàn cục: gọi drawScene mỗi khung hình.
-import { Iso, depth, fitPoints, inkOn, shade } from "./iso.js";
+import { Iso, depth, fitPoints, inkOn, overlaps, shade } from "./iso.js";
 import { planFor, viewBox } from "./plans.js";
 
 export const ROOM = { W: 16, D: 12, H: 4 }; // phòng của quy mô "nhóm nhỏ" (giữ để tương thích)
@@ -568,7 +568,9 @@ export function compose(sink, opts, sorted = true) {
   const [bg, fg, border] = th.label;
   if (opts.names !== false) {
     // Nhãn phòng: viên màu nhấn của kiểu (khác hẳn nhãn agent), chữ tối/trắng theo tương phản với màu nhấn.
-    for (const r of plan.rooms) top.tag(...roomLabelAt(r), "▸ " + r.name, th.trim, inkOn(th.trim), null, "room");
+    // Phòng đang xem phát trước: khi nhãn phải nhường nhau (khung hẹp), nhãn của nó luôn được giữ.
+    const order = [...plan.rooms].sort((a, b) => (b.id === opts.focus) - (a.id === opts.focus));
+    for (const r of order) top.tag(...roomLabelAt(r), "▸ " + r.name, th.trim, inkOn(th.trim), null, "room", r.id);
   }
   for (const { seat, at } of heads) {
     if (opts.names !== false) top.tag(at.x, at.y, at.z, seat.label, bg, fg, border, "agent");
@@ -622,7 +624,16 @@ export function drawScene(ctx, cw, ch, opts) {
   iso.tag = (...a) => tags.push(a);
   compose(iso, opts);
   if (opts.motion) particles(ctx, opts.season === "noel" ? "snow" : th.ambient, cw, ch, opts.t || 0);
-  for (const a of tags) tag(...a);
+  // Nhãn phòng chồng lên nhãn phòng đã đặt (khung hẹp: các phòng hàng sau sát nhau trên màn) → bỏ, giữ nhãn đầu.
+  const placed = [];
+  for (const a of tags) {
+    if (a[7] === "room") {
+      const box = iso.tagBox(a[0], a[1], a[2], a[3]);
+      if (placed.some((o) => overlaps(o, box))) continue;
+      placed.push(box);
+    }
+    tag(...a);
+  }
 }
 
 // Mô tả văn bản của cảnh cho trình đọc màn hình (canvas role="img").
