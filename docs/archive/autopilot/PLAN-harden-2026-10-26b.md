@@ -1,4 +1,4 @@
-# PLAN-harden-2026-10-26b.md — Khung X-office · ERR-001, lệnh kiểm blueprint trên CI, siết SEC-004
+# PLAN-harden-2026-10-26b.md — Khung X-Office · ERR-001, lệnh kiểm blueprint trên CI, siết SEC-004
 
 > Lập ngày 2026-10-26 theo `/complete` (pha harden), nối PLAN-harden-2026-10-26 (#274). Nguồn: đề xuất cuối #274 và
 > 🟢 review lượt 4 của #274. Phiên chính tự duyệt (D-194).

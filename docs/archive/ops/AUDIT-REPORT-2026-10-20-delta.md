@@ -1,4 +1,4 @@
-# AUDIT-REPORT — X-office · 2026-10-20 (delta sau #183)
+# AUDIT-REPORT — X-Office · 2026-10-20 (delta sau #183)
 
 > Commit quét: `main` `f36ea90` · Phạm vi: delta `a4f929c..f36ea90` (12 commit, #172…#183) — nhóm 1 ARCH, 2 SEC, 3 CODE,
 > 4 TEST, 8 CI, 9 DOC, 12 XFEAT, 13 HAR, kèm xác minh lại 58 bằng chứng blueprint `stale_evidence` · Người quét: subagent

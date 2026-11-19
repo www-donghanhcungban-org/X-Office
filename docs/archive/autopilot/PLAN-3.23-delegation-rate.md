@@ -1,4 +1,4 @@
-# PLAN-3.23-delegation-rate.md — Khung X-office · `delegation_rate` trong `xt.py loop stats` → bản 3.22.0
+# PLAN-3.23-delegation-rate.md — Khung X-Office · `delegation_rate` trong `xt.py loop stats` → bản 3.22.0
 
 > Lập ngày 2026-10-25. Chủ repo: "tiếp tục trả nợ delegation_rate" (nợ cuối của ADR-0045). Phiên chính tự duyệt (D-171).
 >

@@ -1,5 +1,5 @@
 ---
-title: Đề xuất X-office thành xưởng phần mềm dựa trên 34 chuyên mục stored
+title: Đề xuất X-Office thành xưởng phần mềm dựa trên 34 chuyên mục stored
 kind: research
 updated: 2026-11-04
 ---
@@ -18,15 +18,15 @@ updated: 2026-11-04
 
 ## 1. Mục tiêu và phạm vi bằng chứng
 
-Định vị đề xuất: **X-office là bộ máy giao hàng phần mềm có kiểm chứng**, giúp biến yêu cầu thành sản phẩm có thể phát hành, vận hành, nâng cấp và phục hồi. Đơn vị thành công là một lát nghiệp vụ được nghiệm thu trên sản phẩm, gắn với artifact và kết quả thực địa.
+Định vị đề xuất: **X-Office là bộ máy giao hàng phần mềm có kiểm chứng**, giúp biến yêu cầu thành sản phẩm có thể phát hành, vận hành, nâng cấp và phục hồi. Đơn vị thành công là một lát nghiệp vụ được nghiệm thu trên sản phẩm, gắn với artifact và kết quả thực địa.
 
 Đối chiếu ngày 2026-11-04:
 
-- X-office **3.29.0**, commit [e0ea0a6c97576f96611e42dad05d21907745c4f7](https://github.com/seeker19110/X-Templates/tree/e0ea0a6c97576f96611e42dad05d21907745c4f7) (bản 2 đối chiếu lại ở `9c03257` — `main` sau #436; `scripts/xt.py` không đổi giữa hai commit nên số dòng dưới đây giữ nguyên): đọc tài liệu, implementation và CI; chưa chạy sản phẩm/deployment để xác minh các tuyến đề xuất.
+- X-Office **3.29.0**, commit [e0ea0a6c97576f96611e42dad05d21907745c4f7](https://github.com/seeker19110/X-Templates/tree/e0ea0a6c97576f96611e42dad05d21907745c4f7) (bản 2 đối chiếu lại ở `9c03257` — `main` sau #436; `scripts/xt.py` không đổi giữa hai commit nên số dòng dưới đây giữ nguyên): đọc tài liệu, implementation và CI; chưa chạy sản phẩm/deployment để xác minh các tuyến đề xuất.
 - stored, commit [5d8f8a6d6a5245fa3cf543cac57d2d2bb5b8f2d9](https://github.com/seeker19110/stored/tree/5d8f8a6d6a5245fa3cf543cac57d2d2bb5b8f2d9) (PR seeker19110/stored#131; trạng thái merge chưa xác minh được trong phiên — API ngoài phạm vi, chỉ đọc được nội dung tại commit): 34 chuyên mục, 1.040 hồ sơ (README stored dòng 15); đợt mới 1.003 → 1.040: 37 hồ sơ mới và 16 hồ sơ đọc sâu/cập nhật metadata (README stored dòng 386), không xác minh lại toàn bộ lịch sử.
 - Đầu vào chính: [FACTORY.md](https://github.com/seeker19110/stored/blob/5d8f8a6d6a5245fa3cf543cac57d2d2bb5b8f2d9/FACTORY.md), [GUIDES.md](https://github.com/seeker19110/stored/blob/5d8f8a6d6a5245fa3cf543cac57d2d2bb5b8f2d9/GUIDES.md), [phương pháp](https://github.com/seeker19110/stored/blob/5d8f8a6d6a5245fa3cf543cac57d2d2bb5b8f2d9/METHOD.md) và [bàn giao XT-H-113…116](https://github.com/seeker19110/stored/blob/5d8f8a6d6a5245fa3cf543cac57d2d2bb5b8f2d9/data/xt-handoff.json). Chính FACTORY.md §9 ghi: các cổng/pipeline trong đó là **tổng hợp đề xuất**, stored chỉ chạy validator catalog, không chạy sản phẩm hay deployment nào.
 
-Kết quả kiểm tài liệu/CLI của repo khung, nếu có trong PR, chỉ chứng minh thay đổi này giữ hợp đồng hiện tại; không chứng minh xưởng đã vận hành. Các vị trí nguồn trong bảng dưới áp dụng snapshot X-office đã nêu.
+Kết quả kiểm tài liệu/CLI của repo khung, nếu có trong PR, chỉ chứng minh thay đổi này giữ hợp đồng hiện tại; không chứng minh xưởng đã vận hành. Các vị trí nguồn trong bảng dưới áp dụng snapshot X-Office đã nêu.
 
 ## 2. Nền hiện có và phần nên làm sâu
 
@@ -48,7 +48,7 @@ Các khoảng cần nâng dưới đây được kết luận từ những đư�
 | Thành phần | Trách nhiệm | Hợp đồng bàn giao |
 |---|---|---|
 | stored | Nghiên cứu lựa chọn, cơ chế, license, nguồn và giới hạn | Hồ sơ có SHA, phạm vi, mức bằng chứng, alternative và bài học đối chiếu ID |
-| X-office | Controls, composition, adapter, gói được hỗ trợ, chính sách và nâng cấp | Gói có phiên bản/owner, phép nghiệm thu, fixture âm, compatibility và migration notes |
+| X-Office | Controls, composition, adapter, gói được hỗ trợ, chính sách và nâng cấp | Gói có phiên bản/owner, phép nghiệm thu, fixture âm, compatibility và migration notes |
 | Repo sản phẩm | Nghiệp vụ, implementation, hạ tầng và vận hành cụ thể | Acceptance results, artifact digest, deployment receipt và số liệu thực địa có quyền truy cập phù hợp |
 
 Ba phương án đã cân nhắc:
@@ -75,7 +75,7 @@ Giữ lõi CLI stdlib và một nhà cho policy theo các ADR hiện hành. Gói
 
 ## 4. Chuyển 34 chuyên mục thành năng lực xưởng
 
-| Mục stored | Năng lực X-office nhận | Artifact/cổng tại repo sản phẩm |
+| Mục stored | Năng lực X-Office nhận | Artifact/cổng tại repo sản phẩm |
 |---|---|---|
 | 28–29 | Discovery, đặc tả, kiến trúc và hợp đồng | Acceptance IDs → ADR/API/schema → compatibility và test truy vết |
 | 06, 13, 30, 34 | Gói nền UI/API/data có thể dựng và nâng | Môi trường, dependency pin, DB/migration, auth/tenant, unit/integration/E2E |

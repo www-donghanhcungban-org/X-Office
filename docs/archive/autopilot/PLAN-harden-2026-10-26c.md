@@ -1,4 +1,4 @@
-# PLAN-harden-2026-10-26c.md — Khung X-office · lệnh kiểm máy cho 37 MUST còn lại
+# PLAN-harden-2026-10-26c.md — Khung X-Office · lệnh kiểm máy cho 37 MUST còn lại
 
 > Lập ngày 2026-10-26 theo `/complete` (pha harden), nối PLAN-harden-2026-10-26/26b (#274, #277). Chủ repo: "làm hết
 > 17 mục đó, còn 20 mục chọn theo hướng chất lượng, cứ thế mà quyết định". Phiên chính tự duyệt (D-195).

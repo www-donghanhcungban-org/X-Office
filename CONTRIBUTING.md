@@ -1,4 +1,4 @@
-# Đóng góp cho khung X-office
+# Đóng góp cho khung X-Office
 
 > Luật vận hành cho người và AI: [`AGENTS.md`](AGENTS.md). Quy ước viết module: [`framework/00-method/conventions.md`](framework/00-method/conventions.md).
 

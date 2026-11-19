@@ -1,4 +1,4 @@
-# PLAN-3.9-automation.md — Khung X-office · tăng tự động hóa, giữ bằng chứng (3.9.0 → 3.10.0)
+# PLAN-3.9-automation.md — Khung X-Office · tăng tự động hóa, giữ bằng chứng (3.9.0 → 3.10.0)
 
 > Lập ngày 2026-10-19 (Gate siết theo review khác model: tách `-k` theo ý, `sau:` tuần tự cho task cùng sửa `xt.py`) từ [`docs/ops/REMEDIATION-PLAN-2026-10-19.md`](../../ops/REMEDIATION-PLAN-2026-10-19.md) (REC/AUTO, §7).
 > Chạy **sau khi** PLAN 3.8.0 ([`PLAN.md`](../../autopilot/PLAN.md), T-1401…T-1417) phát hành: `python3 scripts/xt.py loop init --plan

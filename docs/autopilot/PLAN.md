@@ -1,4 +1,4 @@
-# PLAN.md — Khung X-office · sửa audit delta 2026-10-19 (#94–#157) → bản 3.8.0
+# PLAN.md — Khung X-Office · sửa audit delta 2026-10-19 (#94–#157) → bản 3.8.0
 
 > Lập ngày 2026-10-19. Chủ repo gọi `/autopilot` ngay sau `/audit` (báo cáo `docs/ops/AUDIT-REPORT-2026-10-19-delta.md`
 > dừng chờ duyệt kế hoạch 5 đợt) — coi là duyệt kế hoạch sửa (D-064). Kế hoạch trước (T-1301…T-1304, 3.5.0) xong ở #140–#142.

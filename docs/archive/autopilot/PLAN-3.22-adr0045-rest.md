@@ -1,4 +1,4 @@
-# PLAN-3.22-adr0045-rest.md — Khung X-office · trả nốt nợ ADR-0045 → bản 3.21.0
+# PLAN-3.22-adr0045-rest.md — Khung X-Office · trả nốt nợ ADR-0045 → bản 3.21.0
 
 > Lập ngày 2026-10-25. Chủ repo: "tiếp tục trả nợ ADR-0045 còn lại". Phiên chính tự duyệt (D-170).
 >

@@ -61,11 +61,11 @@ jobs:
           test "$(git cat-file -t "v$v")" = tag
           # Nguồn phát hành = `git archive` của commit gắn tag; attestation ký TRƯỚC khi đẩy tag — ký lỗi thì chưa có tag,
           # chạy lại workflow được (tag đã có thì workflow từ chối).
-          git archive --format=tar.gz --prefix="X-office-v$v/" -o "$RUNNER_TEMP/X-office-v$v.tar.gz" "$target"
-          echo "archive=$RUNNER_TEMP/X-office-v$v.tar.gz" >> "$GITHUB_OUTPUT"
+          git archive --format=tar.gz --prefix="X-Office-v$v/" -o "$RUNNER_TEMP/X-Office-v$v.tar.gz" "$target"
+          echo "archive=$RUNNER_TEMP/X-Office-v$v.tar.gz" >> "$GITHUB_OUTPUT"
           echo "version=$v" >> "$GITHUB_OUTPUT"
-      # Provenance SLSA của nguồn phát hành (AUD-DEP-010): `gh attestation verify X-office-vX.Y.Z.tar.gz --repo
-      # www-donghanhcungban-org/X-office` với file từ `git archive --format=tar.gz --prefix=X-office-vX.Y.Z/ vX.Y.Z`.
+      # Provenance SLSA của nguồn phát hành (AUD-DEP-010): `gh attestation verify X-Office-vX.Y.Z.tar.gz --repo
+      # www-donghanhcungban-org/X-Office` với file từ `git archive --format=tar.gz --prefix=X-Office-vX.Y.Z/ vX.Y.Z`.
       # attest-build-provenance 4.2.2 (MIT, xác minh 2026-11-02): repo công khai dùng Sigstore public-good.
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:

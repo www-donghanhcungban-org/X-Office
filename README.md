@@ -1,4 +1,4 @@
-# X-office — khung tham chiếu phát triển phần mềm
+# X-Office — khung tham chiếu phát triển phần mềm
 
 > Thư viện **yêu cầu có ID** cho mọi loại phần mềm và ngành nghề, kèm công cụ ghép thành checklist dự án, kiểm "xong" bằng máy,
 > và harness để AI agent **tự làm đến khi hoàn thành** mà vẫn dừng đúng chỗ cần người.
@@ -6,9 +6,9 @@
 >
 > Mã mở [MIT](LICENSE), miễn phí. Thấy hữu ích? [Ủng hộ tác giả](#ủng-hộ-và-liên-hệ) ☕
 
-## Vì sao dùng X-office
+## Vì sao dùng X-Office
 
-| Bạn gặp | X-office giúp |
+| Bạn gặp | X-Office giúp |
 |---|---|
 | Không biết dự án còn thiếu gì: bảo mật, log, backup, pháp lý… | ~2.850 yêu cầu có ID (1.545 MUST) cho 14 loại phần mềm và 8 ngành, mỗi mục có cách kiểm và nguồn kèm ngày xác minh |
 | Checklist quá dài so với quy mô thật | Ghép theo loại phần mềm + ngành + quy mô S/M/L: `web-app` có 70 MUST ở bản prototype, 473 ở production |
@@ -49,7 +49,7 @@ Chỉ mục đầy đủ theo vai đọc: [`framework/README.md`](framework/READ
 
 ```bash
 # 1) Chọn CPython 3.15 trên PATH, rồi cài khung vào dự án
-git clone https://github.com/www-donghanhcungban-org/X-office /tmp/x-office
+git clone https://github.com/www-donghanhcungban-org/X-Office /tmp/x-office
 python3 /tmp/x-office/scripts/install.py /đường/dẫn/dự-án --with-github
 
 # 2) Chọn hồ sơ, ngành, quy mô rồi ghép checklist
@@ -181,7 +181,7 @@ nghe 127.0.0.1, đòi token mỗi lần chạy, kiểm `Host`/`Origin` và đặ
 Biến môi trường (đều tuỳ chọn): `XT_FRAMEWORK` (thư mục khung, mặc định cạnh `scripts/`) · `XT_FRAMEWORK_LINK` (gốc liên kết
 trong blueprint, mặc định `.xtemplates/framework`; ghép lại `BLUEPRINT.md` của chính repo khung: đặt `framework`, nếu không mục đã tick bị coi đổi chữ — AUD-HAR-113) · `XT_RECORD_TIMEOUT` (giây, mặc định 1800) · `XT_PROGRESS_BASE` (nhánh chính cho `progress-check` và `audit check`, mặc định `origin/HEAD` → `origin/main` → `origin/master`; rỗng = tắt) · `CLAUDE_PROJECT_DIR` (gốc dự án cho
 `loop`; không đặt thì: bản cài `.xtemplates/scripts/xt.py` → cha của `.xtemplates`; nếu không, thư mục cha gần nhất có
-`.autopilot`/`xt.yaml`/`.xtemplates`, rồi gần nhất có `.git` — thư mục cha là repo khác (vd `$HOME` dotfiles) sẽ thắng; không thấy thì cwd) · `CLAUDE_CONFIG_DIR` (thư mục cấu hình người dùng của Claude Code mà `doctor`/`loop init` đọc; mặc định `~/.claude` + `~/.claude.json`) · `XT_DEBUG=1` (in traceback khi lỗi) · `XT_GUARD_POLICY=strict` (hook hỏi người như trước ADR-0018; mặc định không hỏi) · `XT_FRAMEWORK_REPO` (repo GitHub để `doctor` so bản phát hành mới nhất, mặc định `www-donghanhcungban-org/X-office`) · `XT_STEWARD_UPDATE=off` (`pr steward` không tự cập nhật nhánh tụt base — workflow chạy bằng `GITHUB_TOKEN`) · `XT_CHANGED_FILES` (mỗi dòng một file đổi; `dev-task.sh gate-fast` đặt, `test-select` đọc để chọn lớp test liên quan; không đặt = chạy cả suite) · `XT_MIN_TESTS` (số lớp test tối thiểu `dev-task.sh test-shard` đòi, mặc định 1; liệt kê hỏng không được xanh) · `XT_JOBS` (số tiến trình pytest-xdist cho lệnh `test` tự dò của `dev-task.sh`: nguyên dương, trần 4×số nhân; `1` = `pytest -q` tuần tự; không đặt/rác = `auto`) · `XT_FRAMEWORK_PYTHON` (đường dẫn Python để `dev-task.sh` chạy CLI của khung, CI mẫu đặt tự động) · `XT_COV_DIR` (thư mục dữ liệu coverage `dev-task.sh test-shard`/`test-combine` dùng, đặt bởi chính script) · `XT_SHARD`, `XT_GATE_ALL_TESTS` (cổng test của `dev-task.sh`, tự đặt) · `XT_CI_WORKFLOW` (tên workflow CI khi khác `ci.yml`) · `XT_GUARD_PHASE=harden` (ép guard vào pha harden, ADR-0040) · `CLAUDE_CODE_SESSION_ID` (id phiên, do Claude Code đặt; chỉ đọc).
+`.autopilot`/`xt.yaml`/`.xtemplates`, rồi gần nhất có `.git` — thư mục cha là repo khác (vd `$HOME` dotfiles) sẽ thắng; không thấy thì cwd) · `CLAUDE_CONFIG_DIR` (thư mục cấu hình người dùng của Claude Code mà `doctor`/`loop init` đọc; mặc định `~/.claude` + `~/.claude.json`) · `XT_DEBUG=1` (in traceback khi lỗi) · `XT_GUARD_POLICY=strict` (hook hỏi người như trước ADR-0018; mặc định không hỏi) · `XT_FRAMEWORK_REPO` (repo GitHub để `doctor` so bản phát hành mới nhất, mặc định `www-donghanhcungban-org/X-Office`) · `XT_STEWARD_UPDATE=off` (`pr steward` không tự cập nhật nhánh tụt base — workflow chạy bằng `GITHUB_TOKEN`) · `XT_CHANGED_FILES` (mỗi dòng một file đổi; `dev-task.sh gate-fast` đặt, `test-select` đọc để chọn lớp test liên quan; không đặt = chạy cả suite) · `XT_MIN_TESTS` (số lớp test tối thiểu `dev-task.sh test-shard` đòi, mặc định 1; liệt kê hỏng không được xanh) · `XT_JOBS` (số tiến trình pytest-xdist cho lệnh `test` tự dò của `dev-task.sh`: nguyên dương, trần 4×số nhân; `1` = `pytest -q` tuần tự; không đặt/rác = `auto`) · `XT_FRAMEWORK_PYTHON` (đường dẫn Python để `dev-task.sh` chạy CLI của khung, CI mẫu đặt tự động) · `XT_COV_DIR` (thư mục dữ liệu coverage `dev-task.sh test-shard`/`test-combine` dùng, đặt bởi chính script) · `XT_SHARD`, `XT_GATE_ALL_TESTS` (cổng test của `dev-task.sh`, tự đặt) · `XT_CI_WORKFLOW` (tên workflow CI khi khác `ci.yml`) · `XT_GUARD_PHASE=harden` (ép guard vào pha harden, ADR-0040) · `CLAUDE_CODE_SESSION_ID` (id phiên, do Claude Code đặt; chỉ đọc).
 
 Kiểm tra trước khi đóng góp với CPython 3.15.x và công cụ ghim kèm hash trong `requirements-dev.txt`.
 
@@ -198,7 +198,7 @@ python3 -m unittest discover -s tests    # chỉ test (cổng test còn đòi co
 - [ADR-0003](docs/adr/0003-scale-s-floor-only.md): ở quy mô S chỉ sàn (baseline, hồ sơ, ngành) là MUST.
 - [ADR-0004](docs/adr/0004-scale-m-module-must-cap.md): ở quy mô M mỗi module tối đa 4 MUST, phần vượt là `MUST@L`.
 - [ADR-0005](docs/adr/0005-audit-with-machine-support.md): audit có máy đỡ — sổ máy đọc, `xt.py audit plan/check`.
-- [ADR-0007](docs/adr/0007-rename-technical-identifiers-to-xtemplates.md): định danh kỹ thuật theo tên X-office
+- [ADR-0007](docs/adr/0007-rename-technical-identifiers-to-xtemplates.md): định danh kỹ thuật theo tên X-Office
   (`.xtemplates/`, `xt.py`, `xt.yaml`, `XT_*`); `install.py` tự chuyển dự án đã cài bản ≤ 2.x. Thay ADR-0006.
 - [ADR-0008](docs/adr/0008-main-session-self-approves-decisions.md): phiên chính tự duyệt điểm quyết định chuyên môn
   theo tiêu chí chất lượng cuối, ghi `D-NNN`; điểm dừng về hành động không tự duyệt (cơ chế sau: ADR-0018).
@@ -308,15 +308,15 @@ nghiệm thu A–E; lát A–E đã làm, gộp một PR (#451) theo quyết đ�
 
 ## Ủng hộ và liên hệ
 
-X-office miễn phí và sẽ luôn mở mã. Nếu khung giúp bạn tiết kiệm thời gian hoặc tránh được sự cố, bạn có thể ủng
+X-Office miễn phí và sẽ luôn mở mã. Nếu khung giúp bạn tiết kiệm thời gian hoặc tránh được sự cố, bạn có thể ủng
 hộ để tác giả duy trì và cập nhật nội dung (chuẩn, luật, phiên bản công cụ thay đổi liên tục):
 
 <img src="docs/assets/donate-vietqr-techcombank.png" alt="Mã VietQR ủng hộ: Techcombank, số tài khoản 890977819110" width="260">
 
 - Quét mã VietQR bằng ứng dụng ngân hàng bất kỳ, hoặc chuyển khoản **Techcombank — số tài khoản `890977819110`**.
 - Liên hệ, góp ý, hợp tác: điện thoại / Zalo **[+84 977 819 110](https://zalo.me/0977819110)** ·
-  email **admin@donghanhcungban.org**. Lỗi và đề xuất tính năng xin mở [issue](https://github.com/www-donghanhcungban-org/X-office/issues).
-- **Hỗ trợ triển khai:** tác giả hỗ trợ cài đặt và áp dụng X-office cho dự án của bạn — **trực tiếp tại TP. Hồ Chí
+  email **admin@donghanhcungban.org**. Lỗi và đề xuất tính năng xin mở [issue](https://github.com/www-donghanhcungban-org/X-Office/issues).
+- **Hỗ trợ triển khai:** tác giả hỗ trợ cài đặt và áp dụng X-Office cho dự án của bạn — **trực tiếp tại TP. Hồ Chí
   Minh** hoặc **online** ở bất kỳ đâu. Liên hệ qua điện thoại/Zalo hoặc email ở trên để trao đổi nhu cầu.
 
 Ủng hộ là tự nguyện, không kèm quyền lợi riêng; hỗ trợ triển khai thoả thuận riêng theo từng dự án. Báo lỗ hổng bảo
@@ -330,4 +330,4 @@ gồm tái hiện, nghiên cứu nguồn sống, thang tự chủ theo loại PR
 [`PLAN-3.9-automation.md`](docs/archive/autopilot/PLAN-3.9-automation.md) cho đợt sau 3.8.0.
 Vận hành: [runbook `pr-steward`](docs/ops/RUNBOOK-PR-STEWARD.md) · [phụ thuộc và license](docs/ops/DEPENDENCIES.md).
 Báo lỗ hổng: [`SECURITY.md`](SECURITY.md). Giấy phép: [MIT](LICENSE) cho toàn repo (mã và tài liệu), trừ thành phần
-bên thứ ba và nhãn hiệu ghi ở [`NOTICE`](NOTICE); X-office không liên kết với các tổ chức có sản phẩm được nhắc tên.
+bên thứ ba và nhãn hiệu ghi ở [`NOTICE`](NOTICE); X-Office không liên kết với các tổ chức có sản phẩm được nhắc tên.

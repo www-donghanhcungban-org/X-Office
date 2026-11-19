@@ -1,4 +1,4 @@
-# AUDIT-REPORT — X-office · 2026-10-19 (delta sau 3.8.0)
+# AUDIT-REPORT — X-Office · 2026-10-19 (delta sau 3.8.0)
 
 > Commit quét: `fd64dd6` (= `main` `63454a2` + sửa review #165) · Phạm vi: delta `9433792..fd64dd6` (nhóm ARCH, SEC, CODE, TEST, DOC, XFEAT, HAR) ·
 > Người quét: hai subagent `reviewer` (Opus 5.5), song song · Xác minh đối kháng: `reviewer` Sonnet 5.5 (khác họ) tái hiện độc lập 6 phát hiện 🔴/🟠

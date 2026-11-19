@@ -2022,7 +2022,7 @@ class GuardChokePointTest(TmpMixin, unittest.TestCase):
         self.assertIn(ROOT / xt.GUARD_FILE, xt.guard_paths(self.base))
 
     def test_guard_paths_parent_of_install_only_for_xtemplates(self):
-        # Review #311: repo khung ở ~/X-office → cấp trên là ~/.claude/hooks của người dùng, không phải guard dự án.
+        # Review #311: repo khung ở ~/X-Office → cấp trên là ~/.claude/hooks của người dùng, không phải guard dự án.
         self.assertNotIn(ROOT.parent / xt.GUARD_FILE, xt.guard_paths(self.base))
         scripts = self.base / ".xtemplates" / "scripts"
         with unittest.mock.patch.object(xt, "SCRIPT_DIR", scripts):

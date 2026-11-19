@@ -56,7 +56,7 @@
   bằng `actions/attest-build-provenance` **4.2.2** ghim `4d101475d8b20a2381f78447822ac1eab6504dd8` (MIT; tag nhẹ, phát hành
   2026-08-06; từ v4 là vỏ của `actions/attest` — README khuyên dùng `actions/attest` cho bản mới, chưa đổi vì vỏ vẫn được
   hỗ trợ; xác minh 2026-11-02). Quyền job: `id-token: write`, `attestations: write`; repo công khai dùng Sigstore
-  public-good (chứng chỉ, bản ghi minh bạch công khai). Kiểm: `gh attestation verify X-office-vX.Y.Z.tar.gz --repo
+  public-good (chứng chỉ, bản ghi minh bạch công khai). Kiểm: `gh attestation verify X-Office-vX.Y.Z.tar.gz --repo
   seeker19110/X-Templates`; tái tạo đúng byte bằng `git archive` ở máy khác: (chưa xác minh — gzip của git có thể khác
   theo bản). Chưa chạy thật trên CI tới lần cắt bản kế.
 - Gói mới hoặc đổi license khi Dependabot nâng phiên bản: cập nhật bảng này trong cùng PR (`BASE-DEP-006`).

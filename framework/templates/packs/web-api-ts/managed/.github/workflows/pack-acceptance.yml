@@ -1,6 +1,6 @@
 name: pack-acceptance
 
-# File do gói `web-api-ts` của X-office sở hữu (install.py --pack; manifest ghi hash): chưa sửa → cài lại cập nhật tại
+# File do gói `web-api-ts` của X-Office sở hữu (install.py --pack; manifest ghi hash): chưa sửa → cài lại cập nhật tại
 # chỗ; đã sửa → bản mới ở `pack-acceptance.yml.xtemplates-new` để gộp tay. Chạy bộ nghiệm thu (`test` của xt.yaml qua
 # dev-task.sh) với Postgres thật, rồi build artifact có digest (`build`). Thêm vào required check của ruleset khi xanh ổn định.
 on:

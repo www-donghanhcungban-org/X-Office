@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""install.py — cài khung X-office vào một dự án đích (mọi hệ điều hành, cần CPython 3.15.x).
+"""install.py — cài khung X-Office vào một dự án đích (mọi hệ điều hành, cần CPython 3.15.x).
 
 Kết quả trong dự án đích:
   .xtemplates/framework/        bản sao thư viện yêu cầu (chỉ đọc; cập nhật bằng cách chạy lại install)
@@ -40,7 +40,7 @@ Dùng:
   --preset: chính sách merge/review cho xt.yaml mới; cài lại giữ lựa chọn dự án (không cấu hình sandbox).
   --stage-init: dự án mới — tạo sổ giai đoạn sản phẩm docs/autopilot/STAGE.json (giai đoạn 1, ADR-0058) khi chưa có; không
                 cờ thì không tạo. Sau cài luôn kiểm sổ bằng `xt.py stage status` (sổ có sẵn giữ nguyên).
-  (chạy từ bản clone của X-office; hoặc: python3 -c "$(curl ...)" KHÔNG được khuyến khích — tải về, kiểm checksum rồi chạy)
+  (chạy từ bản clone của X-Office; hoặc: python3 -c "$(curl ...)" KHÔNG được khuyến khích — tải về, kiểm checksum rồi chạy)
 Thoát 0 = ổn; 1 = bootstrap/doctor hỏng; 2 = lỗi tham số/đích.
 """
 
@@ -838,7 +838,7 @@ def install_framework(xt_dir: Path, label: str | None) -> str:
         drop_symlink(xt_dir / f)
     (xt_dir / "VERSION").write_text(version + "\n", encoding="utf-8")
     (xt_dir / "README.md").write_text(
-        "# .xtemplates/\n\nBản sao khung X-office (chỉ đọc). Cập nhật: chạy lại `install.py` từ bản khung mới.\n"
+        "# .xtemplates/\n\nBản sao khung X-Office (chỉ đọc). Cập nhật: chạy lại `install.py` từ bản khung mới.\n"
         "Ghép blueprint: `python3 .xtemplates/scripts/xt.py compose --profile <p> --scale <S|M|L> --out BLUEPRINT.md`.\n",
         encoding="utf-8",
     )
@@ -1906,13 +1906,13 @@ def ensure_gitignore(target: Path) -> None:
         if missing:
             with gi.open("a", encoding="utf-8") as fh:
                 fh.write(
-                    "\n# X-office: trạng thái autopilot cục bộ, settings cá nhân\n"
+                    "\n# X-Office: trạng thái autopilot cục bộ, settings cá nhân\n"
                     + "".join(f"{ln}\n" for ln in missing)
                 )
             log("  .gitignore: thêm " + ", ".join(missing))
     else:
         body = "".join(f"{ln}\n" for ln in GITIGNORE_LINES)
-        gi.write_text(f"# X-office: trạng thái autopilot cục bộ, settings cá nhân\n{body}", encoding="utf-8")
+        gi.write_text(f"# X-Office: trạng thái autopilot cục bộ, settings cá nhân\n{body}", encoding="utf-8")
         log("  .gitignore: tạo mới")
 
 
@@ -2607,7 +2607,7 @@ def new_flags_error(args: argparse.Namespace) -> str | None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(description="Cài khung X-office vào dự án đích (cần CPython 3.15.x)")
+    p = argparse.ArgumentParser(description="Cài khung X-Office vào dự án đích (cần CPython 3.15.x)")
     p.add_argument("target", help="thư mục gốc dự án đích")
     p.add_argument("--new", action="store_true", help="tạo dự án git mới từ thư mục trống, không cần mạng")
     p.add_argument("--idea", help="ý tưởng gốc (dữ liệu, 1…4000 ký tự), bắt buộc cùng --new")

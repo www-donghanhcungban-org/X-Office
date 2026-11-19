@@ -1,6 +1,6 @@
 import type { Plugin } from "@opencode-ai/plugin"
 
-// X-office guard cho OpenCode (ADR-0064 lát B): mọi lời gọi tool qua `xt_adapter.py opencode`; deny → throw (chặn tool).
+// X-Office guard cho OpenCode (ADR-0064 lát B): mọi lời gọi tool qua `xt_adapter.py opencode`; deny → throw (chặn tool).
 // Không có logic ở đây — luật nằm ở guard của khung. Giới hạn: hook có thể không chạy ở `opencode run` (issue #41422).
 export const XtGuard: Plugin = async ({ $, worktree }) => ({
   "tool.execute.before": async (input, output) => {
@@ -8,6 +8,6 @@ export const XtGuard: Plugin = async ({ $, worktree }) => ({
     const adapter = `${worktree}/.xtemplates/scripts/xt_adapter.py`
     const r = await $`python3 -I -B ${adapter} opencode < ${new Response(payload)}`.nothrow().quiet()
     const out = JSON.parse(r.stdout.toString() || "{}")
-    if (out.decision === "deny") throw new Error(out.reason || "X-office guard: chặn")
+    if (out.decision === "deny") throw new Error(out.reason || "X-Office guard: chặn")
   },
 })

@@ -1,4 +1,4 @@
-# PLAN-upgrade-2026-11-01.md — Khung X-office · nâng cấp: Adaptive Agent (ADR-0061), stored e3fdcb0..e8b3831, sửa batch audit delta 2026-11-01
+# PLAN-upgrade-2026-11-01.md — Khung X-Office · nâng cấp: Adaptive Agent (ADR-0061), stored e3fdcb0..e8b3831, sửa batch audit delta 2026-11-01
 
 > Lập ngày 2026-11-01 theo `/complete` (pha harden) sau audit delta 2026-11-01 (báo cáo `docs/ops/AUDIT-REPORT-2026-11-01-delta.md`
 > viết ở T-3608) và hai research note [`2026-11-01-adaptive-agent-topology.md`](../../../research/2026-11-01-adaptive-agent-topology.md),

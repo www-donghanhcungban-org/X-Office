@@ -102,6 +102,6 @@ template và `AGENTS.md` chỉ tóm tắt và liên kết, không chép bảng/n
 
 ## Lệnh thật
 
-Bảng mọi lệnh con của `scripts/xt.py`: README gốc repo khung §Công cụ ([`../../README.md`](../../README.md); dự án đích: GitHub `www-donghanhcungban-org/X-office`) và `<XT> --help`.
+Bảng mọi lệnh con của `scripts/xt.py`: README gốc repo khung §Công cụ ([`../../README.md`](../../README.md); dự án đích: GitHub `www-donghanhcungban-org/X-Office`) và `<XT> --help`.
 Trần ngoài xt.py: Claude Code tự ngừng block Stop sau 8 lần liên tiếp không có tool call
 (`CLAUDE_CODE_STOP_HOOK_BLOCK_CAP`, không đặt `0`); headless thêm `--max-turns`, `--max-budget-usd`.

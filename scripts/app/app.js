@@ -1,4 +1,4 @@
-// X-office app: router hash + helper DOM. Chỉ createElement/textContent (không HTML động, CSP không inline).
+// X-Office app: router hash + helper DOM. Chỉ createElement/textContent (không HTML động, CSP không inline).
 const TOKEN_KEY = "xt-token";
 const ROUTES = {
   "": ["overview", "Tổng quan"],
@@ -104,11 +104,11 @@ async function route(moveFocus = true) {
     return;
   }
   if (!entry) {
-    document.title = "Không tìm thấy — X-office";
+    document.title = "Không tìm thấy — X-Office";
     empty(main, "Không có màn này.");
     return;
   }
-  document.title = entry[1] + " — X-office";
+  document.title = entry[1] + " — X-Office";
   loading(main);
   try {
     const view = await import("./views/" + entry[0] + ".js");

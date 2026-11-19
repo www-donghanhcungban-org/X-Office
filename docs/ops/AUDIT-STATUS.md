@@ -1,4 +1,4 @@
-# AUDIT-STATUS — Khung X-office
+# AUDIT-STATUS — Khung X-Office
 
 > 2026-11-14 · [Audit delta DOC](AUDIT-REPORT-2026-11-14-delta.md) `454d146..2bf2e1cf`: DOC đã quét phần tài liệu trong repo, URL ngoài chưa kiểm lại. TEST và HAR còn `chưa quét`.
 

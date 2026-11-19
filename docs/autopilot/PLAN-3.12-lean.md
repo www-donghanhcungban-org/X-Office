@@ -1,4 +1,4 @@
-# PLAN-3.12-lean.md — Khung X-office · tinh gọn toàn bộ: ít đọc hơn, ít lượt hơn, nhanh hơn, dự án đích nhẹ hơn
+# PLAN-3.12-lean.md — Khung X-Office · tinh gọn toàn bộ: ít đọc hơn, ít lượt hơn, nhanh hơn, dự án đích nhẹ hơn
 
 > Lập ngày 2026-10-20 theo yêu cầu chủ repo ("merge xong rồi tối ưu toàn bộ — skill, quy trình, code — cả dự án này và
 > dự án đích"), sau PR #189 (ADR-0033). Dữ liệu: 3 khảo sát chỉ-đọc cùng ngày (tài liệu quy trình · code/hook/cổng/CI ·

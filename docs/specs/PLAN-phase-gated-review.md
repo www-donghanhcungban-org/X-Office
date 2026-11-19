@@ -121,7 +121,7 @@ Bất kỳ bằng chứng bypass cổng, stale approval, mất ledger hoặc l�
 
 ## 9. Cơ sở nghiên cứu và mức chắc chắn
 
-Nguồn kiểm tra ngày **2026-10-27**; các kết luận dưới đây là nguyên tắc tham khảo, không phải benchmark cho X-office:
+Nguồn kiểm tra ngày **2026-10-27**; các kết luận dưới đây là nguyên tắc tham khảo, không phải benchmark cho X-Office:
 
 - [Google — Small CLs](https://google.github.io/eng-practices/review/developer/small-cls.html): thay đổi nhỏ dễ kiểm/hoàn tác; không chứng minh rằng một diff khổng lồ review một lần sẽ tốt hơn. Suy ra: gộp lịch gọi reviewer, không gộp vô hạn phạm vi.
 - [Google — Standard of Code Review](https://google.github.io/eng-practices/review/reviewer/standard.html): không đòi hoàn hảo; phân biệt gợi ý nhỏ với yêu cầu bắt buộc, dùng bằng chứng khi bất đồng. Suy ra: findings có contract, non-blocking không kéo thêm vòng.

@@ -1,4 +1,4 @@
-# AGENTS.md — luật vận hành cho AI agent trong repo X-office
+# AGENTS.md — luật vận hành cho AI agent trong repo X-Office
 
 > Repo này **là** khung tham chiếu (thư viện yêu cầu có ID + công cụ + harness); agent ở đây **sửa/mở rộng khung**. Dự án đích cài khung vào `.xtemplates/` và có `AGENTS.md` riêng (từ `framework/templates/AGENTS.md`). Mọi agent đọc file này (`CLAUDE.md` import nó); **không thay cho hook/permission**: hàng rào thật là `.claude/settings.json` + hook guard (ADR-0018).
 

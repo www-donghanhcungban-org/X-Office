@@ -8,7 +8,7 @@
             "type": "command",
             "command": "python3 -I -B \"$(git rev-parse --show-toplevel)/.xtemplates/scripts/xt_adapter.py\" codex",
             "timeout": 30,
-            "statusMessage": "X-office guard"
+            "statusMessage": "X-Office guard"
           }
         ]
       }

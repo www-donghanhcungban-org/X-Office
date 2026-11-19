@@ -62,7 +62,7 @@ chuyên mục NN, mục x của catalog.
   thay justification — khung chọn chặt hơn; settings repo chỉ đọc ở phiên cloud **một repo** (bẫy `enabledPlugins` ở đợt 1 thiếu ý này).
 - Chưa xác minh/lưu ý: mốc Chrome Root Program cho clientAuth; nghĩa vụ hiển thị cảnh báo SIMO của tổ chức không phải ngân hàng; WebSocket
   bị gate LNA từ bản Chrome nào; tình trạng tố tụng SB2420 đổi nhanh (mục đòi rà ≤ 90 ngày).
-- **Lưu ý cho phiên này:** phiên cloud gắn hai repo (X-office + stored) thuộc loại "nhiều repo" — hook/guard của `.claude/settings.json` có thể
+- **Lưu ý cho phiên này:** phiên cloud gắn hai repo (X-Office + stored) thuộc loại "nhiều repo" — hook/guard của `.claude/settings.json` có thể
   không chạy; Gate được chạy tay (`gate-fast`) trước mỗi lần đẩy.
 
 | ID | Mức | File |

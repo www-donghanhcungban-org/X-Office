@@ -1,4 +1,4 @@
-# AUDIT-REPORT — Khung X-office · 2026-10-16
+# AUDIT-REPORT — Khung X-Office · 2026-10-16
 
 > Commit: `58b8c8b` (`main` sau #57) · Phạm vi: delta `8e64aac`→`58b8c8b` (16 commit #43–#57, ~4.800 dòng mã) cho
 > ARCH/SEC/CODE/TEST/PERF/CFG/DOC/XFEAT/HAR; CI từ `05ec95d` · Người quét: phiên chính + 3 subagent read-only

@@ -13,7 +13,7 @@ Bổ sung cho [đợt nâng trần trước](2026-11-02-stored-delta-ceiling.md)
 - Nguồn: [stored PR105](https://github.com/seeker19110/stored/pull/105), merge `d8d2708377933491107c0cd3f2f88f64da95ba34` ngày 2026-11-02; phạm vi từ base `a1413e6` đến merge này. Catalog 908→976, thêm 68 hồ sơ, đọc sâu lại 18 hồ sơ; cả 23 mục cũ được mở sâu và thêm 5 mục mới. Ngày snapshot không có nghĩa mọi hồ sơ đều được kiểm lại.
 - Bàn giao máy đọc: [XT-H-094…105](https://github.com/seeker19110/stored/blob/d8d2708377933491107c0cd3f2f88f64da95ba34/data/xt-handoff.json), [bảng phía stored](https://github.com/seeker19110/stored/blob/d8d2708377933491107c0cd3f2f88f64da95ba34/X-TEMPLATES.md#4d-bàn-giao-mở-rộng-28-chuyên-mục-xt-h-094105).
 - Khung đối chiếu: `24f221bd992560525a917a9fee1154a53fb67347`, ngày 2026-11-02. Đọc lại 32 ID đã có và các research note trước; 32 ID/nội dung/line không đổi từ `628e36c`. Phân loại 10 **nông hơn**, 2 **chưa có hợp đồng cụ thể** (OCR/CAD); không nói cả chủ đề hoàn toàn vắng mặt.
-- Giữ nguồn permalink của từng hồ sơ. Bằng chứng upstream là đọc mã/đặc tả, không chạy model/benchmark; tiêu chí kiểm trong đề xuất là việc cần triển khai nếu được chấp nhận. CI của note này chỉ kiểm chính repo X-office.
+- Giữ nguồn permalink của từng hồ sơ. Bằng chứng upstream là đọc mã/đặc tả, không chạy model/benchmark; tiêu chí kiểm trong đề xuất là việc cần triển khai nếu được chấp nhận. CI của note này chỉ kiểm chính repo X-Office.
 
 ## 2. Bản đồ 12 đề xuất
 

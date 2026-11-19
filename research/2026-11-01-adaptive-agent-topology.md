@@ -6,7 +6,7 @@ updated: 2026-11-03
 
 # Adaptive Agent: một agent chính, subagent theo loại việc, KPI đo thật — nghiên cứu 2026-11-01
 
-> Đầu vào: nhận định của chủ dự án (2026-11-01, một phiên cloud) đề xuất X-office dùng kiến trúc
+> Đầu vào: nhận định của chủ dự án (2026-11-01, một phiên cloud) đề xuất X-Office dùng kiến trúc
 > *Adaptive Agent*: Software Factory tự chọn cấu hình theo độ độc lập của việc; mặc định **một** agent sở hữu code và tích
 > hợp; subagent chỉ khi việc độc lập về file và có hợp đồng đầu ra; ưu tiên test tự động liên tục hơn nhiều reviewer trao đổi;
 > một lượt audit sau pha lớn rồi sửa theo batch; chỉ tăng số agent khi số đo chứng minh; 1 agent chính + tối đa 2–4 subagent;

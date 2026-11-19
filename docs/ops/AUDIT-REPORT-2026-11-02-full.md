@@ -1,4 +1,4 @@
-# AUDIT-REPORT — Khung X-office · 2026-11-02 (toàn bộ)
+# AUDIT-REPORT — Khung X-Office · 2026-11-02 (toàn bộ)
 
 > Commit quét: `1e3c060` (#398, `main`); sau quét merge #399 (lát C guard, `c346bdb`) — 7 🟠 dấu review đã sửa, 4 🔴 và AUD-SEC-248 kiểm lại ở `c346bdb` vẫn tái hiện · Phạm vi: toàn bộ 13 nhóm (A11Y chỉ smoke, DATA N/A) · Người quét: phiên chính + 4 cụm
 > song song (mã `xt.py`/`install.py`/`xt_app` · harness `.claude/` + guard · nội dung `framework/` · CI/vận hành/sổ) ·

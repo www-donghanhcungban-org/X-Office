@@ -1107,7 +1107,7 @@ class InstallEdgeTest(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(
             gi.read_text(encoding="utf-8"),
-            "node_modules/\n\n# X-office: trạng thái autopilot cục bộ, settings cá nhân\n.autopilot/\n"
+            "node_modules/\n\n# X-Office: trạng thái autopilot cục bộ, settings cá nhân\n.autopilot/\n"
             ".claude/settings.local.json\n",
         )
         self.assertIn("thêm .autopilot/, .claude/settings.local.json", err)

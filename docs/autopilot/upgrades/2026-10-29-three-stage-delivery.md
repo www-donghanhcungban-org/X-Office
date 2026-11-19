@@ -1,6 +1,6 @@
 # Giao hàng ba giai đoạn trên một chu trình sản phẩm thống nhất
 
-Ngày: 2026-10-29. Phạm vi yêu cầu: **mọi dự án đích** của X-office, không phụ thuộc loại phần mềm hoặc stack.
+Ngày: 2026-10-29. Phạm vi yêu cầu: **mọi dự án đích** của X-Office, không phụ thuộc loại phần mềm hoặc stack.
 
 **Trạng thái: lát A–E đã triển khai (C: `stage submit` đòi kiểm lại cuối xanh, ghi `preview`, chạy smoke `preview_smoke` — D-247; D: `next-step` trả `stage-submit`/`wait-approval`, `/complete`/`/optimize` khoá theo giai đoạn — D-246, `/optimize` nhận mục tiêu chưa đỏ ở giai đoạn 3 — D-248; E: `install.py --stage-init` — D-249) ([ADR-0058](../../adr/0058-product-stages-machine-lock.md), D-239)** — `xt.py stage`, sổ `docs/autopilot/STAGE.json`, khoá ở `loop init/next/record`, hàng `stage` của `release-check`, guard chặn agent duyệt/ghi tay sổ; test `tests/test_stage.py`. Lát F (§8: nâng dự án đích, nghiệm thu trên dự án thật) **chưa** làm; mục nào bên dưới không gắn ✅/D-NNN vẫn là thiết kế đề xuất. Dự án chỉ chịu khoá khi có sổ (`xt.py stage init`); chưa dự án đích nào được nâng.
 
@@ -22,7 +22,7 @@ Ba giai đoạn không thay thế chu trình 11 bước, cũng không chia nó t
 
 Ưu tiên tốc độ bằng cách giảm phạm vi sớm, thời gian chờ, công việc đang làm và review lặp; không bỏ cổng an toàn, sửa giả bằng chứng hoặc hạ tiêu chí để báo xong.
 
-## 2. Đối chiếu hiện trạng X-office
+## 2. Đối chiếu hiện trạng X-Office
 
 Đã đọc `main` tại `c3a7e563795e43a8ef68f3b5bc17b78152732ed9`, ngày 2026-10-29:
 

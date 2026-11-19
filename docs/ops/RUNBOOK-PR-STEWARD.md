@@ -39,7 +39,7 @@ không có token thì steward không cập nhật nhánh tụt.
 
 Ruleset của repo khung: `.github/rulesets/main.json` đòi **5** check — `quality`, `protection-guard`, `gitleaks`,
 `dep-audit`, `pack-npm-audit` (thêm ở #622); **"up to date" bật** (`strict: true`), yêu cầu giải quyết luồng thảo luận
-tắt. Ruleset sống (kiểm `gh api repos/www-donghanhcungban-org/X-office/rules/branches/main` ngày 2026-11-17) mới có 4
+tắt. Ruleset sống (kiểm `gh api repos/www-donghanhcungban-org/X-Office/rules/branches/main` ngày 2026-11-17) mới có 4
 check đầu, ghim app 15368 — thiếu `pack-npm-audit` tới khi chủ repo import lại file. PR tụt sau `main` cần cập nhật để
 CI chạy lại.
 

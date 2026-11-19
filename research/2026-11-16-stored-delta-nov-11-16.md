@@ -109,7 +109,7 @@ Bổ sung cho [đợt 5–8/11](2026-11-10-stored-delta-nov-5-8.md). File này c
 
 **Hồ sơ nguồn:** [03-agentic-patterns-loops/README.md#8m](https://github.com/seeker19110/stored/blob/c60701366d3e20e24b352ff182ecb725ec05ebcb/03-agentic-patterns-loops/README.md#8m-kiểm-ảnh-và-bài-ai-coding-is-moving-beyond-the-agent-5-lớp-model--harness--loop--graph--software-factory-ảnh-và-bài-viết-lại-người-dùng-gửi-đối-chiếu-nguồn-gốc-11112026).
 
-**Khung đã có:** LOOP-DESIGN-006 (MUST@L) và LOOP-CTX-006 (MUST) đã bắt trạng thái bền nằm trong repo; X-office làm đúng điều số đông bỏ qua.
+**Khung đã có:** LOOP-DESIGN-006 (MUST@L) và LOOP-CTX-006 (MUST) đã bắt trạng thái bền nằm trong repo; X-Office làm đúng điều số đông bỏ qua.
 
 **Phần cần bổ sung:** Thêm bằng chứng nguồn cho LOOP-DESIGN-006 và tiêu chí phân ranh harness/factory cho tài liệu 11-autonomous-loop; không đổi mức, không cần ID mới.
 

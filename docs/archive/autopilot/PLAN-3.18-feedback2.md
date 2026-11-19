@@ -1,4 +1,4 @@
-# PLAN-3.18-feedback2.md — Khung X-office · 7 lỗi 🟢 dự án đích còn lại → bản 3.18.0
+# PLAN-3.18-feedback2.md — Khung X-Office · 7 lỗi 🟢 dự án đích còn lại → bản 3.18.0
 
 > Lập ngày 2026-10-24. Chủ repo gọi lại `/autopilot` sau PLAN-3.17-feedback (done, `v3.17.0`). Nguồn: bảng phân loại
 > 30 nhóm phản hồi của PLAN-3.17 (scratchpad phiên, không commit) — 7 dòng `con-loi` 🟢 chưa sửa. Phiên chính tự duyệt (D-157).

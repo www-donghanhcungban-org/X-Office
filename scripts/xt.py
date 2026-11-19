@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""xt.py — công cụ dòng lệnh của khung X-office (chỉ dùng thư viện chuẩn CPython 3.15.x).
+"""xt.py — công cụ dòng lệnh của khung X-Office (chỉ dùng thư viện chuẩn CPython 3.15.x).
 
 Lệnh:
   validate                      Kiểm quy ước toàn khung (frontmatter, ID, liên kết, hồ sơ/gói ngành).
@@ -2371,7 +2371,7 @@ GUARD_FILE = ".claude/hooks/guard.py"
 def guard_paths(base: Path) -> List[Path]:
     """Guard của dự án `base`, rồi guard cùng bản cài với `xt.py` này (repo khung: `scripts/` → gốc; dự án đích:
     `.xtemplates/scripts/` → gốc dự án) — đổi `CLAUDE_PROJECT_DIR` sang thư mục không có guard không thoát được kiểm.
-    Gốc dự án chỉ khi `xt.py` nằm trong `.xtemplates/`: repo khung ở `~/X-office` thì cấp đó là `~/.claude/hooks`
+    Gốc dự án chỉ khi `xt.py` nằm trong `.xtemplates/`: repo khung ở `~/X-Office` thì cấp đó là `~/.claude/hooks`
     của người dùng — guard lạ ở đó không được chặn mọi lệnh (review #311)."""
     paths = [base / GUARD_FILE, SCRIPT_DIR.parent / GUARD_FILE]
     return paths + [SCRIPT_DIR.parent.parent / GUARD_FILE] if SCRIPT_DIR.parent.name == ".xtemplates" else paths
@@ -4691,7 +4691,7 @@ AUTOPILOT_IGNORES = (".autopilot/", ".autopilot", "/.autopilot/", "/.autopilot")
 # Công cụ memory ngoài cho coding agent (LOOP-HARNESS-021); khớp theo token trong tên plugin/MCP server.
 MEMORY_TOOLS = ("engram", "claude-mem", "agentmemory", "mem0", "openmemory", "basic-memory")
 MEMORY_TOOL_RE = re.compile(r"(?<![a-z0-9])(" + "|".join(re.escape(t) for t in MEMORY_TOOLS) + r")(?![a-z0-9])")
-INSTALL_HINT = "người chạy lại `python3 <bản clone X-office>/scripts/install.py <gốc dự án>`"
+INSTALL_HINT = "người chạy lại `python3 <bản clone X-Office>/scripts/install.py <gốc dự án>`"
 
 
 @dataclass
@@ -5291,7 +5291,7 @@ def _doctor_gitignore(base: Path) -> List[Finding]:
     lines = gi.read_text(encoding="utf-8", errors="replace").splitlines() if gi.is_file() else []
     if any(ln.strip() in AUTOPILOT_IGNORES for ln in lines):
         return []
-    block = "\n# X-office: trạng thái autopilot cục bộ\n.autopilot/\n"
+    block = "\n# X-Office: trạng thái autopilot cục bộ\n.autopilot/\n"
     return [
         Finding(
             "gitignore",
@@ -5595,7 +5595,7 @@ def _doctor_settings_local(base: Path) -> List[Finding]:
 
 
 # Nguồn bản phát hành của khung; fork đặt XT_FRAMEWORK_REPO=chủ/repo.
-FRAMEWORK_REPO = "www-donghanhcungban-org/X-office"
+FRAMEWORK_REPO = "www-donghanhcungban-org/X-Office"
 # Đầu nhãn `.xtemplates/VERSION`: "3.0.0 (abc1234)"; đuôi pre-release ("3.0.0-rc1") nhỏ hơn bản cùng số (SemVer §11).
 SEMVER_PREFIX_RE = re.compile(r"v?(\d+)\.(\d+)\.(\d+)(-[0-9A-Za-z.-]+)?")
 RELEASE_TAG_RE = re.compile(r"v(\d+)\.(\d+)\.(\d+)")  # tag phát hành (release-tag.yml); pre-release không tính
@@ -9812,7 +9812,7 @@ LOOP_AGENTS: Dict[str, List[str]] = {
 }
 LOOP_RUN_STALL = 3  # lượt liền nhau mà verdict máy không đổi → dừng (agent không tiến triển)
 LOOP_RUN_PROMPT = (
-    "Dự án dùng khung X-office — đọc AGENTS.md. Việc kế tiếp do máy chọn: {reason}. Chỉ làm đúng task {task}; chạy "
+    "Dự án dùng khung X-Office — đọc AGENTS.md. Việc kế tiếp do máy chọn: {reason}. Chỉ làm đúng task {task}; chạy "
     "Gate qua `python3 .xtemplates/scripts/xt.py loop record --task {task} -- '<lệnh Gate trong PLAN>'`; việc cần người "
     "→ `xt.py loop defer --task {task} --reason …`. Không làm task khác, không hỏi người."
 )
@@ -20648,7 +20648,7 @@ def _add_perf_trial(ppsub: "argparse._SubParsersAction[argparse.ArgumentParser]"
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="xt.py",
-        description="Công cụ khung X-office (cần CPython 3.15.x)",
+        description="Công cụ khung X-Office (cần CPython 3.15.x)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="ví dụ:\n"
         "  xt.py list profiles\n"

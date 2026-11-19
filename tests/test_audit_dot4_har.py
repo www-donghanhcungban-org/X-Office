@@ -320,7 +320,7 @@ class DocFactsTest(unittest.TestCase):
                 self.assertIn(f"`{check}`", contributing)
                 self.assertIn(f"`{check}`", runbook)
         self.assertNotIn("repos/seeker19110", runbook)
-        self.assertIn("repos/www-donghanhcungban-org/X-office/rules/branches/main", runbook)
+        self.assertIn("repos/www-donghanhcungban-org/X-Office/rules/branches/main", runbook)
 
     def test_readme_must_count(self):
         out = io.StringIO()

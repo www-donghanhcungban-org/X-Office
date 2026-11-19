@@ -1,4 +1,4 @@
-# PLAN-3.26.1-green-debt.md — Khung X-office · trả 3 🟢 mở của audit delta3 → bản 3.26.1
+# PLAN-3.26.1-green-debt.md — Khung X-Office · trả 3 🟢 mở của audit delta3 → bản 3.26.1
 
 > Lập ngày 2026-10-25. Nguồn: `docs/ops/AUDIT-STATUS.md` AUD-HAR-113, AUD-HAR-114, AUD-DOC-086 (chủ: phiên chính, hạn
 > 2026-11-08) và `release-check` NO-GO hàng `review_debt` (`VERSION` đổi ở #265 sau SHA quét `daefc7c`). Phiên chính tự

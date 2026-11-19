@@ -1,4 +1,4 @@
-# PLAN-3.20.1-adr0045-debt.md — Khung X-office · trả nợ ADR-0045: skill `/autopilot` bước 5 và thang cũ "workflow trước, agent sau" → bản 3.20.1
+# PLAN-3.20.1-adr0045-debt.md — Khung X-Office · trả nợ ADR-0045: skill `/autopilot` bước 5 và thang cũ "workflow trước, agent sau" → bản 3.20.1
 
 > Lập ngày 2026-10-25. Chủ repo chọn "Nợ ADR-0045" khi gọi `/autopilot` không kèm yêu cầu mới. Phiên chính tự duyệt (D-169).
 >

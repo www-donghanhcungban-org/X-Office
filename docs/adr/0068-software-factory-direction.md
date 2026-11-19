@@ -16,7 +16,7 @@
   §Quyết định là chữ bản nháp được chấp nhận nguyên văn; mốc xét lại "lát A xong mà chưa có dự án đích deploy thật" đã tới
   — xét cùng mốc 2027-01-21.
 - **Ngày:** 2026-11-04.
-- **Nghiên cứu:** research cùng tên (đối chiếu X-office `e0ea0a6`/`9c03257` và stored `5d8f8a6` ngày 2026-11-04; nhật ký
+- **Nghiên cứu:** research cùng tên (đối chiếu X-Office `e0ea0a6`/`9c03257` và stored `5d8f8a6` ngày 2026-11-04; nhật ký
   xác minh §10; điều chưa xác minh: trạng thái merge stored#131, stack dự án đích).
 - **Liên quan (ràng buộc, không thay):** ADR-0001 (thư viện ID + compose), ADR-0008 (tự duyệt), ADR-0010 (phản hồi kéo về),
   ADR-0042/0062 §6 (`release-check`), ADR-0043/0050 + D-142 (đóng băng bề mặt 3.x, không tách `xt.py`), ADR-0058 (giai đoạn,
@@ -34,7 +34,7 @@ deploy" thành bốn việc và chỉ làm hai việc đầu (ADR-0069 cho agent
 quyết định → hợp đồng → thay đổi → kiểm chứng → bản phát hành → số đo thực địa" và tự ghi rằng các cổng đó là đề xuất, chưa
 chạy ở đâu.
 
-Câu hỏi: X-office có nên định vị là **bộ máy giao hàng có kiểm chứng** (xưởng) thay vì chỉ thư viện yêu cầu, và nếu có thì
+Câu hỏi: X-Office có nên định vị là **bộ máy giao hàng có kiểm chứng** (xưởng) thay vì chỉ thư viện yêu cầu, và nếu có thì
 bằng cách nào mà không đảo các quyết định 3.x đã chốt?
 
 ## Yếu tố quyết định

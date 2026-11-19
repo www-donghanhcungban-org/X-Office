@@ -1,4 +1,4 @@
-# AUDIT-REPORT — X-office · 2026-11-05 (delta)
+# AUDIT-REPORT — X-Office · 2026-11-05 (delta)
 
 > Mốc quét `23447d8..6086e69` trên `main` (PR #435–#445), cộng hai PR sửa [#446](https://github.com/seeker19110/X-Templates/pull/446) và [#447](https://github.com/seeker19110/X-Templates/pull/447) (D-371, D-372). Task T-3557, trước cắt 3.30.0. Ba nhóm auditor độc lập: SEC/CFG/CI · XFEAT/DOC/HAR · CODE/TEST/PERF/DEP. Kết quả theo ID ở [sổ audit](../../ops/AUDIT-STATUS.md).
 

@@ -8,7 +8,7 @@
 // Chromium có sẵn nhưng khác bản Playwright (sandbox/CI tự dựng): đặt XT_CHROMIUM=/đường/dẫn/chromium.
 // Exit: 0 đạt · 1 có vi phạm (hoặc có UNMEASURED khi --strict) · 2 không chạy được (goto lỗi, không mở được Chromium).
 // Phép đo không thực hiện được (nền ảnh/gradient, điều khiển bị che) in "UNMEASURED" và dòng kết quả không ghi "đạt".
-// Mã tự viết cho khung X-office (không chép mã của dự án khác); ý tưởng cổng "đo bản render" tham khảo stored 06 §7d.
+// Mã tự viết cho khung X-Office (không chép mã của dự án khác); ý tưởng cổng "đo bản render" tham khảo stored 06 §7d.
 import { chromium } from 'playwright';
 import AxeBuilder from '@axe-core/playwright';
 import { resolve } from 'node:path';

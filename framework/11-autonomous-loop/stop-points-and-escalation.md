@@ -200,7 +200,7 @@ tên workflow CI khác thì sửa `workflows:` (tên không khớp = không bao 
 
 - Trigger *Schedule* hằng tuần (≥ 1 giờ/lần là giới hạn của Routine); repo là dự án đích, nhánh mặc định.
 - Prompt: (1) `python3 .xtemplates/scripts/xt.py doctor --drift --json` — `ok: true` và không có `outdated` → kết thúc
-  không làm gì; (2) có `outdated`/`missing`: trong bản clone X-office mới nhất chạy
+  không làm gì; (2) có `outdated`/`missing`: trong bản clone X-Office mới nhất chạy
   `python3 <clone>/scripts/install.py <gốc dự án> --plan` đọc JSON, rồi `install.py` (copy-if-absent, giữ file
   `modified`, chỉ gỡ `ask` có trong `.xtemplates/manifest.json`), làm các bước "Dự án đích" của `CHANGELOG.md`, qua
   `/gate`, mở **PR nháp** từ nhánh `claude/upgrade-<tag>` (`LOOP-STOP-014`: chỉ đề xuất, không merge).

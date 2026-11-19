@@ -36,7 +36,7 @@ Bản harden (ADR-0080): guard mặc định chặn theo danh sách đóng (D-50
 
 ### Added
 
-- README thêm mục "Vì sao dùng X-office" (vấn đề → lợi ích) và "Ủng hộ và liên hệ" (VietQR Techcombank,
+- README thêm mục "Vì sao dùng X-Office" (vấn đề → lợi ích) và "Ủng hộ và liên hệ" (VietQR Techcombank,
   điện thoại/Zalo, email, hỗ trợ triển khai tại TP.HCM hoặc online); `.github/FUNDING.yml` bật nút Sponsor trỏ về mục này.
 
 - `NOTICE` ghi phạm vi giấy phép MIT, thành phần bên thứ ba (axe-core, MPL-2.0) và tuyên bố nhãn hiệu; README trỏ tới
