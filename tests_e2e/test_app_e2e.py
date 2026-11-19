@@ -466,6 +466,16 @@ class OfficeTest(AppCase):
             " names: true, npc: true, motion: false, t: 0, zoom: 1, pan: {x: 0, y: 0}, quality: 'high'});"
             " out[w] = seen.length; } return out; }"
         )
+        # Phòng đang xem phát nhãn TRƯỚC (nên thắng khi nhãn phải nhường nhau ở khung hẹp).
+        firsts = page.evaluate(
+            "async () => { const sc = await import('/office/scene.js'), th = await import('/office/themes.js');"
+            " const first = (focus) => { const tags = [], nop = () => {};"
+            " const sink = {box: nop, panel: nop, dot: nop, ring: nop, tag: (...a) => tags.push(a)};"
+            " sc.compose(sink, {theme: th.themeById('night'), scale: 'company', layout: 'open', seats: [], names: true,"
+            " npc: true, motion: false, t: 0, focus}); return tags.find(a => a[7] === 'room')[8]; };"
+            " return [first(null), first('server'), first('garden')]; }"
+        )
+        self.assertEqual(firsts, ["reception", "server", "garden"])
         self.assertEqual(drawn["1118"], 8)
         self.assertTrue(3 <= drawn["358"] < 8, drawn)
         self.assertEqual(len(data["contrast"]), 8)
@@ -640,6 +650,8 @@ class OfficeTest(AppCase):
         names = [b[0] for b in boxes]
         self.assertTrue(0 < len(boxes) < 8, names)  # còn nhãn (không kiểm trên tập rỗng), nhưng không phải mọi phòng
         self.assertIn("▸ Khu làm việc", names)  # bàn agent nằm trong Khu làm việc
+        # Phòng xa hẳn khỏi bàn (ra ngoài hình) không bị ghim vào mép khung.
+        self.assertEqual({"▸ Vườn & hồ bơi", "▸ Ngủ trưa", "▸ Pantry"} & set(names), set(), names)
         self.assert_labels_apart(boxes)
         # Phóng to rồi "Tới phòng" Lễ tân: phòng đang xem luôn giữ nhãn, kẹp trọn trong khung.
         for _ in range(3):
