@@ -169,7 +169,11 @@ pre.md { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 60vh; overf
 .office-bar > span { display: inline-flex; gap: 0.35rem; align-items: center; }
 .office-bar select { font: inherit; max-width: 100%; }
 .office-stage { position: relative; border: 1px solid var(--border); border-radius: 0.5rem; overflow: hidden; }
-.office-3d { cursor: grab; touch-action: none; }
+.office-3d, .office-canvas { cursor: grab; touch-action: none; }
+.office-rooms { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; margin: 0 0 0.5rem; }
+.office-rooms button { background: var(--muted); color: var(--foreground); border-color: var(--border); padding: 0.2rem 0.6rem; }
+.office-rooms button[aria-pressed="true"] { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary); }
+.office-counters { font-weight: 600; margin: 0.5rem 0 0; }
 .office-3d:focus-visible { outline-offset: -3px; } /* stage overflow:hidden cắt vòng focus vẽ ngoài canvas (WCAG 2.4.7) */
 .office-3d:active { cursor: grabbing; }
 .office-labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }

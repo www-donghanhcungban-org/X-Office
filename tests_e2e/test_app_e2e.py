@@ -284,14 +284,18 @@ class OfficeTest(AppCase):
         page.uncheck("#office-motion")
         themes = page.eval_on_selector_all("#office-theme option", "os => os.map(o => o.value)")
         layouts = page.eval_on_selector_all("#office-layout option", "os => os.map(o => o.value)")
+        scales = page.eval_on_selector_all("#office-scale option", "os => os.map(o => o.value)")
         self.assertEqual(len(themes), 8)
         self.assertEqual(layouts, ["open", "connected", "private"])
+        self.assertEqual(scales, ["team", "company", "corp"])
         frames = "() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))"
-        for layout in layouts:
-            page.select_option("#office-layout", layout)
-            for theme in themes:
-                page.select_option("#office-theme", theme)
-                page.evaluate(frames)  # vẽ thật từng tổ hợp (cờ dirty gộp nhiều lần đổi vào một khung hình)
+        for scale in scales:
+            page.select_option("#office-scale", scale)
+            for layout in layouts:
+                page.select_option("#office-layout", layout)
+                for theme in themes:
+                    page.select_option("#office-theme", theme)
+                    page.evaluate(frames)  # vẽ thật từng tổ hợp (cờ dirty gộp nhiều lần đổi vào một khung hình)
         self.assertEqual(watch.take(), [])
         # Cửa hẹp hơn 1 ô vẫn mở đúng mép (review #6): đoạn vách không phủ khoảng cửa nào.
         segs = page.evaluate(
@@ -300,13 +304,28 @@ class OfficeTest(AppCase):
         self.assertEqual(segs[0], [0, 0.6])
         self.assertTrue(all(not (a < 1.4 and b > 0.6) and not (a < 7.6 and b > 6.8) for a, b in segs))
         self.assertAlmostEqual(sum(b - a for a, b in segs), 12.6 - 0.8 - 0.8)
+        # Quy mô công ty: nút "Tới phòng" đủ 8 phòng + Toàn cảnh; bấm → nút đó aria-pressed; bấm tên agent → tới bàn.
+        page.select_option("#office-scale", "company")
+        rooms = page.locator(".office-rooms button")
+        self.assertEqual(rooms.count(), 9)
+        page.click(".office-rooms button[data-room='meeting']")
+        self.assertEqual(page.get_attribute(".office-rooms button[data-room='meeting']", "aria-pressed"), "true")
+        page.locator("main tbody tr th button").first.click()
+        self.assertEqual(page.get_attribute(".office-rooms button[data-room='meeting']", "aria-pressed"), "false")
+        self.assertRegex(page.text_content(".office-counters") or "", r"^5 agent \+ \d+ nhân viên minh hoạ")
+        page.uncheck("#office-npc")
+        self.assertRegex(page.text_content(".office-counters") or "", r"^5 agent · ")
+        page.select_option("#office-scale", "corp")
         page.select_option("#office-renderer", "3d")
         canvas3d = page.locator("canvas.office-3d")
         canvas3d.wait_for()
         self.assertTrue(page.locator("canvas.office-canvas:not(.office-3d)").is_hidden())
         page.locator(".office-labels .office-tag:not([hidden])").nth(4).wait_for()  # 5 nhãn tên, bám nhân vật
         page.get_by_role("button", name="Làm mới").focus()  # Tab tới canvas: vòng focus vẽ TRONG canvas — WCAG 2.4.7
-        page.keyboard.press("Tab")
+        for _ in range(20):  # Tab qua các nút (Tới phòng…) tới canvas
+            page.keyboard.press("Tab")
+            if page.evaluate("() => document.activeElement.classList.contains('office-3d')"):
+                break
         state = page.evaluate(
             "() => { const c = document.activeElement; return [c.className, c.matches(':focus-visible'),"
             " getComputedStyle(c).outlineOffset]; }"

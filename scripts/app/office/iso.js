@@ -125,6 +125,18 @@ export function depth(b) {
   return (b.x + b.w / 2) + (b.y + b.d / 2) + b.z * 0.01 + (b.bias || 0);
 }
 
+// Tỉ lệ + gốc để mọi điểm thế giới `pts` ([x,y,z]) vừa khung cw×ch, rồi nhân `zoom` quanh tâm và dời `pan` (px).
+export function fitPoints(pts, cw, ch, zoom = 1, pan) {
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (const [x, y, z] of pts) {
+    const sx = (x - y) * C, sy = (x + y) * S - z;
+    x0 = Math.min(x0, sx); x1 = Math.max(x1, sx); y0 = Math.min(y0, sy); y1 = Math.max(y1, sy);
+  }
+  const scale = Math.min((cw - 24) / Math.max(1, x1 - x0), (ch - 48) / Math.max(1, y1 - y0)) * zoom;
+  const p = pan || { x: 0, y: 0 };
+  return { scale, ox: cw / 2 - ((x0 + x1) / 2) * scale + p.x, oy: ch / 2 - ((y0 + y1) / 2) * scale + 14 + p.y };
+}
+
 // Tỉ lệ + gốc để phòng W×D×H vừa khung (cw×ch px), chừa lề trên cho nhãn.
 export function fit(W, D, H, cw, ch, zoom = 1) {
   const spanX = (W + D) * C;
