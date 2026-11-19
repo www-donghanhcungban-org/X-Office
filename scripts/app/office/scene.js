@@ -1,5 +1,5 @@
 // Dựng + vẽ văn phòng từ (kiểu, mùa, dữ liệu /api/office). Không trạng thái toàn cục: gọi drawScene mỗi khung hình.
-import { Iso, depth, fitPoints, shade } from "./iso.js";
+import { Iso, depth, fitPoints, inkOn, overlaps, shade } from "./iso.js";
 import { planFor, viewBox } from "./plans.js";
 
 export const ROOM = { W: 16, D: 12, H: 4 }; // phòng của quy mô "nhóm nhỏ" (giữ để tương thích)
@@ -567,8 +567,10 @@ export function compose(sink, opts, sorted = true) {
 
   const [bg, fg, border] = th.label;
   if (opts.names !== false) {
-    // Nhãn phòng: viên màu nhấn của kiểu (khác hẳn nhãn agent), đặt sát tường sau của phòng — không đứng trên đầu ai.
-    for (const r of plan.rooms) top.tag(r.x + r.w / 2, r.y + 0.6, 3.7, "▸ " + r.name, th.trim, "#ffffff", null, "room");
+    // Nhãn phòng: viên màu nhấn của kiểu (khác hẳn nhãn agent), chữ tối/trắng theo tương phản với màu nhấn.
+    // Phòng đang xem phát trước: khi nhãn phải nhường nhau (khung hẹp), nhãn của nó luôn được giữ.
+    const order = [...plan.rooms].sort((a, b) => (b.id === opts.focus) - (a.id === opts.focus));
+    for (const r of order) top.tag(...roomLabelAt(r), "▸ " + r.name, th.trim, inkOn(th.trim), null, "room", r.id);
   }
   for (const { seat, at } of heads) {
     if (opts.names !== false) top.tag(at.x, at.y, at.z, seat.label, bg, fg, border, "agent");
@@ -578,6 +580,15 @@ export function compose(sink, opts, sorted = true) {
     }
   }
   return { items: items.length, plan };
+}
+
+// Điểm neo nhãn phòng, sao cho nhãn rơi lên tường/sàn của CHÍNH phòng đó: phòng giáp tường sau ngoài (y = 0) → cao
+// trên tường sau; phòng giáp tường trái ngoài (x = 0) → cao trên tường trái; phòng khác (chỉ có vách kính thấp phía
+// sau) → sát sàn, gần mép trước của phòng — không treo lơ lửng đè lên phòng phía sau.
+export function roomLabelAt(r) {
+  if (r.y === 0) return [r.x + r.w / 2, 0.6, 3.7];
+  if (r.x === 0) return [0.6, r.y + r.d - 3, 3.7];
+  return [r.x + r.w / 2, r.y + r.d - 1, 0.6];
 }
 
 // Bàn phụ thứ k có nhân viên minh hoạ không — MỘT quy tắc cho cả compose (vẽ) lẫn npcSeated (bộ đếm).
@@ -613,7 +624,16 @@ export function drawScene(ctx, cw, ch, opts) {
   iso.tag = (...a) => tags.push(a);
   compose(iso, opts);
   if (opts.motion) particles(ctx, opts.season === "noel" ? "snow" : th.ambient, cw, ch, opts.t || 0);
-  for (const a of tags) tag(...a);
+  // Nhãn phòng chồng lên nhãn phòng đã đặt (khung hẹp: các phòng hàng sau sát nhau trên màn) → bỏ, giữ nhãn đầu.
+  const placed = [];
+  for (const a of tags) {
+    if (a[7] === "room") {
+      const box = iso.tagBox(a[0], a[1], a[2], a[3]);
+      if (placed.some((o) => overlaps(o, box))) continue;
+      placed.push(box);
+    }
+    tag(...a);
+  }
 }
 
 // Mô tả văn bản của cảnh cho trình đọc màn hình (canvas role="img").

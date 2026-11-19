@@ -12,6 +12,30 @@ export function shade(hex, f) {
   return "#" + ch.map((v) => v.toString(16).padStart(2, "0")).join("");
 }
 
+// Độ chói tương đối (WCAG 2.x) của màu #rrggbb; màu không đọc được → null.
+function luminance(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || "");
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+// Tỉ lệ tương phản WCAG giữa hai màu #rrggbb (1–21); màu không đọc được → 0.
+export function contrast(a, b) {
+  const la = luminance(a), lb = luminance(b);
+  if (la === null || lb === null) return 0;
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+
+// Màu chữ (tối hay trắng) tương phản cao hơn trên nền `bg` — nhãn tô màu nhấn của kiểu vẫn đạt WCAG 1.4.3.
+export function inkOn(bg) {
+  return contrast("#0b0f19", bg) >= contrast("#ffffff", bg) ? "#0b0f19" : "#ffffff";
+}
+
 export class Iso {
   constructor(ctx, view) {
     this.ctx = ctx;
@@ -75,15 +99,20 @@ export class Iso {
   }
 
   // Nhãn bo góc ở điểm thế giới (x,y,z), neo đáy-giữa.
-  // `kind` (agent/state/room) chỉ dùng cho bộ vẽ 3D (thuộc tính data-kind của nhãn HTML) — 2D bỏ qua.
-  tag(x, y, z, text, bg, fg, border) {
-    const ctx = this.ctx;
+  // `kind` (agent/state/room) và `id` (phòng của nhãn phòng) chỉ dùng cho bộ vẽ 3D (nhãn HTML) — 2D bỏ qua.
+  // Hộp màn hình {l, t, r, b, sx, size} của nhãn — dùng chung cho vẽ và cho tránh chồng nhãn.
+  tagBox(x, y, z, text) {
     const [sx, sy] = this.p(x, y, z);
     const size = Math.max(10, Math.round(this.view.scale * 0.42));
-    ctx.font = "600 " + size + "px system-ui, sans-serif";
-    const tw = ctx.measureText(text).width;
-    const pw = tw + size, ph = size * 1.6;
-    const left = sx - pw / 2, top = sy - ph;
+    this.ctx.font = "600 " + size + "px system-ui, sans-serif";
+    const pw = this.ctx.measureText(text).width + size, ph = size * 1.6;
+    return { l: sx - pw / 2, t: sy - ph, r: sx + pw / 2, b: sy, sx, size };
+  }
+
+  tag(x, y, z, text, bg, fg, border) {
+    const ctx = this.ctx;
+    const { l: left, t: top, r, b, sx, size } = this.tagBox(x, y, z, text);
+    const pw = r - left, ph = b - top;
     ctx.beginPath();
     ctx.roundRect(left, top, pw, ph, size * 0.5);
     ctx.fillStyle = bg;
@@ -122,6 +151,11 @@ export class Iso {
   }
 }
 
+// Hai hộp {l, t, r, b} chồng lên nhau (cách nhau dưới `gap` px).
+export function overlaps(a, b, gap = 2) {
+  return a.l < b.r + gap && b.l < a.r + gap && a.t < b.b + gap && b.t < a.b + gap;
+}
+
 // Thứ tự vẽ (painter): xa trước gần sau theo tâm x+y, rồi đáy z.
 export function depth(b) {
   return (b.x + b.w / 2) + (b.y + b.d / 2) + b.z * 0.01 + (b.bias || 0);
@@ -136,7 +170,10 @@ export function fitPoints(pts, cw, ch, zoom = 1, pan) {
   }
   const scale = Math.min((cw - 24) / Math.max(1, x1 - x0), (ch - 48) / Math.max(1, y1 - y0)) * zoom;
   const p = pan || { x: 0, y: 0 };
-  return { scale, ox: cw / 2 - ((x0 + x1) / 2) * scale + p.x, oy: ch / 2 - ((y0 + y1) / 2) * scale + 14 + p.y };
+  return {
+    scale, ox: cw / 2 - ((x0 + x1) / 2) * scale + p.x, oy: ch / 2 - ((y0 + y1) / 2) * scale + 14 + p.y,
+    w: (x1 - x0) * scale, h: (y1 - y0) * scale, // cỡ cảnh trên màn (px) — giới hạn dời góc nhìn
+  };
 }
 
 // Tỉ lệ + gốc để phòng W×D×H vừa khung (cw×ch px), chừa lề trên cho nhãn.

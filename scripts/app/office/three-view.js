@@ -4,6 +4,7 @@
 // quay về 2D. Toạ độ thế giới (x, y, z lên) → three (x, z, y).
 import * as THREE from "../vendor/three/three.module.js";
 import { compose, viewCorners } from "./scene.js";
+import { overlaps } from "./iso.js";
 
 // Mặt phẳng chồng nhau (cửa sổ trên tường, thảm trên sàn) nằm đúng toạ độ; thứ tự phát (như painter của 2D) được giữ
 // bằng polygonOffset — dịch độ sâu, không dịch hình — nên toạ độ lớn (mặt tiền toà nhà) không bị đẩy lệch.
@@ -55,7 +56,9 @@ class Collector {
   panel(f) { this.panels.push(f); }
   dot(x, y, z, r, color) { this.dots.push({ x, y, z, r, color }); }
   ring(x, y, z, r, tilt, color) { this.rings.push({ x, y, z, r, tilt, color }); }
-  tag(x, y, z, text, bg, fg, border, kind) { this.tags.push({ x, y, z, text, bg, fg, border, kind: kind || "" }); }
+  tag(x, y, z, text, bg, fg, border, kind, id) {
+    this.tags.push({ x, y, z, text, bg, fg, border, kind: kind || "", id: id || "" });
+  }
 }
 
 class Pool {
@@ -161,8 +164,9 @@ export function createThreeView(stage) {
     setMat(m.material, f.color, f.glow, glowOn);
   }
 
-  function syncTags(list) {
+  function syncTags(list, focus) {
     const rect = { w: view.w, h: view.h };
+    const placed = []; // hộp các nhãn phòng đã đặt — nhãn phòng sau chồng lên thì nhường (compose phát phòng đang xem trước)
     list.forEach((t, i) => {
       let el = tagEls[i];
       if (!el) {
@@ -175,8 +179,28 @@ export function createThreeView(stage) {
       el.textContent = t.text;
       el.dataset.kind = t.kind; // agent | state | room — test và CSS phân biệt nhãn agent với nhãn phòng
       el.hidden = false;
-      el.style.setProperty("left", ((p.x + 1) / 2) * rect.w + "px");
-      el.style.setProperty("top", ((1 - p.y) / 2) * rect.h + "px");
+      let left = ((p.x + 1) / 2) * rect.w, top = ((1 - p.y) / 2) * rect.h;
+      if (t.kind === "room") {
+        // Nhãn phòng là biển chỉ dẫn: nhãn ra hẳn ngoài khung (tới bàn/tới phòng khác, phóng to) → ẩn, không ghim mép
+        // đè lên phòng khác; nhãn chỉ chạm mép (khung hẹp, xoay sát biên) → kẹp trọn để không cắt chữ. Phòng đang xem
+        // ("Tới phòng") luôn giữ nhãn, kẹp vào khung — kể cả khi phóng to khiến điểm neo ra ngoài hình.
+        const hw = el.offsetWidth / 2 + 2;
+        const out = left < -hw || left > rect.w + hw || top < 0 || top - el.offsetHeight > rect.h;
+        if (out && t.id !== focus) {
+          el.hidden = true;
+          return;
+        }
+        left = Math.min(rect.w - hw, Math.max(hw, left));
+        top = Math.min(rect.h - 2, Math.max(el.offsetHeight + 2, top));
+        const box = { l: left - hw + 2, r: left + hw - 2, t: top - el.offsetHeight, b: top };
+        if (placed.some((o) => overlaps(o, box))) {
+          el.hidden = true;
+          return;
+        }
+        placed.push(box);
+      }
+      el.style.setProperty("left", left + "px");
+      el.style.setProperty("top", top + "px");
       el.style.setProperty("background", t.bg);
       el.style.setProperty("color", t.fg);
       el.style.setProperty("border-color", t.border || t.bg);
@@ -237,6 +261,7 @@ export function createThreeView(stage) {
   canvas.addEventListener("pointerup", stop);
   canvas.addEventListener("pointercancel", stop);
   canvas.addEventListener("keydown", (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return; // tổ hợp của trình duyệt/hệ điều hành (Ctrl+−, Alt+←) giữ nguyên
     const step = { ArrowLeft: [0.1, 0], ArrowRight: [-0.1, 0], ArrowUp: [0, 0.08], ArrowDown: [0, -0.08] }[e.key];
     if (!step) return;
     e.preventDefault();
@@ -282,7 +307,7 @@ export function createThreeView(stage) {
       for (const p of [boxes, panels, dots, rings]) p.finish();
       place(opts.zoom, viewCorners(opts).box, plan);
       renderer.render(scene, camera);
-      syncTags(sink.tags);
+      syncTags(sink.tags, opts.focus);
       api.dirty = false;
     },
     dispose() {
