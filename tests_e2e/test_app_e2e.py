@@ -290,7 +290,7 @@ class OfficeTest(AppCase):
         self.assertEqual(scales, ["team", "company", "corp"])
         frames = "() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))"
         seasons = page.eval_on_selector_all("#office-season option", "os => os.map(o => o.value)")
-        self.assertTrue({"noel", "tet"} <= set(seasons))
+        self.assertLessEqual({"noel", "tet"}, set(seasons))
         for scale in scales:
             page.select_option("#office-scale", scale)
             for season in seasons:  # lớp mùa đặt theo `plan.season` của từng quy mô
