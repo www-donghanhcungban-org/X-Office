@@ -43,7 +43,8 @@ function seatRows(h, seats) {
 
 export async function render(main, { api, h, error }) {
   const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const prefs = { renderer: "2d", layout: "open", theme: "night", season: "auto", names: true, motion: !reduce, quality: "high", zoom: 1, ...loadPrefs() };
+  const prefs = { renderer: "2d", layout: "open", theme: "night", season: "auto", names: true, motion: true, quality: "high", zoom: 1, ...loadPrefs() };
+  if (reduce) prefs.motion = false; // hệ thống xin giảm chuyển động thắng lựa chọn đã lưu; bật lại tay chỉ cho phiên này
   const [rendererLabel, rendererSel] = select(h, "office-renderer", "Bộ vẽ", RENDERERS, prefs.renderer);
   const [layoutLabel, layoutSel] = select(h, "office-layout", "Bố cục", LAYOUTS, prefs.layout);
   const [themeLabel, themeSel] = select(h, "office-theme", "Kiểu văn phòng", THEMES, prefs.theme);
@@ -141,6 +142,10 @@ export async function render(main, { api, h, error }) {
   async function useRenderer() {
     if (prefs.renderer === "3d" && !three) {
       try {
+        // Thăm dò WebGL trước khi tải ~2 MB three.js; dự án đích không cài bản 3D (install.py) → tệp vendor 404.
+        const probe = document.createElement("canvas").getContext("webgl2");
+        if (!probe) throw new Error("trình duyệt/GPU không có WebGL 2");
+        probe.getExtension("WEBGL_lose_context")?.loseContext();
         const mod = await import("../office/three-view.js");
         three = mod.createThreeView(stage);
         canvas.hidden = true;
@@ -149,7 +154,7 @@ export async function render(main, { api, h, error }) {
         three = null;
         prefs.renderer = rendererSel.value = "2d";
         msg.replaceChildren(h("p", { class: "state error", role: "alert" },
-          "Không bật được 3D (" + ((e && e.message) || "WebGL không khả dụng") + ") — dùng bản 2D."));
+          "Không bật được 3D (" + ((e && e.message) || "WebGL không khả dụng") + ") — dùng bản 2D. Ở dự án đích, bản 3D cần cài bằng `install.py --with-office-3d`."));
       }
     } else if (prefs.renderer !== "3d" && three) {
       three.dispose();
@@ -187,7 +192,7 @@ export async function render(main, { api, h, error }) {
     prefs.quality = qualitySel.value;
     prefs.names = namesBox.checked;
     prefs.motion = motionBox.checked;
-    savePrefs(prefs);
+    savePrefs(reduce ? { ...prefs, motion: loadPrefs().motion } : prefs);
     await useRenderer();
     label();
   }
@@ -200,5 +205,8 @@ export async function render(main, { api, h, error }) {
   await load();
   await useRenderer();
   requestAnimationFrame(tick);
-  const timer = setInterval(() => (stage.isConnected ? load() : clearInterval(timer)), POLL_MS);
+  const timer = setInterval(() => {
+    if (!stage.isConnected) clearInterval(timer);
+    else if (!document.hidden) load(); // tab ẩn: không hỏi máy chủ
+  }, POLL_MS);
 }

@@ -247,6 +247,7 @@ export function createThreeView(stage) {
     },
     dispose() {
       renderer.dispose();
+      renderer.forceContextLoss(); // trả ngữ cảnh WebGL ngay (trình duyệt giới hạn số ngữ cảnh sống)
       for (const g of [boxGeo, planeGeo, dotGeo, ringGeo]) g.dispose();
       scene.traverse((o) => {
         if (!o.material) return;

@@ -6,7 +6,8 @@ Kết quả trong dự án đích:
   .xtemplates/research/         bản nghiên cứu nền mà module trỏ tới (chỉ file được trỏ)
   .xtemplates/scripts/xt.py     công cụ compose / blueprint-status / loop
   .xtemplates/scripts/dev-task.sh
-  .xtemplates/scripts/{xt_app,app}/  app cục bộ `xt.py app` (ADR-0038)
+  .xtemplates/scripts/{xt_app,app}/  app cục bộ `xt.py app` (ADR-0038); bộ vẽ 3D three.js của màn Văn phòng
+                                     (app/vendor/three/, ~2,1 MB) chỉ khi --with-office-3d hoặc bản cài cũ đã có (ADR-0082)
   .xtemplates/VERSION           SHA/nhãn phiên bản khung đã cài
   .xtemplates/manifest.json     hash file harness/gốc/GitHub + rule do khung đặt (chỉ gỡ `ask` có trong đây) + chính sách (REC-09)
                                 — hash dạng `sha256:<hex>` (cả `harness.sha256.json`); đọc nhận cả hex trần của bản cũ
@@ -30,7 +31,7 @@ Dự án đã cài bản ≤ 2.x (`.xstored/`, `xs.py`, `xs.yaml`, `XS_*`): ch�
   giữ manifest hash, đổi `xs.yaml` → `xt.yaml`, xoá bản sao `.xstored/`; file người dùng còn nhắc tên cũ được liệt kê để sửa tay.
 
 Dùng:
-  python3 scripts/install.py <thư-mục-dự-án> [--force-harness] [--no-harness] [--no-git-hooks] [--harness codex,…] [--with-github] [--preset safe|autonomous] [--stage-init] [--pack <id>] [--label v1.0.0] [--plan]
+  python3 scripts/install.py <thư-mục-dự-án> [--force-harness] [--no-harness] [--no-git-hooks] [--harness codex,…] [--with-github] [--with-office-3d] [--preset safe|autonomous] [--stage-init] [--pack <id>] [--label v1.0.0] [--plan]
   python3 scripts/install.py <thư-mục-mới-hoặc-rỗng> --new --pack <id> --idea "<ý tưởng>" [--name <slug>] [--scale S|M|L]
   --new: một repo main, khung + gói + PROJECT + blueprint + giai đoạn 1; commit đầu trước khi cài hook, doctor offline.
   --plan: in JSON kế hoạch (quyền thêm/bớt, hook thêm/đổi matcher, file đè/giữ, git hook, adapter; gói và drift file
@@ -139,6 +140,19 @@ def drop_symlink(path: Path) -> None:
 
 
 BYTECODE = shutil.ignore_patterns("__pycache__", "*.pyc")
+OFFICE_3D = ("app", "vendor", "three")  # three.js vendor của màn Văn phòng (ADR-0082) — chỉ cài khi chủ dự án chọn
+
+
+def without_office_3d(app_root: Path) -> Callable[[str, list[str]], set[str]]:
+    """Bỏ `vendor/three` ngay dưới `app_root` (cùng bytecode); thư mục khác chép đủ."""
+    vendor = os.fspath(app_root / OFFICE_3D[1])
+
+    def ignore(d: str, names: list[str]) -> set[str]:
+        return set(BYTECODE(d, names)) | ({OFFICE_3D[2]} & set(names) if os.fspath(d) == vendor else set())
+
+    return ignore
+
+
 PACK_PAYLOADS = ("starter", "managed")
 
 
@@ -813,9 +827,11 @@ def pack_root_error(target: Path, pack: dict[str, Any] | None) -> str | None:
     )
 
 
-def install_framework(xt_dir: Path, label: str | None) -> str:
+def install_framework(xt_dir: Path, label: str | None, office_3d: bool = False) -> str:
     """Bước 1: framework + research + scripts + VERSION + README vào .xtemplates/ — thay thế toàn bộ (bản chỉ đọc).
-    Trả nhãn đã ghi vào VERSION."""
+    `office_3d`: chép cả three.js của màn Văn phòng; bản cài cũ đã có thì giữ (nâng khung không làm mất). Trả nhãn đã
+    ghi vào VERSION."""
+    keep_3d = office_3d or (xt_dir / "scripts" / Path(*OFFICE_3D)).is_dir()
     copy_tree_replace(SRC / "framework", xt_dir / "framework", framework_ignore)
     # research/: chỉ file module trong framework/ trỏ tới bằng đường dẫn tương đối (AUD-XFEAT-046) — nhật ký nghiên cứu
     # khác của repo khung không phải của dự án đích.
@@ -832,7 +848,10 @@ def install_framework(xt_dir: Path, label: str | None) -> str:
     # App cục bộ `xt.py app` (ADR-0038): gói máy chủ + giao diện tĩnh cạnh xt.py, luôn thay như xt.py.
     for d in ("xt_app", "app"):
         if (SRC / "scripts" / d).is_dir():  # khung tối giản (test, bản cũ) không có app: bỏ qua, `doctor` báo ⚠
-            copy_tree_replace(SRC / "scripts" / d, xt_dir / "scripts" / d)
+            src = SRC / "scripts" / d
+            copy_tree_replace(
+                src, xt_dir / "scripts" / d, BYTECODE if keep_3d or d != "app" else without_office_3d(src)
+            )
     version = framework_label(label)
     for f in ("VERSION", "README.md"):
         drop_symlink(xt_dir / f)
@@ -2276,6 +2295,7 @@ def install(
     no_git_hooks: bool = False,
     pack: dict[str, Any] | None = None,
     _new_cwd: bool = False,
+    office_3d: bool = False,
 ) -> int:
     target = target if _new_cwd else target.resolve()
     error = (
@@ -2295,7 +2315,7 @@ def install(
 
     migrate_legacy(target)
     inferred = infer_root_hashes(target)  # mẫu cũ trong .xtemplates/framework/ — trước khi install_framework thay
-    version = install_framework(xt_dir, label)
+    version = install_framework(xt_dir, label, office_3d)
     if not no_harness:
         install_harness(target, force_harness)
         if not no_git_hooks:
@@ -2602,6 +2622,7 @@ def new_flags_error(args: argparse.Namespace) -> str | None:
         args.preset is not None,
         args.stage_init,
         bool(args.harness),
+        args.with_office_3d,
     )
     return "--new chỉ nhận --pack/--idea/--name/--scale" if any(incompatible) else None
 
@@ -2621,6 +2642,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="copy ruleset mẫu, PR template, Dependabot, workflow ci + secret-scan + pr-title + pr-steward (+ stub merge-gate tạm, "
         "D-122) vào .github/ (không đè)",
+    )
+    p.add_argument(
+        "--with-office-3d",
+        action="store_true",
+        help="cài cả bộ vẽ 3D three.js (~2,1 MB) cho màn Văn phòng của `xt.py app` (ADR-0082); cài lại giữ lựa chọn",
     )
     p.add_argument(
         "--plan",
@@ -2695,6 +2721,7 @@ def main(argv: list[str] | None = None) -> int:
         hosts,
         a.no_git_hooks,
         pack,
+        office_3d=a.with_office_3d,
     )
 
 

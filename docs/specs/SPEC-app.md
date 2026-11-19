@@ -72,7 +72,7 @@ khoá `(method, path)`; `Ctx` có `base` (gốc dự án), `framework` (thư m�
 | `GET /api/prs` | — | `available: true`, `prs: [{number, title, head_sha, lane, action, reasons}]`; không có `gh`/chưa đăng nhập/hết giờ → `available: false`, `reason` | — (luôn 200) | T-1971 |
 | `GET /api/pr-stats` | `days` (1–90, mặc định 7) | như `pr stats --json`, thêm `available` | 400 `days` sai | T-1971 |
 | `GET /api/registry` | — | như `registry --json` + `available`, `path`, mỗi sản phẩm thêm owner/type/risk/environments/slo/release/exceptions; chưa có hoặc sai → `available: false`, `reason`, `errors` (≤ 50) | — (luôn 200) | T-3691 |
-| `GET /api/office` | — | `project`, `loop: {verdict, reason}`, `seats: [{key, label, state, task: {id, title} \| null}]` (bàn theo thứ tự `main`, `executor`, `executor-deep`, `reviewer`, `researcher`; `state` ∈ `work`, `fail`, `wait`, `done`, `idle` — suy từ verdict vòng và lần chạy cuối của mỗi agent trong `.autopilot/runs.jsonl`), `tasks: {open, done, skipped}`, `pending_human: [{id, reason}]`, `feed: [{at, agent, task, ok}]` (≤ 15, mới nhất trước) | — (luôn 200; dữ liệu hỏng → bàn rảnh, danh sách rỗng) | F-008 |
+| `GET /api/office` | — | `project`, `loop: {verdict, reason}`, `seats: [{key, label, state, task: {id, title} \| null}]` (bàn theo thứ tự `main`, `executor`, `executor-deep`, `reviewer`, `researcher`; `state` ∈ `work`, `fail`, `wait`, `done`, `idle`, `untracked` — suy từ verdict vòng và lần chạy cuối của mỗi agent trong `.autopilot/runs.jsonl`; lần chạy cũ hơn 30 phút không còn tính là đang làm; bàn không có nguồn bằng chứng (reviewer, researcher) là `untracked`), `tasks: {open, done, skipped}`, `pending_human: [{id, reason}]`, `feed: [{at, agent, task, ok}]` (≤ 15, mới nhất trước) | — (luôn 200; dữ liệu hỏng → bàn rảnh, danh sách rỗng) | F-008 |
 
 Đọc file mới mỗi request (hoặc cache theo `mtime`); không ghi gì ngoài `POST /api/blueprint`. `GET /api/prs` chỉ gọi REST
 `GET` qua `_gh_api`, không ghi sổ review, không gọi merge.
@@ -117,7 +117,7 @@ khoá `(method, path)`; `Ctx` có `base` (gốc dự án), `framework` (thư m�
 ### F-008 Văn phòng (`#/office`, `views/office.js`, `office/*.js`)
 - S-015 Given vòng đang chạy có lần chạy xanh của `executor` và lần đỏ của `executor-deep` trên task còn mở, When mở màn, Then bàn "Thực thi" hiện "đang làm" kèm ID task, bàn "Thực thi sâu" hiện "đang sửa (đỏ)"; bảng văn bản dưới canvas nêu đúng như vậy; việc `loop defer` nằm ở "Việc cần người".
 - S-016 When chọn kiểu văn phòng (Công ty công nghệ, Studio sáng tạo, Thư viện yên tĩnh, Văn phòng ban đêm, Cyberpunk, Quán cà phê, Vũ trụ, Bệnh viện) hoặc mùa (Tự động, Tắt, Noel, Tết), Then cảnh vẽ lại ngay, lựa chọn nhớ trong `localStorage` (lỗi lưu → vẫn chạy với mặc định).
-- S-017 Given `prefers-reduced-motion: reduce`, When mở màn, Then chuyển động tắt mặc định (bật lại bằng tay được); rời màn thì vòng vẽ và hỏi lại dữ liệu (10 s) dừng.
+- S-017 Given `prefers-reduced-motion: reduce`, When mở màn, Then chuyển động tắt (thắng lựa chọn đã lưu; bật lại bằng tay chỉ cho phiên đó); tab ẩn thì không hỏi lại dữ liệu (10 s); rời màn thì vòng vẽ dừng và ngữ cảnh WebGL được trả.
 - S-018 When chọn "Bộ vẽ: 3D three.js", Then cảnh dựng lại bằng three.js (tải lười), kéo chuột hoặc phím mũi tên xoay
 góc nhìn, nhãn tên bám nhân vật; không có WebGL → thông báo và quay về 2D. Chọn lại 2D → giải phóng canvas WebGL.
 - S-019 When chọn "Bố cục" (Mở chung, Nhiều phòng liên thông, Mỗi người một phòng), Then vách kính có cửa thông

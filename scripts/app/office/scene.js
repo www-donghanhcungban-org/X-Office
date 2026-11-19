@@ -6,8 +6,9 @@ const DESKS = [[1.2, 1.2], [5.2, 1.2], [9.2, 1.2], [1.2, 6.2], [5.2, 6.2]];
 const SKIN = ["#f2c6a0", "#e0ac69", "#c68642", "#f1c27d", "#8d5524"];
 const HAIR = ["#2d1b12", "#6b3e26", "#111827", "#b45309", "#4b5563"];
 const SHIRT = ["#2563eb", "#16a34a", "#9333ea", "#dc2626", "#0d9488"];
-export const STATE_TEXT = { work: "đang làm", fail: "đang sửa (đỏ)", wait: "cần người", done: "xong", idle: "rảnh" };
-const STATE_COLOR = { work: "#22c55e", fail: "#ef4444", wait: "#f59e0b", done: "#38bdf8", idle: "#94a3b8" };
+export const STATE_TEXT = { work: "đang làm", fail: "đang sửa (đỏ)", wait: "cần người", done: "xong", idle: "rảnh", untracked: "chưa có tín hiệu" };
+const STATE_COLOR = { work: "#22c55e", fail: "#ef4444", wait: "#f59e0b", done: "#38bdf8", idle: "#94a3b8", untracked: "#94a3b8" };
+const QUIET = new Set(["idle", "untracked"]); // không bong bóng, màn hình tắt
 
 // Số giả ngẫu nhiên ổn định theo chỉ số (cửa sổ toà nhà, sao) — khung hình nào cũng như nhau.
 function rnd(i) {
@@ -224,9 +225,9 @@ function flatProp(iso, p, th) {
 function deskBoxes(th, x, y, seat, out, t, motion) {
   out.push(box(x, y, 0.72, 2.8, 1.1, 0.1, th.desk, { glow: th.edge ? th.edge : null }));
   for (const [dx, dy] of [[0.1, 0.1], [2.6, 0.1], [0.1, 0.9], [2.6, 0.9]]) out.push(box(x + dx, y + dy, 0, 0.1, 0.1, 0.72, th.leg));
-  const lit = seat.state === "idle" ? shade(th.screen, 0.1) : STATE_COLOR[seat.state];
+  const lit = QUIET.has(seat.state) ? shade(th.screen, 0.1) : STATE_COLOR[seat.state];
   const flick = motion && seat.state === "work" ? 0.1 * Math.sin(t * 9) : 0;
-  out.push(box(x + 0.7, y + 0.15, 0.82, 1.4, 0.08, 0.8, "#111827", { front: shade(lit, -0.35 + flick), glow: seat.state === "idle" ? null : lit }));
+  out.push(box(x + 0.7, y + 0.15, 0.82, 1.4, 0.08, 0.8, "#111827", { front: shade(lit, -0.35 + flick), glow: QUIET.has(seat.state) ? null : lit }));
   out.push(box(x + 1.25, y + 0.25, 0.82, 0.3, 0.2, 0.06, "#374151"));
   out.push(box(x + 0.8, y + 0.55, 0.82, 1.1, 0.35, 0.03, "#4b5563"));
   out.push(box(x + 2.2, y + 0.5, 0.82, 0.18, 0.18, 0.22, "#ffffff"));
@@ -393,7 +394,7 @@ export function compose(sink, opts, sorted = true) {
   const [bg, fg, border] = th.label;
   for (const { seat, at } of heads) {
     if (opts.names !== false) sink.tag(at.x, at.y, at.z, seat.label, bg, fg, border);
-    if (seat.state !== "idle") {
+    if (!QUIET.has(seat.state)) {
       const what = seat.task && seat.task.id ? seat.task.id + " · " : "";
       sink.tag(at.x, at.y, at.z + 0.75, what + STATE_TEXT[seat.state], STATE_COLOR[seat.state], "#0b0f19");
     }
@@ -419,6 +420,6 @@ export function drawScene(ctx, cw, ch, opts) {
 
 // Mô tả văn bản của cảnh cho trình đọc màn hình (canvas role="img").
 export function describe(seats, themeName) {
-  const busy = seats.filter((s) => s.state !== "idle").map((s) => s.label + " " + STATE_TEXT[s.state] + (s.task ? " " + s.task.id : ""));
+  const busy = seats.filter((s) => !QUIET.has(s.state)).map((s) => s.label + " " + STATE_TEXT[s.state] + (s.task ? " " + s.task.id : ""));
   return "Văn phòng kiểu " + themeName + ". " + (busy.length ? busy.join("; ") + "." : "Mọi người đang rảnh.");
 }

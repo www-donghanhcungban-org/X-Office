@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 import re
 import sys
@@ -18,6 +19,7 @@ from xt_app import api_office, server
 
 PLAN = "## Lát 1\n\n- [x] `T-001` xong\n- [ ] `T-002` mở\n- [ ] `T-003` mở sâu\n- [~] `T-004` bỏ\n"
 LOOP = "2026-11-19T10:00:00Z"
+NOW = dt.datetime(2026, 11, 19, 10, 30, tzinfo=dt.timezone.utc)  # lần chạy 10:0x còn trong cửa sổ FRESH (30 phút)
 
 
 def call(base: Path) -> Dict[str, Any]:
@@ -62,8 +64,11 @@ class OfficeApiTest(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         self.base = Path(self._tmp.name) / "văn-phòng"
         self.base.mkdir()
+        self._now = mock.patch.object(api_office, "_now", return_value=NOW)
+        self._now.start()
 
     def tearDown(self) -> None:
+        self._now.stop()
         self._tmp.cleanup()
 
     def test_empty_project_all_idle(self) -> None:
@@ -71,7 +76,10 @@ class OfficeApiTest(unittest.TestCase):
         self.assertEqual(got["project"], "văn-phòng")
         self.assertEqual(got["loop"]["verdict"], "inactive")
         self.assertEqual([s["key"] for s in got["seats"]], [k for k, _, _ in api_office.SEATS])
-        self.assertEqual({s["state"] for s in got["seats"]}, {"idle"})
+        self.assertEqual({s["state"] for s in got["seats"] if s["key"] not in api_office.UNTRACKED}, {"idle"})
+        self.assertEqual(
+            [s["state"] for s in got["seats"] if s["key"] in api_office.UNTRACKED], ["untracked", "untracked"]
+        )
         self.assertTrue(all(s["task"] is None for s in got["seats"]))
         self.assertEqual(got["tasks"], {"open": 0, "done": 0, "skipped": 0})
         self.assertEqual(got["pending_human"], [])
@@ -95,7 +103,7 @@ class OfficeApiTest(unittest.TestCase):
         )
         self.assertEqual(seat(got, "executor-deep")["state"], "fail")
         self.assertEqual(seat(got, "executor-deep")["task"]["id"], "T-003")
-        self.assertEqual(seat(got, "reviewer")["state"], "idle")
+        self.assertEqual(seat(got, "reviewer")["state"], "untracked")  # không có nguồn → không khai "rảnh"
         self.assertEqual(got["tasks"], {"open": 2, "done": 1, "skipped": 1})
         self.assertEqual(
             got["pending_human"], [{"id": "T-009", "reason": "cần khoá trả phí"}, {"id": "T-010", "reason": ""}]
@@ -128,6 +136,22 @@ class OfficeApiTest(unittest.TestCase):
                 self.assertEqual(seat(got, "main")["state"], want)
                 # agent con chỉ "làm" khi vòng đang chạy
                 self.assertEqual(seat(got, "executor")["state"], "work" if want == "work" else "idle")
+
+    def test_stale_run_is_not_working(self) -> None:
+        """Lần chạy cuối cũ hơn FRESH → bàn rảnh, không gắn task (agent có thể đã dừng dù task còn mở)."""
+        project(self.base, [run("T-002", 0, "executor", "2026-11-19T09:00:00Z"), run("T-003", 1, None, "garbage")])
+        with mock.patch.object(xt, "loop_verdict", return_value={"verdict": "continue", "reason": ""}):
+            got = call(self.base)
+        self.assertEqual(seat(got, "executor"), {"key": "executor", "label": "Thực thi", "state": "idle", "task": None})
+        self.assertEqual(seat(got, "main")["state"], "work")
+        self.assertIsNone(seat(got, "main")["task"])  # thời điểm không đọc được → không coi là tươi
+
+    def test_now_is_utc(self) -> None:
+        self._now.stop()
+        try:
+            self.assertEqual(api_office._now().tzinfo, dt.timezone.utc)
+        finally:
+            self._now.start()
 
     def test_broken_inputs_do_not_500(self) -> None:
         project(self.base, [run("T-002", 0, "executor", LOOP)])

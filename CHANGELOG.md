@@ -15,8 +15,11 @@ Bản < 3.20.0: [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md) (T-3651; `changel
   (tự động, Noel, Tết); 3 bố cục (mở chung, nhiều phòng liên thông, mỗi người một phòng); nhãn tên, chuyển động, chất
   lượng, phóng to/thu nhỏ. Bộ vẽ mặc định Canvas 2D tự viết (không phụ thuộc); tuỳ chọn **3D three.js** (0.187.0, MIT,
   vendor ở `scripts/app/vendor/three/` kèm `SOURCE`, tải lười khi chọn; kéo/phím mũi tên để xoay; không có WebGL → về 2D)
-  — [ADR-0082](docs/adr/0082-office-view-renderers.md). Tắt chuyển động khi `prefers-reduced-motion`; có bảng văn bản
-  tương đương. Dự án đích: nhận khi chạy lại `install.py` (thêm ≈ 2,1 MB tệp tĩnh three.js).
+  — [ADR-0082](docs/adr/0082-office-view-renderers.md), [nghiên cứu](research/2026-11-19-office-3d.md). Bàn không có nguồn
+  bằng chứng (reviewer, researcher) hiện "chưa có tín hiệu"; lần chạy cũ hơn 30 phút không còn tính là đang làm. Tắt
+  chuyển động khi `prefers-reduced-motion`; tab ẩn thì không hỏi lại dữ liệu; có bảng văn bản tương đương. Dự án đích:
+  màn Văn phòng 2D nhận khi chạy lại `install.py`; bộ vẽ 3D (≈ 2,1 MB) chỉ khi thêm cờ mới `install.py --with-office-3d`
+  (cài một lần thì nâng khung vẫn giữ).
 
 ### Changed
 

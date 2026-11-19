@@ -792,6 +792,7 @@ test -f PROJECT.md && test -d .git
             ["--idea", "idea"],
             ["--new", "--pack", "web-api-ts", "--idea", "idea", "--no-git-hooks"],
             ["--new", "--pack", "web-api-ts", "--idea", "idea", "--plan"],
+            ["--new", "--pack", "web-api-ts", "--idea", "idea", "--with-office-3d"],
         ]
         for args in cases:
             with self.subTest(args=args), redirect_stderr(io.StringIO()), redirect_stdout(io.StringIO()):

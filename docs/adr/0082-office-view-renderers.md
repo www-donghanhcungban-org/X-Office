@@ -12,6 +12,9 @@ dẫn chiếu dự án `khanh020905/my-office` (MIT, three.js 0.160, Next.js). S
 (công nghệ, studio, thư viện, ban đêm, cyberpunk, quán cà phê, vũ trụ, bệnh viện), lớp mùa, *"thêm cả tuỳ chọn three.js"*,
 bố cục *"nhiều văn phòng liên thông nhau, hoặc mỗi người 1 phòng riêng"* và *"cho hết vào tuỳ chọn"*.
 
+Nghiên cứu cùng ngày ([`research/2026-11-19-office-3d.md`](../../research/2026-11-19-office-3d.md): ba phương án, ba
+giám khảo độc lập, cả ba chọn phương án tiến dần) là cơ sở của quyết định dưới.
+
 Ràng buộc từ ADR-0038: app không bước build, không npm, CSP chặn script inline và nguồn ngoài; `scripts/app/` được
 `install.py` chép nguyên sang mọi dự án đích. Dữ kiện (2026-11-19, registry npm): three.js bản stable mới nhất 0.187.0,
 MIT; gói không có bản `.min`, `build/three.module.js` + `build/three.core.js` ≈ 2,1 MB chưa nén (≈ 420 KB gzip);
@@ -43,8 +46,9 @@ Chọn **3**.
 
 ## Hệ quả
 
-- Dự án đích nhận thêm ≈ 2,1 MB tệp tĩnh trong `.xtemplates/scripts/app/vendor/three/` khi chạy lại `install.py`; chỉ tải
-  vào trình duyệt khi chọn 3D. Máy chủ app đọc mọi tệp tĩnh vào bộ nhớ lúc khởi động (+2,1 MB RAM).
+- Dự án đích **không** nhận three.js mặc định (vendor làm phần `scripts/` cài sang tăng ~141 %): `install.py
+  --with-office-3d` chép `.xtemplates/scripts/app/vendor/three/` (≈ 2,1 MB); bản cài đã có thì nâng khung vẫn giữ. Thiếu
+  vendor, chọn 3D báo lỗi và quay về 2D. Máy chủ app đọc mọi tệp tĩnh vào bộ nhớ lúc khởi động (+2,1 MB RAM khi có).
 - Nâng three.js = thay hai tệp + cập nhật `SOURCE` (hash, ngày) + chạy E2E `OfficeTest`; ghim bản, không tự nâng.
 - Trạng thái bàn là suy ra từ bằng chứng trên đĩa (`runs.jsonl`, verdict vòng), không phải sự kiện thời gian thực;
   bàn Review/Nghiên cứu luôn "rảnh" cho tới khi vòng ghi hoạt động của các agent này.

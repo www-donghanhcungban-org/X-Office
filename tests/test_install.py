@@ -66,6 +66,25 @@ class InstallTest(unittest.TestCase):
         self.assertEqual(exit_status.exception.code, 0)
         self.assertIn("CPython 3.15.x", out.getvalue())
 
+    def test_office_3d_only_when_chosen_and_kept_on_upgrade(self):
+        """ADR-0082: three.js (~2,1 MB) không chép mặc định; --with-office-3d chép; cài lại không cờ vẫn giữ."""
+        app = self.target / ".xtemplates" / "scripts" / "app"
+        with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+            self.assertEqual(self.run_install(), 0)
+            self.assertTrue((app / "office" / "three-view.js").is_file())  # màn Văn phòng 2D luôn có
+            self.assertTrue((app / "vendor").is_dir())
+            self.assertFalse((app / "vendor" / "three").exists())
+            self.assertEqual(self.run_install("--with-office-3d"), 0)
+            self.assertTrue((app / "vendor" / "three" / "three.module.js").is_file())
+            self.assertTrue((app / "vendor" / "three" / "SOURCE").is_file())
+            self.assertEqual(self.run_install(), 0)
+            self.assertTrue((app / "vendor" / "three" / "three.core.js").is_file())
+
+    def test_office_3d_ignore_only_skips_three_under_vendor(self):
+        ignore = install.without_office_3d(Path("/k/app"))
+        self.assertEqual(ignore("/k/app/vendor", ["three", "other", "x.pyc"]), {"three", "x.pyc"})
+        self.assertEqual(ignore("/k/app", ["three", "vendor"]), set())
+
     def test_fresh_install_layout(self):
         self.assertEqual(self.run_install(), 0)
         self.assertTrue((self.target / ".xtemplates" / "framework" / "00-method" / "conventions.md").exists())
