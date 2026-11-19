@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "products": [
+    {
+      "repo": "www-donghanhcungban-org/hotel-manager",
+      "owner": "www-donghanhcungban-org",
+      "type": null,
+      "risk": null,
+      "core": "3.32.0",
+      "pack": null,
+      "environments": [],
+      "slo": "",
+      "release": null,
+      "exceptions": []
+    },
+    {
+      "repo": "www-donghanhcungban-org/X-Company",
+      "owner": "www-donghanhcungban-org",
+      "type": null,
+      "risk": null,
+      "core": "3.34.0",
+      "pack": null,
+      "environments": [],
+      "slo": "",
+      "release": null,
+      "exceptions": []
+    },
+    {
+      "repo": "www-donghanhcungban-org/xboss",
+      "owner": "www-donghanhcungban-org",
+      "type": null,
+      "risk": null,
+      "core": "3.34.0",
+      "pack": null,
+      "environments": [],
+      "slo": "",
+      "release": null,
+      "exceptions": []
+    },
+    {
+      "repo": "www-donghanhcungban-org/dhcb",
+      "owner": "www-donghanhcungban-org",
+      "type": null,
+      "risk": null,
+      "core": "3.34.0",
+      "pack": null,
+      "environments": [],
+      "slo": "",
+      "release": null,
+      "exceptions": []
+    }
+  ]
+}

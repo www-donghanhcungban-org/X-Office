@@ -1,0 +1,14 @@
+Tên: three
+Phiên bản: 0.187.0 (bản stable mới nhất trên npm ngày lấy, phát hành 2026-10-30)
+License: MIT (tệp LICENSE bên cạnh, nguyên văn từ tarball)
+Nguồn: https://registry.npmjs.org/three/-/three-0.187.0.tgz (tệp package/build/three.module.js, package/build/three.core.js, package/LICENSE)
+Tarball sha1: face29ee2de9bcc31a1b573a76f224e35e0b2894 (= dist.shasum của registry npm)
+three.module.js sha256: 104f56145899722094556490d787aae0617cc2fc3382f31df02d724ea1aee341
+three.core.js sha256: 613e370f76638fdef83926642bf256dc9615684922de1ce1f63a8583e5d78578
+Repo gốc: https://github.com/mrdoob/three.js (gitHead 7e89746a687bb88271253698fa108b1dd59825d0)
+Ngày lấy: 2026-11-19
+Sửa đổi: không — tệp chép nguyên văn; three.module.js chỉ import './three.core.js' (đường tương đối) nên chạy không cần
+bundler hay import map, đúng CSP `script-src 'self'` của app.
+Dùng ở đâu: bộ vẽ 3D tuỳ chọn của màn Văn phòng (scripts/app/office/three-view.js), chỉ tải khi người dùng chọn "3D (three.js)".
+Kích thước: ~2,1 MB chưa nén (gói npm không có bản .min); chép sang dự án đích cùng scripts/app khi chạy install.py.
+Kiểm: python3 scripts/xt.py vendor-check --dirs scripts/app/vendor --strict

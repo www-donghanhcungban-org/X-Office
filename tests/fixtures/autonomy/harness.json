@@ -1,0 +1,571 @@
+{
+ "cases": [
+  {
+   "id": "harness-rec01-quote-semantics",
+   "origin": "repro",
+   "refs": [
+    "REC-01"
+   ],
+   "input": {
+    "kind": "same_command",
+    "a": "test \"$X\" = yes",
+    "b": "test '$X' = yes"
+   },
+   "expect": {
+    "green": false
+   }
+  },
+  {
+   "id": "harness-rec01-glob",
+   "origin": "adversarial-author",
+   "refs": [
+    "REC-01"
+   ],
+   "input": {
+    "kind": "same_command",
+    "a": "echo '*'",
+    "b": "echo *"
+   },
+   "expect": {
+    "green": false
+   }
+  },
+  {
+   "id": "harness-rec01-control",
+   "origin": "control",
+   "refs": [
+    "REC-01"
+   ],
+   "input": {
+    "kind": "same_command",
+    "a": "echo  a",
+    "b": "echo a"
+   },
+   "expect": {
+    "green": true
+   }
+  },
+  {
+   "id": "harness-aud-code-014-empty-expansion",
+   "origin": "audit",
+   "refs": [
+    "AUD-CODE-014",
+    "REC-01"
+   ],
+   "input": {
+    "kind": "same_command",
+    "a": "test -n $X",
+    "b": "test -n \"$X\""
+   },
+   "expect": {
+    "green": false
+   }
+  },
+  {
+   "id": "harness-aud-code-014-nbsp",
+   "origin": "audit",
+   "refs": [
+    "AUD-CODE-014"
+   ],
+   "input": {
+    "kind": "same_command",
+    "a": "make test",
+    "b": "make test"
+   },
+   "expect": {
+    "green": false
+   }
+  },
+  {
+   "id": "harness-aud-code-014-heredoc-quoted",
+   "origin": "audit",
+   "refs": [
+    "AUD-CODE-014"
+   ],
+   "input": {
+    "kind": "same_command",
+    "a": "cat <<EOF",
+    "b": "cat <<'EOF'"
+   },
+   "expect": {
+    "green": false
+   }
+  },
+  {
+   "id": "harness-aud-code-014-quoted-assignment",
+   "origin": "audit",
+   "refs": [
+    "AUD-CODE-014"
+   ],
+   "input": {
+    "kind": "same_command",
+    "a": "X=1 cmd",
+    "b": "'X=1' cmd"
+   },
+   "expect": {
+    "green": false
+   }
+  },
+  {
+   "id": "harness-aud-code-014-fd-space",
+   "origin": "adversarial-author",
+   "refs": [
+    "AUD-CODE-014"
+   ],
+   "input": {
+    "kind": "same_command",
+    "a": "exec {fd}>f",
+    "b": "exec {fd} >f"
+   },
+   "expect": {
+    "green": false
+   }
+  },
+  {
+   "id": "harness-rec06-threshold-raised",
+   "origin": "repro",
+   "refs": [
+    "REC-06"
+   ],
+   "input": {
+    "kind": "carry_states",
+    "id": "A-001",
+    "old": "- [x] `A-001` **MUST** Coverage ≥ 80 %. — Bằng chứng: coverage --fail-under=80\n",
+    "new": "- [ ] `A-001` **MUST** Coverage ≥ 90 %.\n"
+   },
+   "expect": {
+    "green": false
+   }
+  },
+  {
+   "id": "harness-rec06-control-level-only",
+   "origin": "control",
+   "refs": [
+    "REC-06"
+   ],
+   "input": {
+    "kind": "carry_states",
+    "id": "A-004",
+    "old": "- [x] `A-004` **SHOULD** d. — Bằng chứng: PR #7\n",
+    "new": "- [ ] `A-004` **MUST@L** d.\n"
+   },
+   "expect": {
+    "green": true
+   }
+  },
+  {
+   "id": "harness-rec02-blueprint-missing",
+   "origin": "repro",
+   "refs": [
+    "REC-02"
+   ],
+   "input": {
+    "kind": "blueprint_done",
+    "state": {
+     "blueprint": "BLUEPRINT.md",
+     "scope": {
+      "blueprint": "BLUEPRINT.md",
+      "profile": "web-app",
+      "scale": "M"
+     }
+    }
+   },
+   "expect": {
+    "green": false
+   }
+  },
+  {
+   "id": "harness-rec02-scale-lowered",
+   "origin": "adversarial-author",
+   "refs": [
+    "REC-02"
+   ],
+   "input": {
+    "kind": "blueprint_done",
+    "files": {
+     "BLUEPRINT.md": "---\nkind: blueprint\nprofile: web-app\nscale: S\n---\n- [x] `A-001` **MUST** a. — Bằng chứng: t\n"
+    },
+    "state": {
+     "blueprint": "BLUEPRINT.md",
+     "scope": {
+      "blueprint": "BLUEPRINT.md",
+      "profile": "web-app",
+      "scale": "M"
+     }
+    }
+   },
+   "expect": {
+    "green": false
+   },
+   "note": "hạ quy mô M→S ngầm là hạ sàn — không khai done"
+  },
+  {
+   "id": "harness-rec07-na-now-ui",
+   "origin": "repro",
+   "refs": [
+    "REC-07"
+   ],
+   "input": {
+    "kind": "na_skipped",
+    "group": 6,
+    "groups": {
+     "6": {
+      "#": "6",
+      "Mã": "A11Y",
+      "Trạng thái": "N/A",
+      "Ghi chú": "không có UI"
+     }
+    },
+    "files": {
+     "web/index.html": "<p>x</p>"
+    }
+   },
+   "expect": {
+    "green": false
+   }
+  },
+  {
+   "id": "harness-rec07-control-still-na",
+   "origin": "control",
+   "refs": [
+    "REC-07"
+   ],
+   "input": {
+    "kind": "na_skipped",
+    "group": 6,
+    "groups": {
+     "6": {
+      "#": "6",
+      "Mã": "A11Y",
+      "Trạng thái": "N/A",
+      "Ghi chú": "không có UI"
+     }
+    },
+    "files": {
+     "main.py": "print(1)\n"
+    }
+   },
+   "expect": {
+    "green": true
+   }
+  },
+  {
+   "id": "harness-rec09-project-ask-kept",
+   "origin": "repro",
+   "refs": [
+    "REC-09"
+   ],
+   "input": {
+    "kind": "ask_removed",
+    "rule": "Bash(git merge:*)",
+    "ours": {
+     "permissions": {
+      "allow": [
+       "Bash"
+      ],
+      "deny": []
+     }
+    },
+    "theirs": {
+     "permissions": {
+      "ask": [
+       "Bash(git merge:*)"
+      ]
+     }
+    }
+   },
+   "expect": {
+    "green": false
+   },
+   "note": "rule `ask` trùng chuỗi khung cũ mà manifest không chứng minh do khung đặt → của dự án, giữ"
+  },
+  {
+   "id": "harness-rec09-control-manifest-proves",
+   "origin": "control",
+   "refs": [
+    "REC-09"
+   ],
+   "input": {
+    "kind": "ask_removed",
+    "rule": "Bash(git merge:*)",
+    "ours": {
+     "permissions": {
+      "allow": [
+       "Bash"
+      ],
+      "deny": []
+     }
+    },
+    "theirs": {
+     "permissions": {
+      "ask": [
+       "Bash(git merge:*)"
+      ]
+     }
+    },
+    "manifest": {
+     "ask": [
+      "Bash(git merge:*)"
+     ]
+    }
+   },
+   "expect": {
+    "green": true
+   }
+  },
+  {
+   "id": "harness-aud-har-379-carry",
+   "origin": "audit",
+   "refs": [
+    "AUD-HAR-379"
+   ],
+   "input": {
+    "kind": "loop_block",
+    "scenario": "carry",
+    "recover": false
+   },
+   "expect": {
+    "green": false,
+    "blocked": true,
+    "recovery": "unblock",
+    "unblocked": 0
+   }
+  },
+  {
+   "id": "harness-aud-har-379-carry-recovered",
+   "origin": "control",
+   "refs": [
+    "AUD-HAR-379"
+   ],
+   "input": {
+    "kind": "loop_block",
+    "scenario": "carry",
+    "recover": true
+   },
+   "expect": {
+    "green": true,
+    "blocked": false,
+    "recovery": "",
+    "unblocked": 1
+   }
+  },
+  {
+   "id": "harness-aud-har-378-expired",
+   "origin": "audit",
+   "refs": [
+    "AUD-HAR-378"
+   ],
+   "input": {
+    "kind": "loop_block",
+    "scenario": "expired",
+    "recover": false
+   },
+   "expect": {
+    "green": false,
+    "blocked": true,
+    "recovery": "init",
+    "unblocked": 0
+   }
+  },
+  {
+   "id": "harness-aud-har-378-expired-recovered",
+   "origin": "control",
+   "refs": [
+    "AUD-HAR-378"
+   ],
+   "input": {
+    "kind": "loop_block",
+    "scenario": "expired",
+    "recover": true
+   },
+   "expect": {
+    "green": true,
+    "blocked": false,
+    "recovery": "",
+    "unblocked": 1
+   }
+  },
+  {
+   "id": "harness-invalid-merge-review",
+   "origin": "audit",
+   "refs": [
+    "AUD-HAR-409"
+   ],
+   "input": {
+    "kind": "merge_review_config",
+    "yaml": "merge_review: optionl\n"
+   },
+   "expect": {
+    "green": false,
+    "ci_green": false,
+    "doctor_green": false
+   }
+  },
+  {
+   "id": "harness-valid-merge-review",
+   "origin": "control",
+   "refs": [],
+   "input": {
+    "kind": "merge_review_config",
+    "yaml": "merge_review: required\n"
+   },
+   "expect": {
+    "green": true,
+    "ci_green": true,
+    "doctor_green": true
+   }
+  },
+  {
+   "id": "harness-optional-review-and-number-order-docs",
+   "origin": "audit",
+   "refs": [
+    "AUD-HAR-410"
+   ],
+   "input": {
+    "kind": "merge_policy_docs",
+    "clauses": {
+     "xt.yaml": "xét theo số PR tăng dần",
+     "LOOP-STOP-002": "review sạch ở đúng head nếu `merge_review: required`",
+     "LOOP-STOP-009": "nếu `merge_review: required`",
+     "LOOP-STOP-029": "khi `merge_review: required`"
+    }
+   },
+   "expect": {
+    "green": true,
+    "matches": true
+   }
+  },
+  {
+   "id": "link-request-iri",
+   "origin": "audit",
+   "refs": [
+    "AUD-CI-033"
+   ],
+   "input": {
+    "kind": "link_request",
+    "url": "https://example.invalid/hồ%20sơ?q=tiếng+Việt&next=%2F#phần"
+   },
+   "expect": {
+    "green": true,
+    "requests": [
+     "/h%E1%BB%93%20s%C6%A1?q=ti%E1%BA%BFng+Vi%E1%BB%87t&next=%2F"
+    ]
+   }
+  },
+  {
+   "id": "link-request-ascii",
+   "origin": "control",
+   "refs": [],
+   "input": {
+    "kind": "link_request",
+    "url": "https://example.invalid/a%2Fb?q=x+y&next=/a?b"
+   },
+   "expect": {
+    "green": true,
+    "requests": [
+     "/a%2Fb?q=x+y&next=/a?b"
+    ]
+   }
+  },
+  {
+   "id": "wrapper-ssh-agent-no-options",
+   "origin": "audit",
+   "refs": [
+    "AUD-SEC-691"
+   ],
+   "input": {
+    "kind": "wrapper_argv",
+    "argv": [
+     "ssh-agent",
+     "git",
+     "status",
+     "--short"
+    ]
+   },
+   "expect": {
+    "green": true,
+    "argv": [
+     "git",
+     "status",
+     "--short"
+    ]
+   }
+  },
+  {
+   "id": "wrapper-ssh-agent-joined",
+   "origin": "audit",
+   "refs": [
+    "AUD-SEC-691"
+   ],
+   "input": {
+    "kind": "wrapper_argv",
+    "argv": [
+     "ssh-agent",
+     "-Ut30",
+     "git",
+     "status",
+     "--short"
+    ]
+   },
+   "expect": {
+    "green": true,
+    "argv": [
+     "git",
+     "status",
+     "--short"
+    ]
+   }
+  },
+  {
+   "id": "wrapper-ssh-agent-separate",
+   "origin": "audit",
+   "refs": [
+    "AUD-SEC-691"
+   ],
+   "input": {
+    "kind": "wrapper_argv",
+    "argv": [
+     "ssh-agent",
+     "-a",
+     "fixture.sock",
+     "git",
+     "status",
+     "--short"
+    ]
+   },
+   "expect": {
+    "green": true,
+    "argv": [
+     "git",
+     "status",
+     "--short"
+    ]
+   }
+  },
+  {
+   "id": "wrapper-ssh-agent-end-options",
+   "origin": "audit",
+   "refs": [
+    "AUD-SEC-691"
+   ],
+   "input": {
+    "kind": "wrapper_argv",
+    "argv": [
+     "ssh-agent",
+     "--",
+     "git",
+     "status",
+     "--short"
+    ]
+   },
+   "expect": {
+    "green": true,
+    "argv": [
+     "git",
+     "status",
+     "--short"
+    ]
+   }
+  }
+ ]
+}

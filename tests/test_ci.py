@@ -1,0 +1,791 @@
+"""CI của repo khung (`.github/workflows/ci.yml`) và chia test cho job song song (`scripts/dev-task.sh test-shard`/
+`test-combine`, WF-CI-024): `quality` tổng hợp mọi job con với `if: always()` (WF-CI-001 — `!cancelled()` để run bị huỷ
+thành `skipped` mà GitHub tính là ĐẠT); mọi task của `dev-task.sh gate` có job; các shard hợp lại đúng bằng bộ test."""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+from typing import Any, Dict, List
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "scripts"))
+import xt
+
+WORKFLOWS = ROOT / ".github" / "workflows"
+CI = WORKFLOWS / "ci.yml"
+STUB = WORKFLOWS / "merge-gate.yml"
+RULESET = ROOT / ".github" / "rulesets" / "main.json"
+AGGREGATE = "quality"
+OUTSIDE_QUALITY = {"protection-guard"}  # required check riêng, không phải cổng chất lượng
+# ADR-0036: `pull_request_target` chỉ còn ở reviewer trên GitHub (đang tắt) — GitHub chặn mặc định ở repo public từ 2026-12-02 (dời từ 2026-11-02 — ADR-0035 Ghi chú 2026-11-03).
+PR_TARGET_ALLOWED = {"pr-review.yml"}
+PR_TARGET_RE = re.compile(r"(?<![\w-])pull_request_target(?![\w-])")
+
+
+def ci_jobs(text: str) -> Dict[str, str]:
+    """Khoá job → thân job (văn bản thô, kể cả block `run: |`) — đọc theo thụt lề như `protection-guard`."""
+    body = text.split("\njobs:\n", 1)[1]
+    parts = re.split(r"^  ([A-Za-z0-9_-]+):\n", body, flags=re.M)
+    return dict(zip(parts[1::2], parts[2::2]))
+
+
+def job_key(body: str, key: str) -> str:
+    """Giá trị một dòng của khoá cấp job (thụt 4) — rỗng nếu không có."""
+    m = re.search(rf"^    {re.escape(key)}:[ \t]*(.*)$", body, re.M)
+    return m.group(1).strip() if m else ""
+
+
+def flow_list(value: str) -> List[str]:
+    """`[a, b, c]` → ['a', 'b', 'c']."""
+    return [x.strip() for x in value.strip().strip("[]").split(",") if x.strip()]
+
+
+def matrix_shards(body: str) -> List[str]:
+    m = re.search(r"^        shard:\s*(\[.*\])\s*$", body, re.M)
+    return flow_list(m.group(1)) if m else []
+
+
+def strip_comment(line: str) -> str:
+    """Bỏ comment YAML (`#` đầu dòng hoặc sau khoảng trắng tới hết dòng)."""
+    return re.sub(r"(?:^|\s)#.*$", "", line)
+
+
+def uses_pull_request_target(text: str) -> bool:
+    """Workflow khai `pull_request_target` ở mã — khoá map, phần tử mảng, chuỗi `on:` (comment không tính)."""
+    return any(PR_TARGET_RE.search(strip_comment(ln)) for ln in text.splitlines())
+
+
+def status_rule(path: Path) -> Dict[str, Any]:
+    """`parameters` của rule `required_status_checks` trong một ruleset JSON."""
+    rules = json.loads(path.read_text(encoding="utf-8"))["rules"]
+    params: Dict[str, Any] = next(r for r in rules if r["type"] == "required_status_checks")["parameters"]
+    return params
+
+
+def required_checks(path: Path) -> List[str]:
+    """Context required check của một ruleset JSON (theo thứ tự khai)."""
+    return [c["context"] for c in status_rule(path)["required_status_checks"]]
+
+
+def gate_loop() -> List[str]:
+    """Từ của vòng `for t in … ; do` ở nhánh `gate)` của dev-task.sh (kể cả biến như `$FLOOR`)."""
+    src = (ROOT / "scripts" / "dev-task.sh").read_text(encoding="utf-8")
+    m = re.search(r"^  gate\)\n(?:.*\n)*?\s*for t in ([^;]+); do", src, re.M)
+    assert m, "không thấy vòng task của `gate` trong dev-task.sh"
+    return m.group(1).split()
+
+
+def gate_tasks() -> List[str]:
+    """Task cố định mà `dev-task.sh gate` chạy. `$FLOOR` chỉ có giá trị khi dự án khai `test_floor`."""
+    return [t for t in gate_loop() if not t.startswith("$")]
+
+
+class QualityAggregateTest(unittest.TestCase):
+    def setUp(self):
+        self.jobs = ci_jobs(CI.read_text(encoding="utf-8"))
+        self.quality = self.jobs[AGGREGATE]
+
+    def test_quality_runs_always_never_cancelled(self):
+        cond = job_key(self.quality, "if")
+        self.assertIn("always()", cond)
+        self.assertNotIn("cancelled()", cond)  # run bị huỷ → `skipped` → required check tính ĐẠT
+        self.assertEqual(job_key(self.quality, "name"), AGGREGATE)  # tên required check của ruleset
+
+    def test_quality_needs_every_other_job(self):
+        needs = set(flow_list(job_key(self.quality, "needs")))
+        self.assertEqual(needs, set(self.jobs) - {AGGREGATE} - OUTSIDE_QUALITY)
+
+    def test_quality_fails_on_any_non_success(self):
+        # Kiểm toàn bộ `needs` (không liệt kê tay từng job — thêm job không thể quên kiểm kết quả của nó).
+        self.assertIn("toJSON(needs)", self.quality)
+        self.assertIn('!= "success"', self.quality)
+        self.assertIn("sys.exit(1)", self.quality)
+
+    def test_protection_guard_kept(self):
+        self.assertEqual(job_key(self.jobs["protection-guard"], "name"), "protection-guard")
+        self.assertEqual(job_key(self.jobs["protection-guard"], "if"), "")  # luôn chạy, không phụ thuộc job khác
+
+    def test_every_job_has_short_timeout(self):
+        for name, body in self.jobs.items():
+            with self.subTest(job=name):
+                self.assertLessEqual(int(job_key(body, "timeout-minutes")), 10)
+
+
+class GateFanOutTest(unittest.TestCase):
+    """Mỗi task của `dev-task.sh gate` là một job gọi đúng `dev-task.sh <task>`; `test` chia shard + `coverage` gộp."""
+
+    def setUp(self):
+        self.jobs = ci_jobs(CI.read_text(encoding="utf-8"))
+
+    def test_gate_tasks_known(self):
+        self.assertEqual(gate_tasks(), ["build", "typecheck", "lint", "test"])
+
+    def test_gate_optional_test_floor_last(self):
+        """T-1812: task tuỳ chọn duy nhất của `gate` là `$FLOOR` (= `test_floor` khi xt.yaml khai), đứng sau `test`."""
+        self.assertEqual(gate_loop(), ["build", "typecheck", "lint", "test", "$FLOOR"])
+        src = (ROOT / "scripts" / "dev-task.sh").read_text(encoding="utf-8")
+        self.assertIn('[ -n "$(declared_cmd test_floor)" ] && FLOOR=test_floor', src)
+        self.assertIn("guard_turn build typecheck lint test $FLOOR", src)
+
+    def test_lint_uses_pinned_shellcheck_from_pip(self):
+        """T-1812: shellcheck của `lint` là bản ghim kèm hash (`shellcheck-py`) — job `lint` cài requirements-dev.txt
+        TRƯỚC khi chạy `dev-task.sh lint`, nên `shellcheck` trên PATH là bản pip, không phải bản của runner."""
+        req = (ROOT / "requirements-dev.txt").read_text(encoding="utf-8")
+        self.assertRegex(req, r"(?m)^shellcheck-py==0\.11\.0\.1 \\\n(?:    --hash=sha256:[0-9a-f]{64}(?: \\)?\n){2,}")
+        body = self.jobs["lint"]
+        install = body.index("pip install --quiet --require-hashes -r requirements-dev.txt")
+        self.assertLess(install, body.index("run: scripts/dev-task.sh lint"))
+        lint = re.search(r"^lint: (.*)$", (ROOT / "xt.yaml").read_text(encoding="utf-8"), re.M).group(1)
+        self.assertIn("shellcheck --severity=warning", lint)
+
+    def test_each_gate_task_has_job(self):
+        for task in gate_tasks():
+            with self.subTest(task=task):
+                self.assertIn(task, self.jobs)
+                if task != "test":
+                    self.assertRegex(self.jobs[task], rf"run: scripts/dev-task\.sh {task}\n")
+
+    def assert_sharded(self, job: str, cov: bool):
+        body = self.jobs[job]
+        shards = matrix_shards(body)
+        n = len(shards)
+        self.assertGreaterEqual(n, 2)
+        self.assertEqual(shards, [str(i) for i in range(1, n + 1)])
+        self.assertIn("SHARD: ${{ matrix.shard }}", body)
+        tail = r' "\$RUNNER_TEMP/cov"' if cov else ""
+        self.assertRegex(body, rf'scripts/dev-task\.sh test-shard "\$SHARD" {n}{tail}\n')
+        self.assertIn(f"/{n}", job_key(body, "name"))
+
+    def test_test_job_shards_with_coverage(self):
+        self.assert_sharded("test", cov=True)
+        self.assertIn("actions/upload-artifact@", self.jobs["test"])
+        self.assertIn("include-hidden-files: true", self.jobs["test"])  # `.coverage.*` là file ẩn
+
+    def test_coverage_job_combines_all_shards(self):
+        cov = self.jobs["coverage"]
+        self.assertEqual(flow_list(job_key(cov, "needs")), ["test"])
+        self.assertIn("actions/download-artifact@", cov)
+        self.assertIn("merge-multiple: true", cov)
+        self.assertRegex(cov, r'run: scripts/dev-task\.sh test-combine "\$RUNNER_TEMP/cov"\n')
+
+    def test_shards_on_main_without_coverage(self):
+        self.assert_sharded("test-main", cov=False)
+        body = self.jobs["test-main"]
+        self.assertLess(body.index("git checkout -q -B main"), body.index("scripts/dev-task.sh test-shard"))
+        self.assertNotIn("XT_PY", body)
+
+    def test_python_workflow_jobs_use_repo_pin(self):
+        version = (ROOT / ".python-version").read_text(encoding="utf-8").strip()
+        self.assertRegex(version, r"\A3\.15\.\d+\Z")
+        templates = ROOT / "framework" / "templates"
+        managed_pack = templates / "packs" / "web-api-ts" / "managed" / ".github" / "workflows"
+        workflows = [
+            templates / "ci.yml",
+            *(
+                path
+                for directory in (WORKFLOWS, managed_pack)
+                for path in sorted(directory.iterdir())
+                if path.is_file() and path.suffix in {".yml", ".yaml"}
+            ),
+        ]
+        for path in workflows:
+            for name, body in ci_jobs(path.read_text(encoding="utf-8")).items():
+                body = "\n".join(strip_comment(line) for line in body.splitlines())
+                python_step = re.search(r"\b(?:python3?|dev-task\.sh) \S+", body)
+                setup_step = body.find("uses: actions/setup-python@")
+                if python_step is None and setup_step < 0:
+                    continue
+                with self.subTest(workflow=path.relative_to(ROOT), job=name):
+                    self.assertGreaterEqual(setup_step, 0)
+                    if python_step is not None:
+                        self.assertLess(setup_step, python_step.start())
+                    self.assertEqual(re.findall(r"(?m)^          python-version: (.+)$", body), [f'"{version}"'])
+
+    def test_pip_cache_keyed_on_installed_requirements(self):
+        """AUD-CI-028 (T-3654): job cài `-r requirements-*.txt` bật `cache: pip` với khoá băm đúng file đó."""
+        for name, body in self.jobs.items():
+            installed = re.findall(r"pip install [^\n]*-r (requirements-[\w-]+\.txt)", body)
+            if not installed:
+                continue
+            with self.subTest(job=name):
+                self.assertIn("cache: pip", body)
+                self.assertEqual(re.findall(r"cache-dependency-path: (\S+)", body), sorted(set(installed)))
+
+    def test_sysmon_only_on_coverage_measuring_jobs(self):
+        self.assertIn("COVERAGE_CORE: sysmon", self.jobs["test"])
+        self.assertIn("COVERAGE_CORE: sysmon", self.jobs["coverage"])
+        self.assertNotIn("COVERAGE_CORE", self.jobs["test-main"])  # cổng coverage đã đo đủ ở job test
+
+    def test_test_job_installs_pinned_bun_and_requires_it(self):
+        """AUD-TEST-056: test plugin OpenCode chạy thật trên CI — job `test` cài bun ghim phiên bản + sha256 (kiểm trước
+        khi giải nén) TRƯỚC bước test, và đặt `XT_REQUIRE_BUN` để thiếu bun là đỏ, không skip im lặng."""
+        body = self.jobs["test"]
+        self.assertRegex(body, r"BUN_VERSION: \d+\.\d+\.\d+\n")
+        self.assertRegex(body, r"BUN_SHA256: [0-9a-f]{64}\n")
+        install = body.index("sha256sum -c -")
+        self.assertLess(install, body.index("tar -xzf"))
+        self.assertLess(body.index('>> "$GITHUB_PATH"'), body.index("scripts/dev-task.sh test-shard"))
+        self.assertIn('XT_REQUIRE_BUN: "1"', body)
+        self.assertNotIn("XT_REQUIRE_BUN", self.jobs["test-main"])  # plugin được kiểm với bun ở job test
+
+    def test_min_tests_declared_once(self):
+        text = CI.read_text(encoding="utf-8")
+        self.assertEqual(len(re.findall(r"XT_MIN_TESTS:", text)), 1)
+        self.assertRegex(text, r'(?m)^env:\n  XT_MIN_TESTS: "(\d+)"\n')
+        self.assertGreaterEqual(int(re.search(r'XT_MIN_TESTS: "(\d+)"', text).group(1)), 100)
+
+    def test_checks_job_keeps_repo_checks(self):
+        body = self.jobs["checks"]
+        for marker in (
+            "actions/setup-python@",
+            "xt.py autonomy-bench",
+            "xt.py compose --profile",
+            "## Dùng cho một dự án",
+            "(đang viết)",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, body)
+        # D-194: lệnh `— Kiểm:` của BLUEPRINT.md chạy trên mỗi PR, sau khi cài ruff ghim kèm hash (SEC-004/007)
+        run = body.index("run: python3 scripts/xt.py blueprint-status BLUEPRINT.md --strict --run")
+        self.assertLess(body.index("pip install --quiet --require-hashes -r requirements-dev.txt"), run)
+
+    def test_xt_yaml_shard_listing_matches_test(self):
+        """`test_list` dùng ĐÚNG cách liệt kê lớp của `test` (CI shard và cổng local không lệch nhau)."""
+        yaml = (ROOT / "xt.yaml").read_text(encoding="utf-8")
+        test = re.search(r"^test: (.*)$", yaml, re.M).group(1)
+        line = re.search(r"^test_list: (.*)$", yaml, re.M).group(1)
+        self.assertTrue(line.startswith("python3 -c "))
+        self.assertIn(f"{line} |", test)
+        self.assertRegex(yaml, r"(?m)^test_combine: .*coverage report --fail-under=100$")
+        self.assertIn("--fail-under=100", test)
+
+    def test_fast_parallelism_preserved(self):
+        # Tách nproc ra biến trước số học: số job và đường lùi khi nproc lỗi giữ như lệnh trước P0.
+        before = '"$(( ("$(nproc 2>/dev/null || echo 2)" + 1) / 2 ))"'
+        command = xt._xt_keys(ROOT)["test_fast"]
+        setup = command.partition(" && ")[0]
+        match = re.search(r" -P (.*) -n 1 python3 -m unittest$", command)
+        self.assertIsNotNone(match)
+        after = match[1]
+        for cpus in (1, 2, 3, 4, 5, 8, 16, 63, 64, 127, 128, 1024, None):
+            with self.subTest(cpus=cpus):
+                stub = "return 1" if cpus is None else f"printf '%s' {cpus}"
+                source = f"nproc() {{ {stub}; }}; printf '%s\\n' {before}; {setup}; printf '%s\\n' {after}"
+                got = subprocess.run(["bash", "-c", source], capture_output=True, text=True, timeout=5, check=True)
+                expected = str(((2 if cpus is None else cpus) + 1) // 2)
+                self.assertEqual(got.stdout.splitlines(), [expected, expected])
+
+    def test_xt_yaml_commands_pass_repo_guard(self):
+        """Review adr-guard 🔴: mọi lệnh của `xt.yaml` qua guard của repo (LOOP-STOP-027 — `dev-task.sh` hỏi guard trước khi
+        chạy. `test_list` và `test_unit` gọi `python3` bằng tên nguyên văn)."""
+        keys = xt._xt_keys(ROOT)
+        self.assertIn("test_list", keys)
+        whys = xt.guard_blocks(list(keys.values()), ROOT)
+        self.assertEqual({k: w for k, w in zip(keys, whys) if w}, {})
+        for key in ("test_list", "test_unit"):
+            with self.subTest(key=key):
+                self.assertNotIn("XT_PY", keys[key])
+        self.assertNotIn("test_floor", keys)
+
+
+class SupplyChainArtifactsTest(unittest.TestCase):
+    """AUD-DEP-010 (T-3654): SBOM CycloneDX ở dep-audit; provenance của nguồn phát hành ký TRƯỚC khi đẩy tag."""
+
+    def test_dep_audit_uploads_cyclonedx_sbom_after_scan(self):
+        body = (WORKFLOWS / "dep-audit.yml").read_text(encoding="utf-8")
+        scan, sbom = body.index("Quét lỗ hổng"), body.index("-f cyclonedx-json -o sbom.cdx.json")
+        self.assertLess(scan, sbom)
+        self.assertRegex(body[sbom:], r"actions/upload-artifact@[0-9a-f]{40}[^\n]*\n(?:.*\n)*?\s+path: sbom\.cdx\.json")
+        self.assertIn("if-no-files-found: error", body[sbom:])
+
+    def test_dep_audit_scans_pack_lockfile_without_swallowing_errors(self):
+        """AUD-DEP-021 (T-3720, D-427): `pnpm audit` quét lockfile của gói, đỏ khi có advisory mức vừa trở lên và khi
+        registry lỗi — không `--ignore-registry-errors`, không `|| true`, không `continue-on-error`."""
+        body = (WORKFLOWS / "dep-audit.yml").read_text(encoding="utf-8")
+        start = body.index("  pack-npm-audit:")
+        nxt = re.search(
+            r"\n  [a-z][a-z0-9-]*:\n", body[start + 1 :]
+        )  # AUD-DEP-029: cắt tới job kế, không tới cuối file
+        job = body[start : start + 1 + nxt.start()] if nxt else body[start:]
+        self.assertNotRegex(job, r"(?m)^\s*(?:-\s+)?if:")  # AUD-DEP-027: không tắt job/bước bằng `if:`
+        self.assertRegex(
+            job,
+            r"working-directory: framework/templates/packs/web-api-ts/starter\n\s+run: pnpm audit --audit-level moderate\n",
+        )
+        for forbidden in ("--ignore-registry-errors", "|| true", "continue-on-error"):
+            self.assertNotIn(forbidden, job)
+        self.assertEqual(len(re.findall(r"uses: pnpm/action-setup@[0-9a-f]{40} ", job)), 1)
+
+    def test_release_tag_attests_archive_before_push(self):
+        body = (WORKFLOWS / "release-tag.yml").read_text(encoding="utf-8")
+        for perm in ("id-token: write", "attestations: write"):
+            self.assertIn(perm, body)
+        attest = body.index("actions/attest-build-provenance@")
+        self.assertRegex(body[attest:], r"^actions/attest-build-provenance@[0-9a-f]{40} ")
+        self.assertLess(body.index("git archive --format=tar.gz"), attest)
+        self.assertLess(attest, body.index('git push origin "refs/tags/'))
+        self.assertIn("subject-path: ${{ steps.tag.outputs.archive }}", body)
+
+
+class MergeGateStubTest(unittest.TestCase):
+    """D-122/ADR-0036: `merge-gate.yml` chỉ là stub giữ context required check cũ tới khi chủ repo gỡ khỏi ruleset sống —
+    trigger `pull_request` trần (không lọc → mọi PR có check-run trên head), luôn xanh, không quyền ghi/action/secret."""
+
+    def setUp(self):
+        self.text = STUB.read_text(encoding="utf-8")
+        self.jobs = ci_jobs(self.text)
+
+    def test_trigger_is_bare_pull_request(self):
+        on = self.text.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
+        self.assertEqual(
+            on.strip(), "pull_request:"
+        )  # không `branches:`/`paths:`/`types:` — PR lệch lọc sẽ treo "Expected"
+        self.assertNotIn("pull_request_target", self.text)  # kể cả comment (cổng T-1807 grep cả file)
+        self.assertFalse(uses_pull_request_target(self.text))
+
+    def test_read_only_no_action_no_secret(self):
+        perms = self.text.split("\npermissions:\n", 1)[1].split("\n\n", 1)[0]
+        self.assertEqual(perms, "  contents: read")
+        for banned in ("uses:", "actions/checkout", "write", "secrets.", "${{", "continue-on-error", "concurrency:"):
+            with self.subTest(banned=banned):
+                self.assertNotIn(banned, self.text)
+        self.assertEqual(xt.ci_check_text(self.text), [])
+
+    def test_single_always_green_job_named_merge_gate(self):
+        self.assertEqual(list(self.jobs), ["merge-gate"])
+        body = self.jobs["merge-gate"]
+        self.assertEqual(job_key(body, "name"), "merge-gate")  # đúng tên context trong ruleset sống
+        self.assertEqual(job_key(body, "runs-on"), "ubuntu-latest")
+        self.assertEqual(job_key(body, "timeout-minutes"), "1")
+        for key in ("if", "needs", "environment", "permissions"):
+            with self.subTest(key=key):
+                self.assertEqual(job_key(body, key), "")
+        steps = re.findall(r"^      - ", body, re.M)
+        self.assertEqual(len(steps), 1)
+        run = body.split("run: |\n", 1)[1].strip().splitlines()
+        self.assertEqual(len(run), 1)
+        self.assertTrue(run[0].startswith('echo "'), run[0])
+        self.assertIn("D-122", run[0])
+
+    def test_header_names_removal_order(self):
+        header = [ln for ln in self.text.split("\non:\n", 1)[0].splitlines() if ln.startswith("#")]
+        self.assertTrue(6 <= len(header) <= 10, len(header))
+        joined = "\n".join(header)
+        for marker in ("D-122", "ADR-0036", "T-1834", "gh api repos/<o>/<r>/rules/branches/main", "`branches:`"):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, joined)
+
+    def test_rulesets_drop_merge_gate(self):
+        self.assertEqual(
+            required_checks(RULESET), ["quality", "protection-guard", "gitleaks", "dep-audit", "pack-npm-audit"]
+        )
+        self.assertIs(status_rule(RULESET)["strict_required_status_checks_policy"], True)  # repo khung giữ "up to date"
+        template = ROOT / "framework" / "templates" / "ruleset-main.json"
+        self.assertEqual(required_checks(template), ["quality", "gitleaks"])
+
+    def test_thread_resolution_follows_merge_review(self):
+        """WF-REVIEW-005/WF-GIT-002 (ADR-0079): `merge_review: required` → ruleset bật thread resolution; mặc định
+        `optional` → `false` (cổng thread thay bằng `pr next` + review 1 lần). Ghim cả repo khung và mẫu dự án đích."""
+        pairs = (
+            (RULESET, xt._xt_keys(ROOT)),
+            (ROOT / "framework" / "templates" / "ruleset-main.json", xt._xt_keys(ROOT / "framework" / "templates")),
+        )
+        for ruleset, keys in pairs:
+            with self.subTest(ruleset=ruleset.name):
+                rules = json.loads(ruleset.read_text(encoding="utf-8"))["rules"]
+                params = next(r for r in rules if r["type"] == "pull_request")["parameters"]
+                review = keys.get("merge_review", "optional")
+                self.assertIn(review, ("optional", "required"))
+                self.assertIs(params["required_review_thread_resolution"], review == "required")
+        wording = {
+            "code-review.md": "`merge_review: required` thì ruleset có `required_review_thread_resolution: true`",
+            "git-and-branching.md": "resolve thread khi `merge_review: required`",
+        }
+        for doc, phrase in wording.items():
+            with self.subTest(doc=doc):
+                self.assertIn(phrase, (ROOT / "framework" / "10-workflow" / doc).read_text(encoding="utf-8"))
+
+
+class PullRequestTargetTest(unittest.TestCase):
+    """ADR-0036 §Lý do: ngoài `pr-review.yml` không workflow nào trong `.github/workflows` dùng `pull_request_target`."""
+
+    def test_detector_cases(self):
+        for text in (
+            "on:\n  pull_request_target:\n",
+            "on: [push, pull_request_target]\n",
+            "on: pull_request_target\n",
+            "on:\n  'pull_request_target':\n",
+            "on:\n  pull_request_target: # zizmor: ignore[dangerous-triggers]\n",
+        ):
+            with self.subTest(text=text):
+                self.assertTrue(uses_pull_request_target(text))
+        for text in (
+            "# `pull_request_target` có chủ đích\non:\n  pull_request:\n",
+            "on:\n  pull_request: # không dùng pull_request_target\n",
+            "on:\n  pull_request_targets:\n",
+            "on: [push, pull_request]\n",
+            "",
+        ):
+            with self.subTest(text=text):
+                self.assertFalse(uses_pull_request_target(text))
+
+    def test_only_pr_review_uses_pull_request_target(self):
+        files = sorted(p for p in WORKFLOWS.iterdir() if p.suffix in (".yml", ".yaml") and p.is_file())
+        self.assertIn(STUB, files)
+        for name in PR_TARGET_ALLOWED:  # danh sách cho phép không cũ: file còn và còn dùng thật
+            with self.subTest(allowed=name):
+                self.assertTrue(uses_pull_request_target((WORKFLOWS / name).read_text(encoding="utf-8")))
+        for path in files:
+            if path.name in PR_TARGET_ALLOWED:
+                continue
+            with self.subTest(workflow=path.name):
+                self.assertFalse(uses_pull_request_target(path.read_text(encoding="utf-8")))
+
+
+class SecretScanTest(unittest.TestCase):
+    def test_scans_git_history_with_verified_cli_in_both_workflows(self):
+        """AUD-CI-030: không phụ thuộc trang đầu của API commit PR, quét cả HEAD tách rời và diff của merge."""
+        path = WORKFLOWS / "secret-scan.yml"
+        template = ROOT / "framework" / "templates" / path.name
+        workflow = path.read_text(encoding="utf-8")
+        body = ci_jobs(workflow)["gitleaks"]
+        self.assertEqual(body, ci_jobs(template.read_text(encoding="utf-8"))["gitleaks"])
+        self.assertNotIn("pull-requests:", workflow)
+        self.assertIn("fetch-depth: 0", body)
+        self.assertIn("--log-opts='--all --diff-merges=first-parent HEAD'", body)
+        self.assertRegex(body, r"(?m)^\s+sha256=[0-9a-f]{64}$")
+        self.assertLess(body.index("sha256sum --check --strict"), body.index('tar -xzf "$archive"'))
+
+
+def step_run(body: str, step_id: str) -> str:
+    """Script `run: |` của bước có `id: <step_id>` (bỏ thụt lề 10 của khối)."""
+    m = re.search(
+        rf"^        id: {re.escape(step_id)}\n(?:        .*\n)*?        run: \|\n((?:          .*\n|\n)+)", body, re.M
+    )
+    return re.sub(r"^          ", "", m.group(1), flags=re.M) if m else ""
+
+
+class PrReviewDiffTest(unittest.TestCase):
+    """AUD-CI-016 (audit 2026-10-21): `pr-review.yml` từng cắt diff ở 400.000 byte (`head -c`) rồi vẫn cho reviewer trả
+    `clean` cho cả head — phần cắt (vd auth ở cuối) không được rà. Nay diff vượt trần hoặc không đọc được → không gọi
+    reviewer, ghi `pr reviewed --inconclusive` (PR làn chuẩn cần review khác ở head đó)."""
+
+    def setUp(self):
+        self.body = ci_jobs((WORKFLOWS / "pr-review.yml").read_text(encoding="utf-8"))["review"]
+
+    def run_diff(self, size: int, gh_rc: int = 0) -> tuple[str, str]:
+        tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        (tmp / "bin").mkdir()
+        gh = tmp / "bin" / "gh"
+        gh.write_text(f"#!/bin/sh\nhead -c {size} /dev/zero | tr '\\000' x\nexit {gh_rc}\n", encoding="utf-8")
+        gh.chmod(0o755)
+        (tmp / "ws").mkdir()
+        out = tmp / "out"
+        env = dict(
+            os.environ,
+            PATH=f"{tmp / 'bin'}:{os.environ['PATH']}",
+            RUNNER_TEMP=str(tmp),
+            GITHUB_WORKSPACE=str(tmp / "ws"),
+        )
+        env.update(GITHUB_OUTPUT=str(out), GH_REPO="o/r", PR="7", MAX_DIFF_BYTES="400000")
+        r = subprocess.run(["bash", "-c", step_run(self.body, "diff")], env=env, capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        review = tmp / "ws" / ".pr-review.diff"
+        return out.read_text(encoding="utf-8").strip(), (review.read_text(encoding="utf-8") if review.exists() else "")
+
+    def test_pr_review_full_diff_only(self):
+        self.assertNotIn("head -c", self.body)
+        self.assertEqual(self.run_diff(400_000), ("complete=true", "x" * 400_000))
+        self.assertEqual(self.run_diff(400_001), ("complete=false", ""))  # không bao giờ review một phần
+        self.assertEqual(self.run_diff(10, gh_rc=1), ("complete=false", ""))
+
+    def test_pr_review_incomplete_records_inconclusive(self):
+        claude = self.body[self.body.index("id: claude") :]
+        self.assertIn("if: steps.diff.outputs.complete == 'true'", claude.split("\n      - ", 1)[0])
+        record = self.body[self.body.index("name: Ghi kết quả bằng danh tính reviewer") :]
+        self.assertIn("COMPLETE: ${{ steps.diff.outputs.complete }}", record)
+        self.assertLess(record.index("--inconclusive"), record.index("jq -er '.verdict'"))
+
+    def run_record(self, author: str, logins: str, gh_rc: int = 0) -> List[str]:
+        """Chạy bước ghi kết quả với `gh`/`jq`/`python3` giả → đối số `xt.py pr reviewed` (mỗi dòng một đối số)."""
+        tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        (tmp / "bin").mkdir()
+        fakes = {
+            "gh": f'printf "%s" "$FAKE_LOGINS"\nexit {gh_rc}\n',
+            "jq": 'case "$2" in .verdict) echo clean ;; esac\n',
+            "python3": 'printf "%s\\n" "$@" > "$ARGS_OUT"\n',
+        }
+        for name, body in fakes.items():
+            (tmp / "bin" / name).write_text("#!/bin/sh\n" + body, encoding="utf-8")
+            (tmp / "bin" / name).chmod(0o755)
+        env = dict(os.environ, PATH=f"{tmp / 'bin'}:{os.environ['PATH']}", GITHUB_STEP_SUMMARY=str(tmp / "sum"))
+        env.update(GH_REPO="o/r", PR="7", HEAD_SHA="a" * 40, STRUCT="{}", REVIEW_MODEL="m", COMPLETE="true")
+        env.update(PR_AUTHOR=author, FAKE_LOGINS=logins, ARGS_OUT=str(tmp / "args"))
+        r = subprocess.run(["bash", "-c", step_run(self.body, "record")], env=env, capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return (tmp / "args").read_text(encoding="utf-8").splitlines()
+
+    def test_pr_review_bot_flag_only_when_all_commits_by_bot(self):
+        """AUD-HAR-213: PR Dependabot chỉ gắn `--author-model dependabot[bot]` khi MỌI commit của PR là của bot; có commit
+        agent/người, hoặc đọc commit lỗi → không cờ (họ tác giả theo `author_model_family` của xt.yaml, như trước #413)."""
+        bot = "dependabot[bot]"
+        self.assertIn("--author-model", self.run_record(bot, f"{bot}\n{bot}\n"))
+        self.assertEqual(self.run_record(bot, f"{bot}\n{bot}\n")[-2:], [bot, "--clean"])
+        for logins, rc in ((f"{bot}\nclaude\n", 0), ("", 0), (f"{bot}\n", 1), ("?\n", 0)):
+            with self.subTest(logins=logins, rc=rc):
+                self.assertNotIn("--author-model", self.run_record(bot, logins, rc))
+        self.assertNotIn("--author-model", self.run_record("someone", f"{bot}\n"))
+
+
+@unittest.skipIf(shutil.which("bash") is None, "cần bash")
+class TestShardTest(unittest.TestCase):
+    """`dev-task.sh test-shard I N [DIR]` / `test-combine DIR` trên dự án giả."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        (self.tmp / "scripts").mkdir()
+        shutil.copy(ROOT / "scripts" / "dev-task.sh", self.tmp / "scripts" / "dev-task.sh")
+        self.out = self.tmp / "out"
+        self.out.mkdir()
+
+    def yaml(self, **keys: str) -> None:
+        (self.tmp / "xt.yaml").write_text("".join(f"{k}: {v}\n" for k, v in keys.items()), encoding="utf-8")
+
+    def run_dt(self, *args: str, **env: str) -> subprocess.CompletedProcess:
+        base = {k: v for k, v in os.environ.items() if k not in ("XT_MIN_TESTS", "XT_COV_DIR", "XT_PY")}
+        full = dict(base, CLAUDE_PROJECT_DIR=str(self.tmp), OUT=str(self.out), **env)
+        return subprocess.run(
+            ["bash", str(self.tmp / "scripts" / "dev-task.sh"), *args],
+            capture_output=True,
+            text=True,
+            env=full,
+            cwd=self.tmp,  # DIR tương đối tính theo thư mục hiện hành của người gọi
+        )
+
+    # Lệnh chỉ `echo`/`printf` bị coi là không kiểm gì (is_noop) — lệnh giả ghi qua `f=…` / `cat`.
+    RECORD = 'f="$(mktemp "$OUT/ran.XXXXXX")" && echo "$1" > "$f"'
+
+    def ids(self, text: str) -> str:
+        (self.tmp / "ids.txt").write_text(text, encoding="utf-8")
+        return "cat ids.txt"
+
+    def ran(self) -> List[str]:
+        got = [p.read_text(encoding="utf-8").strip() for p in self.out.glob("ran.*")]
+        for p in self.out.glob("ran.*"):
+            p.unlink()
+        return got
+
+    def test_shards_partition_ids_exactly(self):
+        self.yaml(test_list=self.ids("c\nb\na \n\ne\nd\nb\n"), test_unit=self.RECORD)
+        ids = ["a", "b", "c", "d", "e"]
+        for n in range(1, 6):
+            seen: List[str] = []
+            for i in range(1, n + 1):
+                r = self.run_dt("test-shard", str(i), str(n))
+                self.assertEqual(r.returncode, 0, r.stderr)
+                got = self.ran()
+                self.assertEqual(sorted(got), ids[i - 1 :: n])  # chỉ số k (sắp xếp, bỏ trùng) → shard k mod N + 1
+                seen += got
+            self.assertEqual(sorted(seen), ids, n)  # không sót, không trùng
+
+    def test_real_suite_partition_equals_discover(self):
+        """Tập lớp của mọi shard (lệnh `test_list` THẬT của xt.yaml) hợp lại == tập lớp của unittest discover."""
+        listing = re.search(r"^test_list: (.*)$", (ROOT / "xt.yaml").read_text(encoding="utf-8"), re.M).group(1)
+        self.yaml(test_list=listing, test_unit=self.RECORD)
+        (self.tmp / "tests").symlink_to(ROOT / "tests", target_is_directory=True)
+        want = xt.unittest_class_ids(ROOT, "tests", None)
+        self.assertGreaterEqual(len(want), 100)
+        for n in (3, 4):
+            seen: List[str] = []
+            for i in range(1, n + 1):
+                r = self.run_dt("test-shard", str(i), str(n), XT_MIN_TESTS="100")
+                self.assertEqual(r.returncode, 0, r.stderr)
+                seen += self.ran()
+            self.assertEqual(sorted(seen), want, n)
+
+    def test_cov_dir_exported_only_when_given(self):
+        self.yaml(test_list=self.ids("a\n"), test_unit='f="$OUT/cov" && echo "${XT_COV_DIR:-none}" > "$f"')
+        r = self.run_dt("test-shard", "1", "1", XT_COV_DIR="/stale")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual((self.out / "cov").read_text(encoding="utf-8").strip(), "none")
+        r = self.run_dt("test-shard", "1", "1", "data/cov")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual((self.out / "cov").read_text(encoding="utf-8").strip(), str(self.tmp.resolve() / "data/cov"))
+        self.assertTrue((self.tmp / "data" / "cov").is_dir())
+
+    def test_red_cases(self):
+        self.yaml(test_list=self.ids("a\nb\n"), test_unit=self.RECORD)
+        for args, env, code in (
+            (("0", "2"), {}, 2),
+            (("3", "2"), {}, 2),
+            (("x", "2"), {}, 2),
+            (("1", ""), {}, 2),
+            (("1", "2"), {"XT_MIN_TESTS": "abc"}, 2),  # không phải số → đỏ (không để `[ -lt ]` lỗi rồi xanh)
+            (("1", "2"), {"XT_MIN_TESTS": "3"}, 1),  # liệt kê được ít hơn sàn
+            (("3", "3"), {}, 1),  # shard rỗng
+        ):
+            with self.subTest(args=args, env=env):
+                r = self.run_dt("test-shard", *args, **env)
+                self.assertEqual(r.returncode, code, r.stderr)
+                self.assertEqual(self.ran(), [])
+        r = self.run_dt("test-shard", "1", "2", XT_MIN_TESTS="2")
+        self.assertEqual((r.returncode, self.ran()), (0, ["a"]))
+
+    def test_list_or_unit_failure_is_red(self):
+        self.yaml(test_list="cat ids.txt; exit 1", test_unit=self.RECORD)
+        self.assertEqual(self.run_dt("test-shard", "1", "1").returncode, 1)
+        self.yaml(test_list="true", test_unit=self.RECORD)  # no-op → không có lệnh thật
+        self.assertEqual(self.run_dt("test-shard", "1", "1").returncode, 2)
+        self.yaml(test_list=self.ids(""), test_unit=self.RECORD)  # không in id nào
+        self.assertEqual(self.run_dt("test-shard", "1", "1").returncode, 1)
+        self.yaml(test_list=self.ids("a\nb\n"))
+        r = self.run_dt("test-shard", "1", "1")
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("test_unit", r.stderr)
+        self.yaml(test_list=self.ids("a\nb\n"), test_unit='[ "$1" != b ]')
+        self.assertNotEqual(self.run_dt("test-shard", "1", "1").returncode, 0)
+
+    def test_combine(self):
+        self.yaml(test_combine='test -f "$XT_COV_DIR/.coverage.x" && touch "$OUT/combined"')
+        self.assertEqual(self.run_dt("test-combine").returncode, 2)
+        self.assertEqual(self.run_dt("test-combine", str(self.tmp / "missing")).returncode, 2)
+        d = self.tmp / "cov"
+        d.mkdir()
+        self.assertEqual(self.run_dt("test-combine", str(d)).returncode, 1)  # lệnh gộp đỏ → đỏ
+        (d / ".coverage.x").write_text("", encoding="utf-8")
+        r = self.run_dt("test-combine", "cov")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue((self.out / "combined").exists())
+        self.yaml(test_list=self.ids("a\n"))
+        self.assertEqual(self.run_dt("test-combine", str(d)).returncode, 2)
+
+    def test_guard_blocks_shard_commands(self):
+        shutil.copy(ROOT / "scripts" / "xt.py", self.tmp / "scripts" / "xt.py")
+        (self.tmp / ".claude" / "hooks").mkdir(parents=True)
+        shutil.copy(ROOT / ".claude" / "hooks" / "guard.py", self.tmp / ".claude" / "hooks" / "guard.py")
+        self.yaml(test_list=self.ids("a\n"), test_unit=f"{self.RECORD}; git push origin main")
+        r = self.run_dt("test-shard", "1", "1", XT_GUARD_POLICY="")
+        self.assertEqual(r.returncode, 126, r.stderr)
+        self.assertIn("LOOP-STOP-027", r.stderr)
+        self.assertEqual(self.ran(), [])
+        self.yaml(test_combine="git push origin main")
+        (self.tmp / "cov").mkdir()
+        self.assertEqual(self.run_dt("test-combine", "cov", XT_GUARD_POLICY="").returncode, 126)
+
+    # xt.py giả: ghi mỗi lần được gọi (argv + stdin) vào $OUT/guard/<n>; `DENY` trong lệnh → 126; biết `--stdin` thì in
+    # dòng xác nhận như xt.py thật. Bản "cũ" không biết `--stdin`: không in gì, không đọc stdin.
+    XT_STUB = (
+        "import os, sys\n"
+        "d = os.path.join(os.environ['OUT'], 'guard'); os.makedirs(d, exist_ok=True)\n"
+        "data = sys.stdin.buffer.read().decode().replace('\\0', '\\n') if '--stdin' in sys.argv and NEW else ''\n"
+        "open(os.path.join(d, str(len(os.listdir(d)))), 'w').write(' '.join(sys.argv[1:]) + '\\n' + data)\n"
+        "sys.exit(126) if 'DENY' in data + ' '.join(sys.argv) else None\n"
+        "print('guard-check: ok') if '--stdin' in sys.argv and NEW else None\n"
+    )
+
+    def guard_calls(self) -> List[str]:
+        d = self.tmp / "out" / "guard"
+        got = (
+            [p.read_text(encoding="utf-8") for p in sorted(d.glob("*"), key=lambda p: int(p.name))]
+            if d.is_dir()
+            else []
+        )
+        shutil.rmtree(d, True)
+        return got
+
+    def rec(self, name: str) -> str:
+        return f'f="$(mktemp "$OUT/ran.XXXXXX")" && echo {name} > "$f"'
+
+    def test_guard_blocks_gate_once_for_every_command(self):
+        """T-1715: `gate`/`gate-fast` hỏi guard MỘT lần (stdin, mỗi dòng một lệnh) cho mọi lệnh của lượt; một lệnh bị
+        cấm → 126 và không lệnh nào chạy; xt.py cũ (không biết `--stdin`) → hỏi từng lệnh như trước."""
+        (self.tmp / "scripts" / "xt.py").write_text("NEW = True\n" + self.XT_STUB, encoding="utf-8")
+        self.yaml(
+            build=self.rec("build"), typecheck=self.rec("typecheck"), lint=self.rec("lint"), test=self.rec("test")
+        )
+        r = self.run_dt("gate", XT_GUARD_POLICY="")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        calls = self.guard_calls()
+        self.assertEqual(len(calls), 1, calls)
+        self.assertEqual(  # here-string thêm một dòng trống cuối stdin: không phải lệnh
+            [ln for ln in calls[0].splitlines() if ln],
+            ["guard-check --stdin", *(self.rec(n) for n in ("build", "typecheck", "lint", "test"))],
+        )
+        self.assertEqual(sorted(self.ran()), ["build", "lint", "test", "typecheck"])
+        self.yaml(
+            build=self.rec("build"),
+            typecheck=self.rec("typecheck"),
+            lint=self.rec("lint"),
+            test=self.rec("test") + " && DENY",
+        )
+        r = self.run_dt("gate", XT_GUARD_POLICY="")
+        self.assertEqual(r.returncode, 126, r.stderr)
+        self.assertIn("LOOP-STOP-027", r.stderr)
+        self.assertEqual((len(self.guard_calls()), self.ran()), (1, []))
+        # gate-fast với mọi lớp test (XT_GATE_ALL_TESTS=1): test_list + test_unit cũng nằm trong một lần hỏi
+        self.yaml(
+            format_check=self.rec("fmt"),
+            lint=self.rec("lint"),
+            typecheck=self.rec("tc"),
+            test_list=self.ids("a\n"),
+            test_unit=self.RECORD,
+        )
+        r = self.run_dt("gate-fast", XT_GUARD_POLICY="", XT_GATE_ALL_TESTS="1")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        calls = self.guard_calls()
+        self.assertEqual(len(calls), 1, calls)
+        self.assertEqual(
+            [ln for ln in calls[0].splitlines() if ln][1:],
+            [self.rec("fmt"), self.rec("lint"), self.rec("tc"), "cat ids.txt", self.RECORD],
+        )
+        self.assertEqual(sorted(self.ran()), ["a", "fmt", "lint", "tc"])
+        # xt.py cũ: lần hỏi --stdin không in gì → hỏi lại từng lệnh (4 lệnh → 5 lần gọi), vẫn chạy đủ
+        (self.tmp / "scripts" / "xt.py").write_text("NEW = False\n" + self.XT_STUB, encoding="utf-8")
+        self.yaml(
+            build=self.rec("build"), typecheck=self.rec("typecheck"), lint=self.rec("lint"), test=self.rec("test")
+        )
+        r = self.run_dt("gate", XT_GUARD_POLICY="")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        calls = self.guard_calls()
+        self.assertEqual(
+            [c.splitlines()[0] for c in calls],
+            ["guard-check --stdin"] + [f"guard-check -- {self.rec(n)}" for n in ("build", "typecheck", "lint", "test")],
+        )
+        self.assertEqual(sorted(self.ran()), ["build", "lint", "test", "typecheck"])
+
+    def test_guard_blocks_multiline_command_in_gate(self):
+        """Review #191: lệnh nhiều dòng (`.claude/project-commands.sh`) tới guard NGUYÊN VẸN qua `guard-check --stdin`
+        (cách nhau bằng NUL) — tiếp dòng `\\<NL>` không né được; heredoc chứa chữ cấm làm dữ liệu vẫn chạy như trước."""
+        shutil.copy(ROOT / "scripts" / "xt.py", self.tmp / "scripts" / "xt.py")
+        (self.tmp / ".claude" / "hooks").mkdir(parents=True)
+        shutil.copy(ROOT / ".claude" / "hooks" / "guard.py", self.tmp / ".claude" / "hooks" / "guard.py")
+        decl = self.tmp / ".claude" / "project-commands.sh"
+        decl.write_text("build=$'" + self.rec("build") + "\\ngit push --fo\\\\\\nrce origin main'\n", encoding="utf-8")
+        r = self.run_dt("gate", XT_GUARD_POLICY="")
+        self.assertEqual(r.returncode, 126, r.stderr)
+        self.assertIn("LOOP-STOP-027", r.stderr)
+        self.assertEqual(self.ran(), [])
+        decl.write_text(
+            "build=$'cat <<E\\ngit push --force origin main\\nE\\n" + self.rec("build") + "'\n", encoding="utf-8"
+        )
+        r = self.run_dt("gate", XT_GUARD_POLICY="")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(self.ran(), ["build"])
+
+    def test_unknown_task_lists_shard_tasks(self):
+        r = self.run_dt("nope")
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("test-shard|test-combine", r.stderr)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -1,315 +1,377 @@
-name: ci
-
-# Cổng chất lượng QLKH-001 (NFR-003). Mọi job là required check, không có đường bỏ qua.
-# Action ghim theo commit SHA (không dùng tag di động) — T-12 chuỗi cung ứng.
-# Nhị phân tải rời phải qua tools/verify_download.py (SD-09).
+name: CI
 
 on:
-  pull_request:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
+    # Không `edited`: sửa tiêu đề/thân PR không đổi SHA nhưng chạy lại cả CI nặng rồi `concurrency` huỷ run cũ (T-2401);
+    # kiểm tiêu đề PR nằm ở `pr-title.yml` (nghe `edited`, vài giây).
+    types: [opened, synchronize, reopened]
+  # pr-steward merge bằng GITHUB_TOKEN (thiếu XT_STEWARD_TOKEN) không kích `push` → steward gọi dispatch trên nhánh đích
+  # (T-2402). Run dispatch trên `main` chạy đủ job như `push` (không job nào lọc theo sự kiện); nhóm concurrency = run_id.
+  workflow_dispatch:
 
+# Mặc định tối thiểu cho MỌI job (GITHUB_TOKEN chỉ đọc). Job nào cần hơn tự khai ở job-level.
 permissions:
   contents: read
 
+# PR: push mới hủy run cũ cùng PR. `main`: mỗi commit một group riêng (run_id), không hủy — giữ bằng chứng CI từng commit.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Số lớp test tối thiểu mà `dev-task.sh test-shard` phải liệt kê được (tổng của bộ test, trước khi chia — một chỗ cho mọi
+# shard của `test` và `test-main`): discover hỏng/rỗng thì đỏ thay vì xanh với 0 test.
 env:
-  PYTHON_VERSION: "3.12"
+  XT_MIN_TESTS: "100"
 
 jobs:
+  # Required check `quality` (job TỔNG HỢP cuối file) + `protection-guard` ở đây; `gitleaks` (secret-scan.yml), `dep-audit`
+  # (dep-audit.yml) ở workflow khác. Nguyên tắc: required check phải là job có thật (protection-guard đối chiếu).
+  # `merge-gate.yml` chỉ là stub tạm (D-122, ADR-0036) giữ context `merge-gate` tới khi chủ repo gỡ khỏi ruleset sống.
+  # Fan-out/fan-in (WF-CI-024): mỗi task của `scripts/dev-task.sh gate` (build · typecheck · lint · test) là MỘT job song
+  # song gọi đúng `dev-task.sh <task>` (lệnh trong xt.yaml — WF-CI-002); `test` chia 6 shard theo lớp, `coverage` gộp dữ
+  # liệu các shard và đòi đúng ngưỡng của `test`; `test-main` (checkout tên nhánh main) 4 shard; `checks` (bench + kiểm của repo khung).
+  # Wall time ≈ nhánh chậm nhất (test → coverage) thay vì cộng dồn. Test `tests/test_ci.py` giữ cho không trôi: mọi task
+  # của `gate` có job, `quality` needs mọi job con và `if: always()`.
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # `xt.py progress-check` cần lịch sử để kiểm SHA bàn giao là tổ tiên HEAD
+          persist-credentials: false # job không push; token không nằm lại trong .git/config (AUD-CI-028)
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.15.2"
+          cache: pip # khoá = hash requirements-dev.txt (setup-python băm file khai ở dưới); đổi khoá → cài lại (AUD-CI-028)
+          cache-dependency-path: requirements-dev.txt
+      - name: Công cụ ghim kèm hash (requirements-dev.txt — khớp xt.yaml)
+        run: pip install --quiet --require-hashes -r requirements-dev.txt
+      - name: build — đúng lệnh trong xt.yaml
+        run: scripts/dev-task.sh build
+
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # `xt.py progress-check` cần lịch sử để kiểm SHA bàn giao là tổ tiên HEAD
+          persist-credentials: false # job không push; token không nằm lại trong .git/config (AUD-CI-028)
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.15.2"
+          cache: pip # khoá = hash requirements-dev.txt (setup-python băm file khai ở dưới); đổi khoá → cài lại (AUD-CI-028)
+          cache-dependency-path: requirements-dev.txt
+      - name: Công cụ ghim kèm hash (requirements-dev.txt — khớp xt.yaml)
+        run: pip install --quiet --require-hashes -r requirements-dev.txt
+      - name: typecheck — đúng lệnh trong xt.yaml
+        run: scripts/dev-task.sh typecheck
+
   lint:
-    runs-on: ubuntu-24.04
+    name: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - run: pip install ruff==0.16.6 mypy==1.11.2 types-PyYAML==6.0.12.20240917
-      - run: ruff check .
-      - run: ruff format --check .
-      - run: mypy qlkh tools
+          fetch-depth: 0 # `xt.py progress-check` cần lịch sử để kiểm SHA bàn giao là tổ tiên HEAD
+          persist-credentials: false # job không push; token không nằm lại trong .git/config (AUD-CI-028)
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.15.2"
+          cache: pip # khoá = hash requirements-dev.txt (setup-python băm file khai ở dưới); đổi khoá → cài lại (AUD-CI-028)
+          cache-dependency-path: requirements-dev.txt
+      - name: Công cụ ghim kèm hash (requirements-dev.txt — khớp xt.yaml)
+        run: pip install --quiet --require-hashes -r requirements-dev.txt
+      - name: lint — đúng lệnh trong xt.yaml (validate · link · progress · changelog · ci-check · ruff · shellcheck · JSON)
+        run: scripts/dev-task.sh lint
 
+  # Test có coverage, 6 shard theo lớp, chia tham lam theo trọng số đo thật (`xt.yaml` `test_weights`, LPT; lớp lạ lấy trung vị — D-095). Mỗi shard tải dữ liệu
+  # `.coverage.*` lên artefact; job `coverage` gộp và đòi 100 % — cùng tập test, cùng ngưỡng với `xt.yaml` `test`.
+  # Số shard theo tổng trọng số (D-516, AUD-CI-035): 2 605 s / 4 = 651 s mỗi shard, vượt trần 10 phút của job (shard 3/4 bị
+  # huỷ ở #672, #674); 6 shard ≈ 434 s. Trần thời gian giữ nguyên — thêm test làm shard sát trần thì tăng số shard.
   test:
-    runs-on: ubuntu-24.04
-    # SD-25: service Postgres thật cho test tích hợp schema (tests/schema/test_postgres_integration.py).
-    # Version 16 khớp phiên bản dự kiến staging/production; đổi tag nếu platform xác nhận version khác.
-    services:
-      postgres:
-        image: postgres:16
+    name: test ${{ matrix.shard }}/6
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false # shard khác vẫn chạy hết để thấy mọi lớp đỏ; kết quả gộp của job vẫn là `failure`
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # `xt.py progress-check` cần lịch sử để kiểm SHA bàn giao là tổ tiên HEAD
+          persist-credentials: false # job không push; token không nằm lại trong .git/config (AUD-CI-028)
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.15.2"
+          cache: pip # khoá = hash requirements-dev.txt (setup-python băm file khai ở dưới); đổi khoá → cài lại (AUD-CI-028)
+          cache-dependency-path: requirements-dev.txt
+      - name: Công cụ ghim kèm hash (requirements-dev.txt — khớp xt.yaml)
+        run: pip install --quiet --require-hashes -r requirements-dev.txt
+      # bun cho test plugin OpenCode (`tests.test_adapters`, AUD-TEST-056 — trước đây CI luôn skip). Gói npm
+      # `@oven/bun-linux-x64` 1.4.4 (phát hành 2026-10-22, qua cooldown BASE-DEP-019); sha256 tính 2026-11-02 trên tarball
+      # tải từ registry, khớp `dist.integrity` sha512 của registry. Kiểm hash TRƯỚC khi giải nén; không chạy script cài.
+      - name: Cài bun ghim phiên bản + sha256 (test plugin OpenCode)
         env:
-          POSTGRES_USER: test
-          POSTGRES_PASSWORD: test
-          POSTGRES_DB: qlkh_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
+          BUN_VERSION: 1.4.4
+          BUN_SHA256: 93ca5a2abe45f3bcac6dd55baff8bb06c4ac824b70f89650b54e5c8b80dbef18
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/bun.tgz" "https://registry.npmjs.org/@oven/bun-linux-x64/-/bun-linux-x64-$BUN_VERSION.tgz"
+          echo "$BUN_SHA256  $RUNNER_TEMP/bun.tgz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/bun.tgz" -C "$RUNNER_TEMP" package/bin/bun
+          echo "$RUNNER_TEMP/package/bin" >> "$GITHUB_PATH"
+      # COVERAGE_CORE=sysmon dùng sys.monitoring. Job `coverage` đòi 100 % dòng và nhánh.
+      - name: Test shard (coverage ghi vào thư mục tạm của runner)
+        env:
+          SHARD: ${{ matrix.shard }}
+          COVERAGE_CORE: sysmon
+          XT_REQUIRE_BUN: "1" # thiếu bun → test plugin OpenCode đỏ thay vì skip (AUD-TEST-056)
+        run: scripts/dev-task.sh test-shard "$SHARD" 6 "$RUNNER_TEMP/cov"
+      # actions/upload-artifact, actions/download-artifact: tag mới nhất giải ra SHA commit bằng `git ls-remote` (tag nhẹ),
+      # xác minh 2026-10-20. File dữ liệu coverage bắt đầu bằng `.` → cần `include-hidden-files`.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-${{ matrix.shard }}
+          path: ${{ runner.temp }}/cov/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
+
+  coverage:
+    name: coverage
+    needs: [test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # `xt.py progress-check` cần lịch sử để kiểm SHA bàn giao là tổ tiên HEAD
+          persist-credentials: false # job không push; token không nằm lại trong .git/config (AUD-CI-028)
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.15.2"
+          cache: pip # khoá = hash requirements-dev.txt (setup-python băm file khai ở dưới); đổi khoá → cài lại (AUD-CI-028)
+          cache-dependency-path: requirements-dev.txt
+      - name: Công cụ ghim kèm hash (requirements-dev.txt — khớp xt.yaml)
+        run: pip install --quiet --require-hashes -r requirements-dev.txt
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: coverage-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/cov
+      - name: Gộp coverage mọi shard, đòi đúng ngưỡng của xt.yaml `test` (100 % dòng + nhánh)
+        env:
+          COVERAGE_CORE: sysmon
+        run: scripts/dev-task.sh test-combine "$RUNNER_TEMP/cov"
+
+  test-main:
+    name: test-main ${{ matrix.shard }}/4
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # `xt.py progress-check` cần lịch sử để kiểm SHA bàn giao là tổ tiên HEAD
+          persist-credentials: false # job không push; token không nằm lại trong .git/config (AUD-CI-028)
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.15.2"
+          cache: pip # khoá = hash requirements-dev.txt (setup-python băm file khai ở dưới); đổi khoá → cài lại (AUD-CI-028)
+          cache-dependency-path: requirements-dev.txt
+      - name: Công cụ ghim kèm hash (requirements-dev.txt — khớp xt.yaml)
+        run: pip install --quiet --require-hashes -r requirements-dev.txt
+      # Job `test` chạy trên checkout của PR (HEAD tách rời); test lại trên nhánh tên `main` như CI sau merge — test phụ
+      # thuộc nhánh (guard: `git push` không refspec trên `main`) từng xanh ở PR mà đỏ trên `main` (AUD-TEST-005, #124).
+      # Coverage đã đo ở job `test`.
+      - name: Test trên checkout mang tên nhánh `main`
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          set -euo pipefail
+          git checkout -q -B main
+          test "$(git symbolic-ref --short HEAD)" = main
+          scripts/dev-task.sh test-shard "$SHARD" 4
+
+  checks:
+    name: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # `xt.py progress-check` cần lịch sử để kiểm SHA bàn giao là tổ tiên HEAD
+          persist-credentials: false # job không push; token không nằm lại trong .git/config (AUD-CI-028)
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.15.2"
+          cache: pip # AUD-CI-028
+          cache-dependency-path: requirements-dev.txt
+
+      # Corpus PR/rollup/review/guard/log CI qua hàm thật của khung (AUTO-07, docs/ops/AUTONOMY-BASELINE.md): exit 1 khi
+      # có false-green (máy cho merge/chạy/tính xanh ở ca phải chặn), exit 2 khi corpus hỏng.
+      - name: autonomy-bench — đỏ khi false-green > 0 (AUTO-07)
+        run: python3 scripts/xt.py autonomy-bench
+
+      # D-194: lệnh `— Kiểm:` của mục đã tick trong BLUEPRINT.md chạy trên MỖI PR (trước chỉ `loop verify`/`release-check`
+      # cục bộ) — mục tick mà hỏng thì đỏ. SEC-004/007 cần ruff ghim kèm hash.
+      - name: Công cụ ghim kèm hash (ruff cho lệnh kiểm blueprint)
+        run: pip install --quiet --require-hashes -r requirements-dev.txt
+      - name: blueprint-status --strict --run — lệnh kiểm của mục đã tick
+        run: python3 scripts/xt.py blueprint-status BLUEPRINT.md --strict --run
+
+      - name: Ghép thử blueprint cho MỌI hồ sơ × gói ngành (smoke)
+        run: |
+          set -euo pipefail
+          profiles=$(python3 scripts/xt.py list profiles | awk '{print $1}')
+          industries=$(python3 scripts/xt.py list industries | awk '{print $1}')
+          n=0
+          for p in $profiles; do
+            python3 scripts/xt.py compose --profile "$p" --scale M --out "/tmp/bp-$p.md" >/dev/null
+            python3 scripts/xt.py blueprint-status "/tmp/bp-$p.md" >/dev/null || true
+            n=$((n+1))
+          done
+          for i in $industries; do
+            python3 scripts/xt.py compose --profile web-app --industry "$i" --scale L --include-may --out "/tmp/bp-web-$i.md" >/dev/null
+            n=$((n+1))
+          done
+          echo "OK — ghép $n blueprint"
+
+      - name: Chạy ĐÚNG khối lệnh "Dùng cho một dự án" trong README (cài thử vào dự án rỗng)
+        run: |
+          set -euo pipefail
+          d=$(mktemp -d)
+          awk '/^## Dùng cho một dự án/{f=1} f&&/^```bash/{g=1;next} g&&/^```/{exit} g' README.md \
+            | grep -v '^git clone' | sed "s#/tmp/x-office#$PWD#g; s#/đường/dẫn/dự-án#$d#g" \
+            | sed '$ s/$/ || test $? -eq 1/' > "$RUNNER_TEMP/readme.sh"   # --strict trả 1 vì blueprint mới chưa tick
+          cat "$RUNNER_TEMP/readme.sh"
+          bash -euo pipefail "$RUNNER_TEMP/readme.sh"
+          test -f "$d/AGENTS.md" && test -f "$d/.claude/settings.json" && test -f "$d/.github/rulesets/main.json"
+          echo "OK — lệnh README chạy được"
+
+      - name: Không còn "(đang viết)" / placeholder trong khung
+        run: |
+          set -euo pipefail
+          if grep -rn "(đang viết)" framework/ ; then echo "::error::Còn chỗ đang viết trong framework/"; exit 1; fi
+          echo "OK"
+
+  # E2E trình duyệt cho app cục bộ `xt.py app` (T-1992, D-133, PRF-WEB-006): 7 màn × 2 viewport (1280×800, 390×844),
+  # console sạch, không cuộn ngang, bàn phím, axe-core 4.14.0 (vendored ở tests_e2e/vendor/axe) 0 vi phạm critical/serious.
+  # Phụ thuộc CHỈ ở job này (requirements-e2e.txt ghim hash) — bộ test chính, `xt.yaml` gate và runtime vẫn chỉ stdlib.
+  # Trình duyệt: Chrome Headless Shell bản Playwright ghim (`--only-shell` bỏ Chromium đầy đủ ~200 MB); không cache theo
+  # khuyến nghị docs CI Playwright (thư viện hệ thống không cache được). Gỡ job + requirements-e2e.txt + tests_e2e/ = về như cũ.
+  app-e2e:
+    name: app-e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false # AUD-CI-028
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.15.2"
+          cache: pip # AUD-CI-028
+          cache-dependency-path: requirements-e2e.txt
+      - name: Playwright ghim kèm hash (requirements-e2e.txt)
+        run: pip install --quiet --require-hashes -r requirements-e2e.txt
+      - name: Chrome Headless Shell + thư viện hệ thống
+        run: python -m playwright install --with-deps --only-shell chromium
+      - name: E2E app — 7 màn × 2 viewport, bàn phím, axe, luồng ghi BLUEPRINT.md
+        run: python -m unittest discover -s tests_e2e -t .
+
+  # Required check `quality` (ruleset `.github/rulesets/main.json`): job TỔNG HỢP của mọi job con ở trên (WF-CI-001).
+  # `always()` — không phải `!cancelled()`: run bị huỷ (push mới, hết giờ) thì `quality` vẫn chạy và ĐỎ (job con
+  # `cancelled`/`skipped` ≠ `success`). Với `!cancelled()`, run bị huỷ làm `quality` thành `skipped`, mà required check
+  # `skipped` được GitHub tính là ĐẠT → auto-merge có thể merge mã chưa qua test. Job matrix: `needs.<job>.result` là kết
+  # quả gộp (một shard đỏ → `failure`). Thêm job con mà quên `needs` → `tests/test_ci.py` đỏ.
+  quality:
+    name: quality
+    needs: [build, typecheck, lint, test, coverage, test-main, checks, app-e2e]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
     env:
-      # SD-25: DSN của service postgres ở trên; test_postgres_integration.py auto-skip nếu
-      # biến này không đặt — ở đây LUÔN đặt nên test chạy thật (không skip) trong CI.
-      QLKH_TEST_PG_DSN: postgresql://test:test@localhost:5432/qlkh_test
+      RESULTS: ${{ toJSON(needs) }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      # ADR-0014 (đóng SD-13): requirements.lock là nguồn khoá phiên bản chính thức
-      # duy nhất; cài ở chế độ frozen + --require-hashes, lệch hash hay thiếu hash là fail (T-12).
-      - run: pip install --require-hashes -r requirements.lock
-      - run: pip install pytest==8.3.3 pytest-cov==5.0.0 pyyaml==6.0.2
-      # SD-25: test_postgres_integration.py gọi psql qua subprocess; runner ubuntu-24.04 có sẵn
-      # postgresql-client, nhưng cài tường minh để không phụ thuộc image mặc định của runner.
-      - run: |
-          set -euo pipefail
-          if ! command -v psql >/dev/null 2>&1; then
-            sudo apt-get update -y
-            sudo apt-get install -y --no-install-recommends postgresql-client
-          fi
-      - run: pg_isready -h localhost -p 5432 -U test -d qlkh_test -t 30
-      - run: pytest --cov=qlkh --cov=tools --cov-branch --cov-fail-under=80
+          python-version: "3.15.2"
+      - name: Mọi job con phải `success`
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+          needs = json.loads(os.environ["RESULTS"])
+          bad = {job: v.get("result") for job, v in needs.items() if v.get("result") != "success"}
+          for job, v in sorted(needs.items()):
+              print(f"{job}={v.get('result')}")
+          if not needs or bad:
+              print(f"::error::Job con không `success`: {bad or 'không có job con nào'}")
+              sys.exit(1)
+          PY
 
-  mutation:
-    # TCK-CR-RUNTIME-05 (CR-RUNTIME-NFR-001, risk_tags=[pii]): mutation testing
-    # thật cho luồng xoá dữ liệu chủ thể (ND13, POST /erasure-requests,
-    # qlkh/application/erasure_http.py) và luồng ghi danh (enrollment,
-    # class_service.py/class_http.py). Không đổi hành vi nghiệp vụ của các
-    # module này trong ticket này — chỉ đưa vào phạm vi mutmut (paths_to_mutate
-    # khai ở pyproject.toml [tool.mutmut]).
-    #
-    # continue-on-error: true CÓ CHỦ ĐÍCH cho lần chạy đầu tiên: agent hiện thực
-    # ticket này không có quyền thực thi tuỳ ý (`run` chỉ nhận git_diff/
-    # git_status/lint/test, không cài/gọi được mutmut) nên KHÔNG có cách tạo
-    # bằng chứng mutation score thật trong worktree cô lập. Đây là job CI thật,
-    # sẽ tạo bằng chứng thật khi chạy trên runner GitHub Actions (có pip install
-    # tuỳ ý) — không phải số liệu đoán. platform/release-engineer PHẢI xác nhận
-    # kết quả lần chạy CI thật đầu tiên: nếu mutation score erasure_http.py VÀ
-    # enrollment (class_service.py + class_http.py) đều >= 70%, gỡ
-    # continue-on-error ngay; nếu <70%, mở lại ticket bổ sung test (ADR-0028:
-    # thuộc test-author, không sửa migration/logic nghiệp vụ). Bỏ qua bước này
-    # thì cổng mất tác dụng chặn vĩnh viễn mà không ai biết.
-    runs-on: ubuntu-24.04
-    continue-on-error: true
+  # Hàng rào cho hàng rào: (1) mọi required check trong ruleset mẫu phải là job có thật (chặn khoá-nhánh-do-đổi-tên-job);
+  # (2) ruleset trên nhánh mặc định có đang hiệu lực không — chỉ CẢNH BÁO (không đỏ) để repo mới chưa import vẫn merge được;
+  # muốn bắt buộc, đổi `::warning` thành `exit 1` (xem CONTRIBUTING.md).
+  protection-guard:
+    name: protection-guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - run: pip install --require-hashes -r requirements.lock
-      # Dev-tool riêng cho job này, KHÔNG vào requirements.lock/dependencies —
-      # cùng quy ước với ruff/mypy/import-linter/pip-audit ở các job khác.
-      - run: pip install mutmut==3.2.2 pyyaml==6.0.2 pytest==8.3.3
-      - name: mutmut run (erasure_http.py + enrollment)
+          persist-credentials: false # AUD-CI-028 — bước API dùng GH_TOKEN qua env
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.15.2"
+      - name: Required check trong ruleset ↔ job có thật
         run: |
           set -euo pipefail
-          mutmut run || true
-      - name: mutmut results (log thật, không ước lượng)
-        run: mutmut results
-      - name: mutation score >= 70% (chỉ cảnh báo, xem continue-on-error ở trên)
+          jobs=$(python3 - <<'PY'
+          import glob, re
+          names = set()
+          for f in glob.glob(".github/workflows/*.yml"):
+              txt = open(f, encoding="utf-8").read()
+              m = re.search(r"^jobs:\n(.*)", txt, re.S | re.M)
+              if not m: continue
+              for jm in re.finditer(r"^  ([A-Za-z0-9_-]+):\n((?:    .*\n|\n)*)", m.group(1), re.M):
+                  key, body = jm.group(1), jm.group(2)
+                  nm = re.search(r"^    name:\s*(.+?)\s*$", body, re.M)
+                  names.add(nm.group(1).strip('"\'') if nm else key)
+          print("\n".join(sorted(names)))
+          PY
+          )
+          fail=0
+          for c in $(python3 -c "import json;[print(x['context']) for r in json.load(open('.github/rulesets/main.json'))['rules'] if r['type']=='required_status_checks' for x in r['parameters']['required_status_checks']]"); do
+            grep -qx "$c" <<<"$jobs" || { echo "::error::Required check '$c' không khớp job nào trong .github/workflows/"; fail=1; }
+          done
+          [ "$fail" = 0 ] && echo "OK — mọi required check đều là job có thật."
+          exit $fail
+      - name: Ruleset trên nhánh mặc định đang hiệu lực? (cảnh báo)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.event.repository.default_branch }}
         run: |
-          set -euo pipefail
-          total=$(mutmut results | grep -c '^' || echo 0)
-          echo "Xem log 'mutmut results' phía trên để lấy % thật; ngưỡng yêu cầu >= 70% (CR-RUNTIME-NFR-001)."
-
-  lock-check:
-    # ADR-0014 (đóng SD-13): requirements.lock PHẢI đồng bộ với pyproject.toml.
-    # Sinh lại lockfile từ pyproject.toml và diff với bản đã commit; lệch (quên
-    # chạy lại `uv pip compile` sau khi đổi dependency) => fail rõ ràng, thay vì
-    # để job `test` âm thầm cài đúng phiên bản cũ trong khi pyproject.toml đã đổi.
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - run: pip install uv==0.4.29
-      - run: uv pip compile pyproject.toml --generate-hashes --no-header --python-version "${{ env.PYTHON_VERSION }}" -o requirements.lock.generated
-      - name: requirements.lock phải khớp pyproject.toml
-        run: |
-          set -euo pipefail
-          # --no-header: uv nhúng chính lệnh gọi (kèm -o requirements.lock.generated) vào
-          # header khi có header, nên hai file KHÔNG BAO GIỜ khớp ở hai dòng đầu dù nội dung
-          # phụ thuộc giống nhau — bỏ header, diff thẳng phần phụ thuộc.
-          if ! diff -u requirements.lock requirements.lock.generated; then
-            echo "::error::requirements.lock lệch so với pyproject.toml (ADR-0014). Chạy lại: uv pip compile pyproject.toml --generate-hashes --no-header --python-version ${{ env.PYTHON_VERSION }} -o requirements.lock" >&2
-            exit 1
-          fi
-
-  smoke:
-    # ADR-0015 / ADR-0031 / TCK-CR-RUNTIME-01: đóng gap evidence.run/smoke
-    # unverified lặp lại 11 lần liên tiếp (REL-027..038, xem
-    # docs/QLKH/changelog/CHANGELOG.md). Đọc runtime.yaml (nguồn sự thật DUY
-    # NHẤT cho lệnh khởi động/cổng/health) qua tools/run_smoke.sh: khởi động
-    # devserver thật, chờ /healthz xanh, chạy infra/staging/wsl/smoke.sh
-    # (4 bước HTTP thật, tài khoản seed) — bằng chứng thật, không phải khai.
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      # Cùng cơ chế cài dependency với job `test` và infra/staging/wsl/deploy.sh (ADR-0014).
-      - run: pip install --require-hashes -r requirements.lock
-      - run: chmod +x tools/run_smoke.sh infra/staging/wsl/smoke.sh
-      - run: tools/run_smoke.sh
-
-  fitness:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - run: pip install import-linter==2.0
-      # Kiểm tối thiểu chạy offline; fail => "vi phạm hướng phụ thuộc"
-      - run: python -m tools.fitness qlkh
-      - run: lint-imports --config importlinter.ini
-
-  authz-gate:
-    # SD-01: QLKH-003 thêm test uỷ quyền → bỏ continue-on-error (RISK-3, T-01/T-02).
-    # authz-gate giờ là cổng chặn cứng: thiếu test uỷ quyền cho endpoint PII → fail build.
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - run: pip install pyyaml==6.0.2
-      - run: python tools/check_authz_tests.py api/QLKH/openapi.yaml tests/authz
-
-  p3-gate:
-    # ADR-004, REQ-009, T-01/T-02: mọi truy cập bảng PII phải đi qua SubjectContext.
-    # Kiểm bằng AST tĩnh (tools/p3_gate.py) — không cần chạy code.
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - run: python -m tools.p3_gate qlkh
-
-  sast:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - run: pipx install semgrep==1.85.0
-      # semgrep -> opentelemetry-instrumentation-requests -> pkg_resources, nhưng
-      # setuptools NHÚNG SẴN trong venv pipx tạo (bản mới trên runner ubuntu-24.04)
-      # đã bỏ pkg_resources — và `pipx inject setuptools` KHÔNG TỰ GHI ĐÈ bản đã có
-      # ("setuptools already seems to be installed... Not modifying"), nên lần trước
-      # bước inject chạy "thành công" mà không đổi gì, semgrep vẫn crash. Cần
-      # --force + pin bản còn pkg_resources.
-      - run: pipx inject semgrep "setuptools==75.6.0" --force
-      - run: semgrep --error --severity ERROR --config p/ci --config p/python .
-
-  sca:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - run: pip install pip-audit==2.7.3
-      # Tiêu chí 2: phụ thuộc có lỗ hổng High/Critical => chặn merge
-      - run: pip-audit --strict --requirement requirements.lock --vulnerability-service osv
-
-  secrets:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - run: |
-          set -euo pipefail
-          url=https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz
-          curl -sSL -o gitleaks.tar.gz "$url"
-          python tools/verify_download.py gitleaks.tar.gz "$url" --checksums-url \
-            https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_checksums.txt
-          tar xzf gitleaks.tar.gz gitleaks
-          ./gitleaks detect --source=. --redact --no-banner --log-opts="--all"
-
-  iac:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - run: pipx install checkov==3.2.0
-      - run: checkov -d ./infra --quiet --compact
-      - run: |
-          set -euo pipefail
-          url=https://github.com/open-policy-agent/conftest/releases/download/v0.56.0/conftest_0.56.0_Linux_x86_64.tar.gz
-          curl -sSL -o conftest.tar.gz "$url"
-          python tools/verify_download.py conftest.tar.gz "$url" --checksums-url \
-            https://github.com/open-policy-agent/conftest/releases/download/v0.56.0/checksums.txt
-          tar xzf conftest.tar.gz conftest
-          ./conftest verify --policy ./policy
-          ./conftest test ./infra --policy ./policy --all-namespaces
-
-  license:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - run: |
-          set -euo pipefail
-          url=https://github.com/anchore/syft/releases/download/v1.18.1/syft_1.18.1_linux_amd64.tar.gz
-          # syft giải nén vào $RUNNER_TEMP, NGOÀI thư mục sẽ scan (`dir:.`) — giải nén
-          # thẳng vào repo trước đây khiến binary cataloger của syft đọc luôn dependency
-          # Go NHÚNG SẴN trong chính binary syft, lẫn vào SBOM của QLKH (đo được: sbom.cdx.json
-          # có ~180 package Go — go-git, docker/*, opencontainers/* — không phải phụ thuộc
-          # của QLKH, và job license fail vì phần lớn không khai license nhúng theo cách syft đọc được).
-          curl -sSL -o "$RUNNER_TEMP/syft.tar.gz" "$url"
-          python tools/verify_download.py "$RUNNER_TEMP/syft.tar.gz" "$url" --checksums-url \
-            https://github.com/anchore/syft/releases/download/v1.18.1/syft_1.18.1_checksums.txt
-          tar xzf "$RUNNER_TEMP/syft.tar.gz" -C "$RUNNER_TEMP" syft
-          "$RUNNER_TEMP/syft" dir:. -o cyclonedx-json=sbom.cdx.json
-      # SD-04: gói không có license cũng bị chặn, không chỉ GPL/AGPL/SSPL/BUSL
-      - run: python tools/check_licenses.py sbom.cdx.json
-
-  sbom:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - run: |
-          set -euo pipefail
-          url=https://github.com/anchore/syft/releases/download/v1.18.1/syft_1.18.1_linux_amd64.tar.gz
-          # Cùng lý do với job `license`: giải nén syft ngoài cây scan (`dir:.`), tránh
-          # binary cataloger tự đọc lại dependency Go nhúng trong chính syft.
-          curl -sSL -o "$RUNNER_TEMP/syft.tar.gz" "$url"
-          python tools/verify_download.py "$RUNNER_TEMP/syft.tar.gz" "$url" --checksums-url \
-            https://github.com/anchore/syft/releases/download/v1.18.1/syft_1.18.1_checksums.txt
-          tar xzf "$RUNNER_TEMP/syft.tar.gz" -C "$RUNNER_TEMP" syft
-          "$RUNNER_TEMP/syft" dir:. -o cyclonedx-json=sbom.cdx.json
-      # Tiêu chí 3: artifact luôn kèm SBOM CycloneDX
-      - run: python tools/check_sbom.py sbom.cdx.json
-      - uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
-        with:
-          name: sbom
-          path: sbom.cdx.json
-
-  image-pin:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      # Chưa có Dockerfile ở QLKH-001 (chưa có runtime); job chặn sẵn tag di động
-      # ngay khi Dockerfile đầu tiên xuất hiện.
-      - name: Base image phải ghim theo digest
-        run: |
-          shopt -s nullglob
-          files=(Dockerfile */Dockerfile)
-          if [ ${#files[@]} -eq 0 ]; then echo "chưa có Dockerfile — bỏ qua"; exit 0; fi
-          if grep -Hn '^FROM ' "${files[@]}" | grep -v '@sha256:'; then
-            echo "Base image chưa ghim digest" >&2
-            exit 1
-          fi
+          set -uo pipefail
+          rules=$(curl -sS -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$REPO/rules/branches/$BRANCH" || echo "[]")
+          for t in pull_request required_status_checks deletion non_fast_forward; do
+            if ! python3 -c "import json,sys; r=json.loads(sys.argv[1]); sys.exit(0 if any(x.get('type')==sys.argv[2] for x in r) else 1)" "$rules" "$t"; then
+              echo "::warning::Nhánh $BRANCH chưa có rule '$t' — import .github/rulesets/main.json (Settings → Rules → Rulesets → Import)."
+            fi
+          done
+          echo "Đã kiểm ruleset (cảnh báo nếu thiếu)."

@@ -1,0 +1,44 @@
+version: 2
+updates:
+  # Nâng SHA của action đã ghim (uses: owner/repo@<sha> # vX.Y.Z); gom nhóm để không phình WIP.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 2
+    # BASE-DEP-016/019: chỉ nhận bản đã phát hành ≥ 7 ngày (AUD-DEP-025: zizmor `dependabot-cooldown` đòi ≥ 7; bản bị rút/tiêm mã thường lộ trong vài ngày đầu).
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]
+  # Lockfile pnpm của gói web-api-ts (AUD-DEP-021): gom một PR mỗi tuần; dự án đích thêm khối npm cho manifest của mình.
+  - package-ecosystem: npm
+    directory: /framework/templates/packs/web-api-ts/starter
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 2
+    cooldown:
+      default-days: 7
+    groups:
+      pack-npm:
+        patterns: ["*"]
+  # Ba file khoá có hash (requirements-dev/audit/e2e.txt: công cụ cổng, audit, E2E) — gom một PR mỗi tuần.
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 2
+    cooldown:
+      default-days: 7
+    groups:
+      dev-tools:
+        patterns: ["*"]
+    ignore:
+      # playwright 1.64.x đòi pyee < 15; updater pip không giải ràng buộc này trong file khoá có hash (#275).
+      # Gỡ khi playwright cho phép pyee >= 15 (METADATA `Requires-Dist: pyee`), rồi nâng pyee cùng PR.
+      - dependency-name: pyee
+        update-types: ["version-update:semver-major"]

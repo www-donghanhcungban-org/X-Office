@@ -1,22 +1,29 @@
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
 .venv/
-.pytest_cache/
-.ruff_cache/
-.mypy_cache/
-*.egg-info/
+# Trạng thái autopilot cục bộ (bằng chứng chạy của từng máy)
+.autopilot/
+# Hệ điều hành / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+# Bí mật
+.env
+.env.*
+!.env.example
+# Claude Code cục bộ
+.claude/settings.local.json
+# Bản sao repo của subagent (worktree tạm)
+.claude/worktrees/
+# HOME giả của test guard (tiến trình bị kill giữa chừng thì nằm lại)
+tests/xt-tmp-home-*/
 
-# uv.lock KHÔNG dùng — requirements.lock là nguồn khoá phiên bản chính thức (ADR-0014)
-uv.lock
-
-# Node / frontend build
-node_modules/
-web/node_modules/
-web/dist/
-package-lock.json
-web/package-lock.json
-
-# Runtime / local state
-var/
-*.log
+# Khoá/chứng chỉ
+*.pem
+*.key
+*.p12
+# Dữ liệu coverage (cổng test ghi rồi gộp)
+.coverage
+.coverage.*

@@ -1,0 +1,36 @@
+# PROGRESS.md — Khung X-Office
+
+> Giai đoạn hiện tại: G8 Vận hành & tiến hoá (khung 3.34.0, pha `harden` — D-136) · Cập nhật: 2026-11-19
+
+## Đang làm
+- 2026-11-19 **3.34.0 đã phát hành** (tag `v3.34.0` của X-Templates, agent ký GO-NO-GO §5 ở #674): harden ADR-0080 xong 14 đợt (D-494…D-509; guard mặc định chặn D-503; giới hạn đã biết ở `harness-files.md`, có hạn 2027-01-21). Audit delta 13 nhóm ở `fe5f1e8e` (SEC/TEST/DOC/HAR `rút gọn` — phần chưa rà ghi ở bảng nhóm của sổ); 🔴/🟠 mở 0; 🟠 chấp nhận AUD-DEP-037 (D-514).
+- ADR-0081 (D-511, #673) đã triển khai: `compose` không `--scale` giữ quy mô cũ (không đọc được → lỗi, AUD-HAR-437), chưa có thì S; `doctor` ở build không cảnh báo chậm MINOR/PATCH ([đo dự án đích](research/2026-11-19-target-project-speed.md)). Nâng khung kèm `actions/setup-python` 3.15.2 ở CI dự án gọi `xt.py` (ADR-0078).
+- 2026-11-11 **ADR-0075** xưởng đầu-cuối ([PLAN-factory-e2e](docs/autopilot/PLAN-factory-e2e.md), T-3841…T-3866; T-3845 `install.py --new`, `doctor --offline`; kế: lệnh triển khai, receipt bền — [ADR-0077](docs/adr/0077-deployment-receipts.md)). AUD-DOC-273/274: [báo cáo pilot](docs/ops/ARTIFACT-PILOT-2026-11-08.md) còn kiểm artifact trên VPS.
+- Dự án đích ([registry](docs/ops/registry.json)): X-Company #114, xboss #747, dhcb #1506 đã nâng 3.34.0; hotel-manager #159 mở, chờ chủ dự án xử lý check đỏ có từ trước (`dep-audit` Next 16.x, ngoại lệ zod quá hạn, test `expected 410 to be 200`, `schema-compat`). Còn mở: AUD-TEST-061 (CodeQL); fixture host Codex/Gemini.
+- D-457: PLAN factory-A/BE đã lưu kho. `LOOP-ORCH-020`: chỉ tăng agent khi có số. 10 nhóm `cong-cu` chờ phân loại ([TARGETS](docs/ops/TARGETS.md)). Hoãn: T-1690/T-1691 (quét lại SEC-091…099); rà `seeker19110/stored` chờ chủ repo (hạn xét 2026-12-31).
+
+## Tiếp theo
+1. Đợt 16 xong (D-516, #676–#678): CI `test` 6 shard (2m54s–5m02s, trước bị huỷ ở 10 phút), `test-select` chọn theo lớp (1 tệp `.md`: 331 → 47–81 lớp), `/complete` chạy lại `doctor` sau `harden`. **Đính chính (D-517):** 12 phút mỗi commit ở checkout chính là do 4 tệp chưa track `.codex/agents/*.toml` không ánh xạ được (cả 697 lớp, AUD-HAR-443); commit trong worktree dưới gốc dự án không qua cổng commit (AUD-HAR-442 🟠 mở) — đợt 17: T-3964, T-3965. Sau đó: nới guard cho lệnh chỉ-đọc dạng ghép khi đã tách `guard.py` (D-142); nợ AUD-TEST-131.
+1b. hotel-manager #159: sau khi chủ dự án xử lý check đỏ → merge, rồi cập nhật `registry.json`/TARGETS (còn 3.32.0).
+2. **3.35.0**: đề xuất stored XT-H-117…139 (research 2026-11-10/16/18); tách `guard.py` (>22 000 dòng) thành module theo họ luật (D-142) để executor song song không xung đột; đưa `pre-push.sh` (kiểm bẫy trước push) vào repo; kiểm máy PROGRESS không lạc hậu (AUD-HAR-436); nợ test AUD-TEST-125…127.
+3. Hạn: 2026-12-02 bỏ `pull_request_target` khỏi `pr-review.yml`; 2026-12-31 rà stored; **2027-01-21** xét lại hàng rào guard + đánh giá sandbox Bash opt-in (D-331/D-332, ADR-0072) và các chấp nhận AUD-SEC-406/931/943/955/965.
+4. Việc của người: import lại `.github/rulesets/main.json` (ruleset sống thiếu `pack-npm-audit`; tắt resolve thread là chủ ý ADR-0079); xoá stash `d497-dup`, `d498-dup-x9`; `XT_STEWARD_TOKEN`, Dependabot security updates (RUNBOOK-PR-STEWARD §1).
+5. Còn: máy hoá `LOOP-HARNESS-031`, `LOOP-STOP-030`; task `[perf]` trong `loop` (D-041); URL phiên do máy chủ MCP gắn vào thân PR; ép báo "đã đo/chưa đo" cho UI (`LOOP-DESIGN-021`); `xt.pyz` (ADR-0010).
+6. Cách làm nhanh: CI là cổng đầy đủ; chạy `pre-push.sh` trước khi đẩy; PR sổ gộp vào PR sửa (mở draft để steward không merge sớm); một executor cho một tệp nóng.
+7. Giữ cổng: C901 ≤ 10, `mypy --strict`, coverage dòng + nhánh 100 %, `changelog-check`, trần byte (`tests/test_docs_budget.py`, ADR-0043), không ngưỡng thời gian/CPU cứng (BASE-GATE-005), tên định danh tránh secret/token/password/credential (CodeQL) — không `noqa`/pragma, không nới trần.
+
+## Quyết định
+> Chi tiết ở `docs/adr/` và `docs/autopilot/DECISIONS.md` (D-NNN); ở đây chỉ giữ điều chưa có nhà khác.
+- Khung = thư viện yêu cầu có ID + ghép blueprint + máy kiểm "xong" (ADR-0001); hook fail-open về luồng, fail-closed về hành động nguy hiểm (ADR-0002); blueprint theo quy mô S/M (ADR-0003/0004/0012).
+- Luật VN: Luật 91/2025/QH15 + NĐ 356/2025 (thay NĐ 13/2023 từ 01/01/2026); Luật ANM 116/2025 (01/07/2026). OWASP LLM Top 10 2026; EU AI Act Đ.50 áp dụng 02/08/2026. Mặc định OSI: OpenTofu, Valkey.
+- Repo khung: Python 3.15.x (D-485, ADR-0078); `mypy --strict`; coverage 100 % (cả subprocess); `changelog-check`/`progress-check` trong `lint`; PROGRESS chỉ ghi SHA trên `main` (squash-merge). Tên: X-stored → X-Office (ADR-0006/0007).
+- Commit/PR không ghi tên model hay URL phiên AI (LOOP-HARNESS-027); tag phát hành qua `release-tag.yml` — gọi bằng REST `workflow_dispatch` (`gh workflow run` cần GraphQL, bị chặn trong phiên).
+- Autopilot: tự duyệt (ADR-0008), một phiên (ADR-0009), phản hồi dự án đích (ADR-0010), cổng rỗng là đỏ (ADR-0011), `doctor --fix` đầu tiên; pha build/harden (ADR-0031), tối giản pha build (ADR-0033). Merge theo làn (ADR-0013…0016, 0020, 0024/0025, 0028/0032), steward (ADR-0027); cơ chế: merge ghim head, không auto-merge, không `merge-gate` (ADR-0036). Guard không hỏi người (ADR-0018/0019), ghi tay `.autopilot/` bị chặn (ADR-0026). Reviewer năng lực cao hơn người viết (D-161): cần review thì spawn agent mới và chỉ định `model`. Cấu hình agent theo loại việc, `max_rethink` 1/PR (ADR-0061).
+- Phiên nhiều lát: mỗi lát một nhánh 1-commit từ `origin/main` (hoặc xếp chồng rồi rebase sau khi lát trước merge), mở PR tuần tự; guard chặn force-push; sửa PR đang mở khi cây bẩn → worktree riêng.
+- Sửa thân PR (chân trang do máy chủ MCP gắn) từng kích `edited` → chỉ `pr-title.yml` nghe `edited`. Phiên khung không merge được PR ở repo khác → để `pr-steward` của dự án merge ghim head.
+- CI đã gỡ macOS (2026-10-17). Nợ chấp nhận: 4 MUST/module là phán đoán; số điều NĐ 356/2025 chưa đối chiếu bản gốc. D-142 chưa làm: tách `xt.py`, merge queue, reviewer LLM mọi PR, thu nhỏ guard. ADR-0075 lập kế hoạch song song worktree theo file (T-3850).
+- Coverage cục bộ < 100 % khi `coverage` cài ở site người dùng: hook chạy `python3 -I` nên tiến trình con không được đo — CI là cổng coverage (đo 2026-11-05).
+
+## Bàn giao phiên
+- Mốc: `main` cũ (qlkh) `9c66ac3`; nội dung thay bằng bản clone X-Templates `main` ngày 2026-11-19 (lịch sử ghép bằng merge commit; khi đưa vào `main` dùng merge commit, không squash). Xét PR xanh theo số tăng dần. Phiên "tiếp tục": đọc sổ `docs/ops/AUDIT-STATUS.md` (🔴/🟠 mở 0), PLAN-harden-2026-11-17 (T-3957 xong), CHANGELOG [3.34.0].
+- Container mới: `scripts/dev-task.sh setup`; trước khi đẩy `gate-fast`, CI là cổng đầy đủ. Subagent dùng scratch riêng dưới `/home/liend` (không `/tmp`: tmpfs, mất khi khởi động lại). Gate cục bộ: `coverage` và `pip` phải ở site-packages của `python3` (hook chạy `python3 -I`) — venv 3.15 đầu PATH; G7 cần `fetch --unshallow --tags`; `release-check` chạy ở worktree sạch (`.agents/`, `.codex/` chưa commit làm hàng `tree` đỏ).
