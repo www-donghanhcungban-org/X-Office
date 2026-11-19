@@ -86,7 +86,7 @@ class PackAuditExceptionsTest(unittest.TestCase):
         _, exceptions = load()
         cves = ignored_ids(ws, "ignoreCves")
         self.assertEqual(sorted(cves), sorted(c for c in (e["cve"] for e in exceptions) if c in cves))
-        self.assertTrue(set(cves) <= {e["cve"] for e in exceptions})
+        self.assertLessEqual(set(cves), {e["cve"] for e in exceptions})
 
     def test_exceptions_complete_and_not_expired(self):
         _, exceptions = load()

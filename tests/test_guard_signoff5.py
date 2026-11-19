@@ -327,7 +327,7 @@ class SignOff5HelperTest(unittest.TestCase):
         self.assertFalse(scope._home_inside('"$HOME/x"'))  # không biết gốc dự án
         self.assertFalse(scope._home_inside('"$PWD/x"'))
         self.assertFalse(guard._env_dir_moved(["env", "-C", "/tmp", "rm"], ["rm"]))
-        self.assertTrue(guard._env_dir_moved(["env", "-C"], []) is False)
+        self.assertIs(guard._env_dir_moved(["env", "-C"], []), False)
 
     def test_dq_unescaped(self):
         self.assertEqual(guard._dq_unescaped(["rm \\$X", "ls"]), ["rm \\$X", "rm $X", "ls"])

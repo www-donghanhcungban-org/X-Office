@@ -1479,11 +1479,8 @@ class DoctorDriftTest(DoctorCase):
         sp = self.base / ".claude" / "settings.json"
         settings = json.loads(sp.read_text(encoding="utf-8"))
         self.assertEqual(xt.DOCTOR_HOOK_EVENTS["PostToolUseFailure"], "warn")  # T-1822
-        del (
-            settings["hooks"]["TaskCompleted"],
-            settings["hooks"]["SubagentStop"],
-            settings["hooks"]["PostToolUseFailure"],
-        )
+        for event in ("TaskCompleted", "SubagentStop", "PostToolUseFailure"):
+            del settings["hooks"][event]
         sp.write_text(json.dumps(settings), encoding="utf-8")
         msgs = [f.msg for f in self.findings(deep=False) if f.code == "hooks" and f.level == "warn"]
         self.assertEqual(len(msgs), 3)
