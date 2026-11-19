@@ -163,3 +163,14 @@ code { overflow-wrap: anywhere; }
 form.compose { display: grid; gap: 0.35rem 1rem; grid-template-columns: minmax(0, 1fr); max-width: 40rem; margin-bottom: 1rem; }
 form.compose select, form.compose button { max-width: 100%; }
 pre.md { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 60vh; overflow: auto; border: 1px solid var(--border); padding: 0.75rem; }
+
+/* F-008 Văn phòng: canvas tự vẽ, thanh tuỳ chọn co theo màn hẹp. */
+.office-bar { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: center; margin: 0.75rem 0; }
+.office-bar > span { display: inline-flex; gap: 0.35rem; align-items: center; }
+.office-bar select { font: inherit; max-width: 100%; }
+.office-stage { border: 1px solid var(--border); border-radius: 0.5rem; overflow: hidden; }
+.office-canvas { display: block; width: 100%; height: auto; }
+.office-state { font-weight: 700; }
+.office-work, .office-ok { color: var(--ok); }
+.office-fail, .office-bad { color: var(--danger); }
+.office-wait { color: var(--accent); }

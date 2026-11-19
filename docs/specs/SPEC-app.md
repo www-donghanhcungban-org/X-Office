@@ -72,6 +72,7 @@ khoá `(method, path)`; `Ctx` có `base` (gốc dự án), `framework` (thư m�
 | `GET /api/prs` | — | `available: true`, `prs: [{number, title, head_sha, lane, action, reasons}]`; không có `gh`/chưa đăng nhập/hết giờ → `available: false`, `reason` | — (luôn 200) | T-1971 |
 | `GET /api/pr-stats` | `days` (1–90, mặc định 7) | như `pr stats --json`, thêm `available` | 400 `days` sai | T-1971 |
 | `GET /api/registry` | — | như `registry --json` + `available`, `path`, mỗi sản phẩm thêm owner/type/risk/environments/slo/release/exceptions; chưa có hoặc sai → `available: false`, `reason`, `errors` (≤ 50) | — (luôn 200) | T-3691 |
+| `GET /api/office` | — | `project`, `loop: {verdict, reason}`, `seats: [{key, label, state, task: {id, title} \| null}]` (bàn theo thứ tự `main`, `executor`, `executor-deep`, `reviewer`, `researcher`; `state` ∈ `work`, `fail`, `wait`, `done`, `idle` — suy từ verdict vòng và lần chạy cuối của mỗi agent trong `.autopilot/runs.jsonl`), `tasks: {open, done, skipped}`, `pending_human: [{id, reason}]`, `feed: [{at, agent, task, ok}]` (≤ 15, mới nhất trước) | — (luôn 200; dữ liệu hỏng → bàn rảnh, danh sách rỗng) | F-008 |
 
 Đọc file mới mỗi request (hoặc cache theo `mtime`); không ghi gì ngoài `POST /api/blueprint`. `GET /api/prs` chỉ gọi REST
 `GET` qua `_gh_api`, không ghi sổ review, không gọi merge.
@@ -112,6 +113,12 @@ khoá `(method, path)`; `Ctx` có `base` (gốc dự án), `framework` (thư m�
 - S-013 Given `gh` đã đăng nhập, When mở màn, Then bảng PR mở (làn, hành động kế, lý do), số đo lead time/CI, lệnh `pr next
   --pr N` để chép; không có nút merge.
 - S-014 Given không có `gh`, When mở màn, Then thông báo lý do, các màn khác vẫn chạy.
+
+### F-008 Văn phòng (`#/office`, `views/office.js`, `office/*.js`)
+- S-015 Given vòng đang chạy có lần chạy xanh của `executor` và lần đỏ của `executor-deep` trên task còn mở, When mở màn, Then bàn "Thực thi" hiện "đang làm" kèm ID task, bàn "Thực thi sâu" hiện "đang sửa (đỏ)"; bảng văn bản dưới canvas nêu đúng như vậy; việc `loop defer` nằm ở "Việc cần người".
+- S-016 When chọn kiểu văn phòng (Công ty công nghệ, Studio sáng tạo, Thư viện yên tĩnh, Văn phòng ban đêm, Cyberpunk, Quán cà phê, Vũ trụ) hoặc mùa (Tự động, Tắt, Noel, Tết), Then cảnh vẽ lại ngay, lựa chọn nhớ trong `localStorage` (lỗi lưu → vẫn chạy với mặc định).
+- S-017 Given `prefers-reduced-motion: reduce`, When mở màn, Then chuyển động tắt mặc định (bật lại bằng tay được); rời màn thì vòng vẽ và hỏi lại dữ liệu (10 s) dừng.
+- Vẽ bằng Canvas 2D tự viết (không thư viện ngoài, đúng CSP §2); kiểu văn phòng là dữ liệu trong `office/themes.js` — thêm kiểu không sửa mã vẽ. Canvas có `role="img"` + `aria-label` tóm tắt; mọi thông tin của cảnh có bản văn bản tương đương.
 
 ## 5. Ca biên
 | Nhóm | Ca cụ thể | Hành vi mong đợi | Scenario |

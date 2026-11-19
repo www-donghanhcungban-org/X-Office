@@ -44,6 +44,7 @@ SCREENS: Tuple[Tuple[str, str], ...] = (
     ("blueprint", "Tiến độ blueprint"),
     ("plan", "Kế hoạch và phân chia việc"),
     ("loop", "Vòng tự động"),
+    ("office", "Văn phòng"),
     ("pr", "PR"),
     ("registry", "Registry sản phẩm"),
 )
@@ -250,6 +251,9 @@ class ScreensTest(AppCase):
     def check_screen(self, page: Page, watch: Watch, route: str) -> None:
         if route == "pr":  # không có gh: màn PR báo rõ, các màn khác vẫn dùng được
             page.get_by_text("Không đọc được GitHub").wait_for()
+        if route == "office":  # canvas có mô tả văn bản; bảng tương đương có đủ 5 bàn
+            page.locator("canvas.office-canvas[aria-label^='Văn phòng kiểu']").wait_for()
+            self.assertEqual(page.locator("main tbody tr").count(), 5)
         if route == "registry":  # bảng có dòng; lý do ngoại lệ chứa thẻ HTML hiện thành chữ, không thành phần tử
             page.get_by_text("hết hạn · EX-1", exact=False).wait_for()
             self.assertEqual(page.locator("main script").count(), 0)

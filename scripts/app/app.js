@@ -7,6 +7,7 @@ const ROUTES = {
   blueprint: ["blueprint", "Tiến độ blueprint"],
   plan: ["plan", "Kế hoạch"],
   loop: ["loop", "Vòng tự động"],
+  office: ["office", "Văn phòng"],
   pr: ["pr", "PR"],
   registry: ["registry", "Registry sản phẩm"],
 };

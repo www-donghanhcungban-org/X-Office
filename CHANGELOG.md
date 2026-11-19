@@ -6,6 +6,16 @@ Bản < 3.20.0: [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md) (T-3651; `changel
 
 ## [Unreleased]
 
+### Added
+
+- App cục bộ `xt.py app` thêm màn **Văn phòng** (`#/office`, F-008, `GET /api/office`): các agent của vòng (điều phối,
+  `executor`, `executor-deep`, reviewer, researcher) ngồi bàn trong một văn phòng isometric; trạng thái suy từ verdict vòng
+  và `.autopilot/runs.jsonl` (đang làm, đang sửa khi Gate đỏ, chờ người, xong, rảnh), kèm feed lần chạy gần đây và việc chờ
+  người. Chọn 7 kiểu văn phòng (công nghệ, studio sáng tạo, thư viện, ban đêm, cyberpunk, quán cà phê, vũ trụ) và lớp mùa
+  (tự động, Noel, Tết); nhãn tên, chuyển động, chất lượng, phóng to/thu nhỏ. Vẽ bằng Canvas 2D tự viết — không thêm phụ
+  thuộc, đúng CSP của app; tắt chuyển động khi `prefers-reduced-motion`; có bảng văn bản tương đương. Dự án đích: nhận khi
+  chạy lại `install.py`.
+
 ### Changed
 
 - `xt.py test-select --unittest` (cổng commit `gate-fast`, khoá `test_fast`) chọn test theo **lớp** thay vì theo tệp: lớp
