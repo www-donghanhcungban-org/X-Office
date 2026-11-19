@@ -2,7 +2,8 @@
 // Bộ vẽ mặc định: Canvas 2D tự viết (không thư viện); tuỳ chọn 3D: three.js vendor, tải lười khi chọn (office/three-view.js).
 // Bản văn bản tương đương ngay dưới canvas; chuyển động tắt khi prefers-reduced-motion.
 import { THEMES, SEASONS, resolveSeason, themeById } from "../office/themes.js";
-import { drawScene, describe, LAYOUTS, STATE_TEXT, npcSeated } from "../office/scene.js";
+import { drawScene, describe, LAYOUTS, STATE_TEXT, npcSeated, viewCorners } from "../office/scene.js";
+import { fitPoints } from "../office/iso.js";
 import { SCALES, planFor } from "../office/plans.js";
 
 const PREF_KEY = "xt-office";
@@ -54,6 +55,12 @@ export async function render(main, { api, h, error }) {
     quality: "high", zoom: 1, ...loadPrefs(),
   };
   const view = { focus: null, seat: null, pan: { x: 0, y: 0 } }; // không lưu: mở lại màn là toàn cảnh
+  // Giá trị đã lưu không còn trong danh sách (bản cũ/sửa tay) → mặc định: ô chọn, mặt bằng và luật hiệu năng (chỉ nhóm nhỏ
+  // bật quầng sáng/bóng) cùng thấy một quy mô.
+  for (const [k, list, d] of [["scale", SCALES, "team"], ["layout", LAYOUTS, "open"], ["theme", THEMES, "night"],
+    ["season", SEASONS, "auto"], ["renderer", RENDERERS, "2d"]]) {
+    if (!list.some((o) => o.id === prefs[k])) prefs[k] = d;
+  }
   if (reduce) prefs.motion = false; // hệ thống xin giảm chuyển động thắng lựa chọn đã lưu; bật lại tay chỉ cho phiên này
   const [rendererLabel, rendererSel] = select(h, "office-renderer", "Bộ vẽ", RENDERERS, prefs.renderer);
   const [scaleLabel, scaleSel] = select(h, "office-scale", "Quy mô", SCALES, prefs.scale);
@@ -74,6 +81,9 @@ export async function render(main, { api, h, error }) {
   // tabindex 0: canvas 2D nhận focus để dời góc nhìn bằng phím mũi tên (thay cho kéo chuột — WCAG 2.1.1).
   const canvas = h("canvas", { class: "office-canvas", role: "img", tabindex: "0", "aria-label": "Văn phòng đang tải" });
   const stage = h("div", { class: "office-stage" }, canvas);
+  // Gợi ý phím hiển thị cho canvas có focus (cả 2D và 3D trỏ tới qua aria-describedby).
+  const keys = h("p", { class: "muted office-keys", id: "office-keys" });
+  canvas.setAttribute("aria-describedby", "office-keys");
   const summary = h("p", { class: "muted", "aria-live": "polite" });
   const table = h("tbody", null);
   const human = h("div", null);
@@ -89,7 +99,7 @@ export async function render(main, { api, h, error }) {
       h("span", null, themeLabel, themeSel), h("span", null, seasonLabel, seasonSel), h("span", null, qualityLabel, qualitySel),
       h("span", null, namesBox, namesLabel), h("span", null, npcBox, npcLabel), h("span", null, motionBox, motionLabel),
       h("span", null, zoomOut, zoomIn, refresh)),
-    rooms, msg, rmsg, stage, counters, summary,
+    rooms, msg, rmsg, stage, keys, counters, summary,
     legend,
     h("h2", null, "Ai đang làm gì"),
     h("table", null, h("thead", null, h("tr", null, h("th", { scope: "col" }, "Bàn"), h("th", { scope: "col" }, "Trạng thái"), h("th", { scope: "col" }, "Task"))), table),
@@ -111,7 +121,7 @@ export async function render(main, { api, h, error }) {
     const buttons = [...table.querySelectorAll("button")];
     const at = buttons.indexOf(document.activeElement);
     table.replaceChildren(...seatRows(h, seats, goSeat));
-    if (at >= 0) table.querySelectorAll("button")[Math.min(at, seats.length - 1)]?.focus();
+    if (at >= 0) table.querySelectorAll("button")[Math.min(at, seats.length - 1)]?.focus({ preventScroll: true });
   }
 
   function apply(d) {
@@ -164,21 +174,22 @@ export async function render(main, { api, h, error }) {
 
   // Bộ đếm: agent thật + nhân viên minh hoạ (số bàn có người minh hoạ của mặt bằng) · đang làm · đang chờ.
   function count() {
-    if (!loaded) {
-      counters.textContent = "Chưa có dữ liệu agent (đang tải hoặc máy chủ lỗi).";
-      return;
-    }
     const plan = planFor(prefs.scale, prefs.layout);
     const npc = prefs.npc ? npcSeated(plan) : 0;
-    const working = data.seats.filter((s) => s.state === "work" || s.state === "fail").length;
-    const waiting = data.seats.filter((s) => s.state === "wait").length;
-    counters.textContent = data.seats.length + " agent" + (npc ? " + " + npc + " nhân viên minh hoạ" : "") +
-      " · đang làm " + working + " · đang chờ " + waiting;
+    // Chú thích chỉ phụ thuộc lựa chọn, không phụ thuộc dữ liệu — đúng cả khi đang tải hay máy chủ lỗi.
     legend.textContent = !prefs.names
       ? "Nhãn tên đang tắt — xem trạng thái từng agent ở bảng \"Ai đang làm gì\" dưới đây."
       : npc
         ? "Người có nhãn là agent thật của vòng; người không nhãn là nhân viên minh hoạ (chỉ trang trí, không mang trạng thái)."
         : "Mỗi người trong cảnh là một agent của vòng, có nhãn tên.";
+    if (!loaded) {
+      counters.textContent = "Chưa có dữ liệu agent (đang tải hoặc máy chủ lỗi).";
+      return;
+    }
+    const working = data.seats.filter((s) => s.state === "work" || s.state === "fail").length;
+    const waiting = data.seats.filter((s) => s.state === "wait").length;
+    counters.textContent = data.seats.length + " agent" + (npc ? " + " + npc + " nhân viên minh hoạ" : "") +
+      " · đang làm " + working + " · đang chờ " + waiting;
   }
 
   function setFocus(focus, seat) {
@@ -257,6 +268,7 @@ export async function render(main, { api, h, error }) {
       canvas.hidden = false;
     }
     size();
+    label(); // tên + gợi ý phím theo bộ vẽ vừa chọn
   }
 
   let last = 0;
@@ -276,7 +288,13 @@ export async function render(main, { api, h, error }) {
   function label() {
     const text = describe(data.seats, themeById(prefs.theme).name, SCALES.find((x) => x.id === prefs.scale)?.name);
     canvas.setAttribute("aria-label", text);
-    if (three) three.canvas.setAttribute("aria-label", text);
+    keys.textContent = three
+      ? "Khi khung cảnh có focus: mũi tên xoay góc nhìn; kéo chuột để xoay."
+      : "Khi khung cảnh có focus: mũi tên dời góc nhìn · + / − phóng to, thu nhỏ · 0 về giữa; kéo chuột để dời.";
+    if (three) {
+      three.canvas.setAttribute("aria-label", text);
+      three.canvas.setAttribute("aria-describedby", "office-keys");
+    }
   }
 
   // Lưu lựa chọn; khi hệ thống xin giảm chuyển động, giữ nguyên "Chuyển động" đã lưu (bật tay chỉ cho phiên này).
@@ -294,12 +312,12 @@ export async function render(main, { api, h, error }) {
       setFocus(null, null);
       roomButtons();
     }
-    count();
     prefs.theme = themeSel.value;
     prefs.season = seasonSel.value;
     prefs.quality = qualitySel.value;
     prefs.names = namesBox.checked;
     prefs.motion = motionBox.checked;
+    count(); // sau khi gán ĐỦ lựa chọn — chú thích theo "Nhãn tên" vừa đổi, không lệch một nhịp
     persist();
     await useRenderer();
     label();
@@ -310,15 +328,17 @@ export async function render(main, { api, h, error }) {
   const zoomBy = (f) => {
     prefs.zoom = Math.min(4, Math.max(0.5, +(prefs.zoom * f).toFixed(2)));
     persist();
-    dirty = true;
+    panTo(view.pan.x, view.pan.y); // thu nhỏ thì biên dời hẹp lại — kẹp lại góc nhìn đang dời
     if (three) three.dirty = true;
   };
   zoomIn.addEventListener("click", () => zoomBy(1.25));
   zoomOut.addEventListener("click", () => zoomBy(0.8));
   // 2D: kéo CHUỘT để dời góc nhìn (chạm/bút: để trang cuộn bình thường); phím mũi tên khi canvas có focus. Dời giới hạn
-  // trong một khung canvas để cảnh không bị kéo mất khỏi tầm nhìn. (3D: three-view.js tự xử lý xoay trên canvas của nó.)
+  // theo cỡ cảnh đã phóng: dời tới mép cảnh, cộng 1/4 khung — luôn còn một phần cảnh trong tầm nhìn ở mọi mức phóng.
+  // (3D: three-view.js tự xử lý xoay trên canvas của nó.)
   const panTo = (x, y) => {
-    const lim = { x: cssW, y: cssH };
+    const f = fitPoints(viewCorners(sceneOpts(0)).pts, cssW, cssH, prefs.zoom);
+    const lim = { x: Math.max(0, (f.w - cssW) / 2) + cssW / 4, y: Math.max(0, (f.h - cssH) / 2) + cssH / 4 };
     view.pan = { x: Math.max(-lim.x, Math.min(lim.x, x)), y: Math.max(-lim.y, Math.min(lim.y, y)) };
     dirty = true;
   };
@@ -332,6 +352,7 @@ export async function render(main, { api, h, error }) {
     if (drag) panTo(drag.pan.x + e.clientX - drag.x, drag.pan.y + e.clientY - drag.y);
   });
   canvas.addEventListener("keydown", (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return; // Ctrl+−/= là phóng của trình duyệt (WCAG 1.4.4) — không giành
     const step = { ArrowLeft: [40, 0], ArrowRight: [-40, 0], ArrowUp: [0, 40], ArrowDown: [0, -40] }[e.key];
     if (step) {
       e.preventDefault();
@@ -345,6 +366,7 @@ export async function render(main, { api, h, error }) {
   if (window.ResizeObserver) new ResizeObserver(() => { if (stage.isConnected) size(); }).observe(stage);
 
   roomButtons();
+  count(); // trước lần tải đầu: "chưa có dữ liệu" + chú thích theo lựa chọn
   await load();
   await useRenderer();
   requestAnimationFrame(tick);

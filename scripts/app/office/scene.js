@@ -1,5 +1,5 @@
 // Dựng + vẽ văn phòng từ (kiểu, mùa, dữ liệu /api/office). Không trạng thái toàn cục: gọi drawScene mỗi khung hình.
-import { Iso, depth, fitPoints, shade } from "./iso.js";
+import { Iso, depth, fitPoints, inkOn, shade } from "./iso.js";
 import { planFor, viewBox } from "./plans.js";
 
 export const ROOM = { W: 16, D: 12, H: 4 }; // phòng của quy mô "nhóm nhỏ" (giữ để tương thích)
@@ -567,8 +567,8 @@ export function compose(sink, opts, sorted = true) {
 
   const [bg, fg, border] = th.label;
   if (opts.names !== false) {
-    // Nhãn phòng: viên màu nhấn của kiểu (khác hẳn nhãn agent), đặt sát tường sau của phòng — không đứng trên đầu ai.
-    for (const r of plan.rooms) top.tag(r.x + r.w / 2, r.y + 0.6, 3.7, "▸ " + r.name, th.trim, "#ffffff", null, "room");
+    // Nhãn phòng: viên màu nhấn của kiểu (khác hẳn nhãn agent), chữ tối/trắng theo tương phản với màu nhấn.
+    for (const r of plan.rooms) top.tag(...roomLabelAt(r), "▸ " + r.name, th.trim, inkOn(th.trim), null, "room");
   }
   for (const { seat, at } of heads) {
     if (opts.names !== false) top.tag(at.x, at.y, at.z, seat.label, bg, fg, border, "agent");
@@ -578,6 +578,15 @@ export function compose(sink, opts, sorted = true) {
     }
   }
   return { items: items.length, plan };
+}
+
+// Điểm neo nhãn phòng, sao cho nhãn rơi lên tường/sàn của CHÍNH phòng đó: phòng giáp tường sau ngoài (y = 0) → cao
+// trên tường sau; phòng giáp tường trái ngoài (x = 0) → cao trên tường trái; phòng khác (chỉ có vách kính thấp phía
+// sau) → sát sàn, gần mép trước của phòng — không treo lơ lửng đè lên phòng phía sau.
+export function roomLabelAt(r) {
+  if (r.y === 0) return [r.x + r.w / 2, 0.6, 3.7];
+  if (r.x === 0) return [0.6, r.y + r.d - 3, 3.7];
+  return [r.x + r.w / 2, r.y + r.d - 1, 0.6];
 }
 
 // Bàn phụ thứ k có nhân viên minh hoạ không — MỘT quy tắc cho cả compose (vẽ) lẫn npcSeated (bộ đếm).

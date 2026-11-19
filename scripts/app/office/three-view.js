@@ -175,8 +175,15 @@ export function createThreeView(stage) {
       el.textContent = t.text;
       el.dataset.kind = t.kind; // agent | state | room — test và CSS phân biệt nhãn agent với nhãn phòng
       el.hidden = false;
-      el.style.setProperty("left", ((p.x + 1) / 2) * rect.w + "px");
-      el.style.setProperty("top", ((1 - p.y) / 2) * rect.h + "px");
+      let left = ((p.x + 1) / 2) * rect.w, top = ((1 - p.y) / 2) * rect.h;
+      if (t.kind === "room") {
+        // Nhãn phòng là biển chỉ dẫn, không bám người: kẹp trọn trong khung (khung hẹp + xoay sát biên không cắt chữ).
+        const hw = el.offsetWidth / 2 + 2;
+        left = Math.min(rect.w - hw, Math.max(hw, left));
+        top = Math.min(rect.h - 2, Math.max(el.offsetHeight + 2, top));
+      }
+      el.style.setProperty("left", left + "px");
+      el.style.setProperty("top", top + "px");
       el.style.setProperty("background", t.bg);
       el.style.setProperty("color", t.fg);
       el.style.setProperty("border-color", t.border || t.bg);
@@ -237,6 +244,7 @@ export function createThreeView(stage) {
   canvas.addEventListener("pointerup", stop);
   canvas.addEventListener("pointercancel", stop);
   canvas.addEventListener("keydown", (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return; // tổ hợp của trình duyệt/hệ điều hành (Ctrl+−, Alt+←) giữ nguyên
     const step = { ArrowLeft: [0.1, 0], ArrowRight: [-0.1, 0], ArrowUp: [0, 0.08], ArrowDown: [0, -0.08] }[e.key];
     if (!step) return;
     e.preventDefault();
