@@ -28,6 +28,7 @@ WORKING = frozenset({"continue", "verify"})
 WAITING = frozenset({"done-pending-human", "blocked", "budget"})
 # Lần chạy cuối cũ hơn cửa sổ này → bàn không còn "đang làm" (agent có thể đã dừng mà task vẫn mở).
 FRESH = _dt.timedelta(minutes=30)
+SKEW = _dt.timedelta(minutes=2)  # lệch đồng hồ chấp nhận cho thời điểm ở tương lai
 
 
 def _now() -> _dt.datetime:
@@ -35,8 +36,9 @@ def _now() -> _dt.datetime:
 
 
 def _fresh(ctx: Ctx, row: Dict[str, Any]) -> bool:
+    """Lần chạy trong cửa sổ FRESH; thời điểm ở tương lai (quá SKEW — đồng hồ lệch, ghi tay) không tin (AUD-HAR-024)."""
     at = ctx.xt._parse_iso(str(row.get("finished") or row.get("started") or ""))
-    return at is not None and _now() - at <= FRESH
+    return at is not None and -SKEW <= _now() - at <= FRESH
 
 
 _XT_ERRORS = (OSError, ValueError, KeyError, TypeError, AttributeError)

@@ -37,7 +37,9 @@ Chọn **3**.
 - Một nguồn cảnh: kiểu văn phòng (`office/themes.js`), bố cục (`LAYOUTS` trong `scene.js`: mở chung, nhiều phòng liên
   thông, mỗi người một phòng) và lớp mùa là dữ liệu dùng chung cho cả hai bộ vẽ — thêm kiểu/bố cục không sửa bộ vẽ.
 - three.js 0.187.0 chép nguyên văn vào `scripts/app/vendor/three/` kèm `LICENSE` và `SOURCE` (URL tarball, sha1 tarball,
-  sha256 từng tệp, gitHead, ngày lấy); `xt.py vendor-check --dirs scripts/app/vendor --strict` xanh. Không addon (tự viết
+  sha256 từng tệp, gitHead, ngày lấy); `xt.py vendor-check --dirs scripts/app/vendor --strict` xanh. Test `OfficeVendorTest`
+  (chạy ở CI) đối chiếu sha256 của tệp với `SOURCE` và chạy vendor-check — sửa tệp vendor mà không cập nhật SOURCE thì đỏ;
+  lệnh kiểm grep của blueprint chỉ miễn đúng ba tệp đã ghim. Không addon (tự viết
   xoay camera, nhãn là lớp HTML phủ) để khỏi phải sửa đường import `three` của addon.
 - An toàn giữ nguyên ADR-0038: không mạng ngoài, không script inline, nhãn dựng bằng `textContent`; vị trí nhãn đặt qua
   CSSOM (`style.setProperty`), không qua thuộc tính `style`.
@@ -51,7 +53,8 @@ Chọn **3**.
   vendor, chọn 3D báo lỗi và quay về 2D. Máy chủ app đọc mọi tệp tĩnh vào bộ nhớ lúc khởi động (+2,1 MB RAM khi có).
 - Nâng three.js = thay hai tệp + cập nhật `SOURCE` (hash, ngày) + chạy E2E `OfficeTest`; ghim bản, không tự nâng.
 - Trạng thái bàn là suy ra từ bằng chứng trên đĩa (`runs.jsonl`, verdict vòng), không phải sự kiện thời gian thực;
-  bàn Review/Nghiên cứu luôn "rảnh" cho tới khi vòng ghi hoạt động của các agent này.
+  bàn Review/Nghiên cứu hiện "chưa có tín hiệu" (`untracked`, không khai "rảnh") cho tới khi vòng ghi hoạt động của các
+  agent này; lần chạy cũ hơn 30 phút hay có thời điểm ở tương lai không tính là "đang làm".
 
 ## Đường lùi
 

@@ -1091,6 +1091,20 @@ class RepoBlueprintKiemTest(TmpRepoCase):
                 self.commit_as("t", subject)
                 self.assertEqual(self.kiem("BASE-REPO-005"), ["BASE-REPO-005"])
 
+    def test_base_repo_005_x_office_start_tag_is_the_floor(self):
+        """X-Office: có tag `x-office-start` thì lịch sử TRƯỚC tag (repo cũ, subject sai dạng) không xét; commit sai dạng SAU
+        tag vẫn đỏ — tag là mốc dưới, không phải danh sách miễn trừ."""
+        self.link_scripts()
+        self.commit_as("t", "chore: gốc")
+        self.git("tag", "v3.20.0")
+        self.commit_as("t", "Merge pull request #1 from repo-cu/release")  # lịch sử repo cũ, sai dạng
+        self.assertEqual(self.kiem("BASE-REPO-005"), ["BASE-REPO-005"])
+        self.git("tag", "-a", "x-office-start", "-m", "mốc")
+        self.commit_as("t", "feat(app): màn mới (#2)")
+        self.assertEqual(self.kiem("BASE-REPO-005"), [])
+        self.commit_as("t", "WIP sửa nhanh (#3)")
+        self.assertEqual(self.kiem("BASE-REPO-005"), ["BASE-REPO-005"])
+
     def test_base_repo_005_has_no_sha_exemption_list(self):
         line = next(
             ln for ln in (ROOT / "BLUEPRINT.md").read_text(encoding="utf-8").splitlines() if "`BASE-REPO-005`" in ln

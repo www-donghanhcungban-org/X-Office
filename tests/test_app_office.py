@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import json
 import re
 import sys
@@ -146,6 +147,21 @@ class OfficeApiTest(unittest.TestCase):
         self.assertEqual(seat(got, "main")["state"], "work")
         self.assertIsNone(seat(got, "main")["task"])  # thời điểm không đọc được → không coi là tươi
 
+    def test_future_run_is_not_working(self) -> None:
+        """Thời điểm ở tương lai quá SKEW (đồng hồ lệch/ghi tay) không giữ bàn ở "đang làm"; lệch nhỏ vẫn tính."""
+        project(
+            self.base,
+            [
+                run("T-002", 0, "executor", "2099-01-01T00:00:00Z"),
+                run("T-003", 1, "executor-deep", "2026-11-19T10:31:00Z"),
+            ],
+        )
+        with mock.patch.object(xt, "loop_verdict", return_value={"verdict": "continue", "reason": ""}):
+            got = call(self.base)
+        self.assertEqual(seat(got, "executor")["state"], "idle")
+        self.assertIsNone(seat(got, "executor")["task"])
+        self.assertEqual(seat(got, "executor-deep")["state"], "fail")  # 1 phút sau NOW: trong SKEW
+
     def test_now_is_utc(self) -> None:
         self._now.stop()
         try:
@@ -169,6 +185,28 @@ class OfficeApiTest(unittest.TestCase):
         with mock.patch.object(xt, "read_runs", return_value=[run("T-002", 0, "executor", LOOP), "rác"]):
             got = call(self.base)
         self.assertEqual(len(got["feed"]), 1)
+
+
+class OfficeVendorTest(unittest.TestCase):
+    """ADR-0082: three.js vendor đúng từng byte như SOURCE ghi (sha256) và qua vendor-check --strict — lệnh kiểm grep của
+    blueprint (BASE-CFG-001/DATA-006) chỉ miễn ba tệp đã ghim nên sửa chúng phải lộ ra ở đây."""
+
+    VENDOR = ROOT / "scripts" / "app" / "vendor" / "three"
+
+    def test_sha256_matches_source(self) -> None:
+        source = (self.VENDOR / "SOURCE").read_text(encoding="utf-8")
+        pinned = dict(re.findall(r"^(three\.\w+\.js) sha256: ([0-9a-f]{64})$", source, re.M))
+        self.assertEqual(set(pinned), {"three.module.js", "three.core.js"})
+        for name, digest in pinned.items():
+            with self.subTest(name=name):
+                self.assertEqual(hashlib.sha256((self.VENDOR / name).read_bytes()).hexdigest(), digest)
+        self.assertEqual(
+            sorted(p.name for p in self.VENDOR.iterdir()), ["LICENSE", "SOURCE", "three.core.js", "three.module.js"]
+        )
+
+    def test_vendor_check_strict_green(self) -> None:
+        self.assertEqual(xt.vendor_dir_problems(ROOT, "scripts/app/vendor", set()), [])
+        self.assertEqual(xt.vendor_source_gaps(ROOT, "scripts/app/vendor", set()), [])
 
 
 class OfficeThemesStaticTest(unittest.TestCase):
