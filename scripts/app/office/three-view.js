@@ -18,6 +18,7 @@ function parseColor(str) {
 function setMat(mat, str, glow, glowOn) {
   const { color, alpha } = parseColor(str);
   mat.color.copy(color);
+  if (mat.transparent !== alpha < 1) mat.needsUpdate = true; // three.js chỉ đổi chương trình shader (OPAQUE) khi được báo
   mat.transparent = alpha < 1;
   mat.opacity = alpha;
   if (mat.emissive) {

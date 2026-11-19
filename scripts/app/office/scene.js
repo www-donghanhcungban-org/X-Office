@@ -283,13 +283,23 @@ const WALLS = {
   ],
 };
 
+// Đoạn vách [u, v] của [from, to] trừ các khoảng cửa — cắt ĐÚNG tại mép cửa (cửa hẹp hơn 1 ô vẫn mở), rồi chia ≤ 1 ô
+// để thứ tự painter của 2D đúng.
+export function wallSegments(from, to, doors) {
+  const cuts = [from, to, ...doors.flat().filter((x) => x > from && x < to)].sort((a, b) => a - b);
+  const out = [];
+  for (let k = 0; k + 1 < cuts.length; k++) {
+    const [a, b] = [cuts[k], cuts[k + 1]];
+    if (b - a < 1e-6 || doors.some(([d0, d1]) => (a + b) / 2 > d0 && (a + b) / 2 < d1)) continue;
+    for (let u = a; u < b - 1e-6; u = Math.min(b, u + 1)) out.push([u, Math.min(b, u + 1)]);
+  }
+  return out;
+}
+
 function layoutWalls(layout, th, out) {
   const glass = th.edge ? "rgba(120,200,255,0.18)" : "rgba(190,225,245,0.32)";
   for (const [axis, at, from, to, doors] of WALLS[layout] || []) {
-    for (let u = from; u < to - 1e-6; u = Math.min(to, u + 1)) {
-      const v = Math.min(to, u + 1);
-      const mid = (u + v) / 2;
-      if (doors.some(([a, b]) => mid > a && mid < b)) continue;
+    for (const [u, v] of wallSegments(from, to, doors)) {
       const seg = (z, h, color, extra) =>
         out.push(axis === "x" ? box(u, at - T / 2, z, v - u, T, h, color, extra) : box(at - T / 2, u, z, T, v - u, h, color, extra));
       seg(0, 1.0, th.wall, { top: th.trim });
@@ -421,5 +431,7 @@ export function drawScene(ctx, cw, ch, opts) {
 // Mô tả văn bản của cảnh cho trình đọc màn hình (canvas role="img").
 export function describe(seats, themeName) {
   const busy = seats.filter((s) => !QUIET.has(s.state)).map((s) => s.label + " " + STATE_TEXT[s.state] + (s.task ? " " + s.task.id : ""));
-  return "Văn phòng kiểu " + themeName + ". " + (busy.length ? busy.join("; ") + "." : "Mọi người đang rảnh.");
+  const unknown = seats.filter((s) => s.state === "untracked").map((s) => s.label);
+  const tail = unknown.length ? " " + unknown.join(", ") + ": " + STATE_TEXT.untracked + "." : "";
+  return "Văn phòng kiểu " + themeName + ". " + (busy.length ? busy.join("; ") + "." : "Không agent nào đang làm.") + tail;
 }

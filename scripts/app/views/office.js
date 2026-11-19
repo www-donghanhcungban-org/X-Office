@@ -139,7 +139,15 @@ export async function render(main, { api, h, error }) {
     dirty = false;
   }
 
-  async function useRenderer() {
+  // Đổi bộ vẽ tuần tự: lần gọi sau chờ lần trước (import three.js có thể lâu) — không bao giờ có 2 canvas WebGL; xong
+  // import mà người dùng đã chọn lại 2D hay đã rời màn thì giải phóng ngay.
+  let switching = Promise.resolve();
+  function useRenderer() {
+    switching = switching.then(applyRenderer, applyRenderer);
+    return switching;
+  }
+
+  async function applyRenderer() {
     if (prefs.renderer === "3d" && !three) {
       try {
         // Thăm dò WebGL trước khi tải ~2 MB three.js; dự án đích không cài bản 3D (install.py) → tệp vendor 404.
@@ -147,6 +155,7 @@ export async function render(main, { api, h, error }) {
         if (!probe) throw new Error("trình duyệt/GPU không có WebGL 2");
         probe.getExtension("WEBGL_lose_context")?.loseContext();
         const mod = await import("../office/three-view.js");
+        if (prefs.renderer !== "3d" || !stage.isConnected) return; // đổi ý / rời màn trong lúc tải
         three = mod.createThreeView(stage);
         canvas.hidden = true;
         three.canvas.setAttribute("aria-label", canvas.getAttribute("aria-label") || "Văn phòng");
@@ -184,6 +193,11 @@ export async function render(main, { api, h, error }) {
     if (three) three.canvas.setAttribute("aria-label", text);
   }
 
+  // Lưu lựa chọn; khi hệ thống xin giảm chuyển động, giữ nguyên "Chuyển động" đã lưu (bật tay chỉ cho phiên này).
+  function persist() {
+    savePrefs(reduce ? { ...prefs, motion: loadPrefs().motion } : prefs);
+  }
+
   async function changed() {
     prefs.renderer = rendererSel.value;
     prefs.layout = layoutSel.value;
@@ -192,13 +206,13 @@ export async function render(main, { api, h, error }) {
     prefs.quality = qualitySel.value;
     prefs.names = namesBox.checked;
     prefs.motion = motionBox.checked;
-    savePrefs(reduce ? { ...prefs, motion: loadPrefs().motion } : prefs);
+    persist();
     await useRenderer();
     label();
   }
   for (const el of [rendererSel, layoutSel, themeSel, seasonSel, qualitySel, namesBox, motionBox]) el.addEventListener("change", changed);
-  zoomIn.addEventListener("click", () => { prefs.zoom = Math.min(2, +(prefs.zoom + 0.15).toFixed(2)); savePrefs(prefs); dirty = true; });
-  zoomOut.addEventListener("click", () => { prefs.zoom = Math.max(0.6, +(prefs.zoom - 0.15).toFixed(2)); savePrefs(prefs); dirty = true; });
+  zoomIn.addEventListener("click", () => { prefs.zoom = Math.min(2, +(prefs.zoom + 0.15).toFixed(2)); persist(); dirty = true; });
+  zoomOut.addEventListener("click", () => { prefs.zoom = Math.max(0.6, +(prefs.zoom - 0.15).toFixed(2)); persist(); dirty = true; });
   refresh.addEventListener("click", load);
   if (window.ResizeObserver) new ResizeObserver(() => { if (stage.isConnected) size(); }).observe(stage);
 

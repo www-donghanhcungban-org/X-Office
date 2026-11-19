@@ -144,7 +144,9 @@ class OfficeApiTest(unittest.TestCase):
         with mock.patch.object(xt, "loop_verdict", return_value={"verdict": "continue", "reason": ""}):
             got = call(self.base)
         self.assertEqual(seat(got, "executor"), {"key": "executor", "label": "Thực thi", "state": "idle", "task": None})
-        self.assertEqual(seat(got, "main")["state"], "work")
+        self.assertEqual(
+            seat(got, "main")["state"], "idle"
+        )  # vòng "continue" nhưng không lần chạy nào tươi → không khai làm
         self.assertIsNone(seat(got, "main")["task"])  # thời điểm không đọc được → không coi là tươi
 
     def test_future_run_is_not_working(self) -> None:
@@ -161,6 +163,13 @@ class OfficeApiTest(unittest.TestCase):
         self.assertEqual(seat(got, "executor")["state"], "idle")
         self.assertIsNone(seat(got, "executor")["task"])
         self.assertEqual(seat(got, "executor-deep")["state"], "fail")  # 1 phút sau NOW: trong SKEW
+
+    def test_corrupt_inputs_never_500(self) -> None:
+        """Đường PLAN có NUL (resolve ném ValueError) và runs.jsonl lồng quá sâu (RecursionError) → 200, dữ liệu rỗng."""
+        project(self.base, [run("T-002", 0, "executor", LOOP)], plan="x\u0000y")
+        self.assertEqual(call(self.base)["tasks"], {"open": 0, "done": 0, "skipped": 0})
+        with mock.patch.object(xt, "read_runs", side_effect=RecursionError("sâu")):
+            self.assertEqual(call(self.base)["feed"], [])
 
     def test_now_is_utc(self) -> None:
         self._now.stop()

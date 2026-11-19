@@ -291,6 +291,13 @@ class OfficeTest(AppCase):
             for theme in themes:
                 page.select_option("#office-theme", theme)
         self.assertEqual(watch.take(), [])
+        # Cửa hẹp hơn 1 ô vẫn mở đúng mép (review #6): đoạn vách không phủ khoảng cửa nào.
+        segs = page.evaluate(
+            "async () => (await import('/office/scene.js')).wallSegments(0, 12.6, [[0.6, 1.4], [6.8, 7.6]])"
+        )
+        self.assertEqual(segs[0], [0, 0.6])
+        self.assertTrue(all(not (a < 1.4 and b > 0.6) and not (a < 7.6 and b > 6.8) for a, b in segs))
+        self.assertAlmostEqual(sum(b - a for a, b in segs), 12.6 - 0.8 - 0.8)
         page.select_option("#office-renderer", "3d")
         canvas3d = page.locator("canvas.office-3d")
         canvas3d.wait_for()
@@ -307,6 +314,21 @@ class OfficeTest(AppCase):
         self.assertNotEqual(before, canvas3d.screenshot())  # kéo → góc nhìn đổi
         page.select_option("#office-renderer", "2d")
         self.assertEqual(page.locator("canvas.office-3d").count(), 0)  # rời 3D → giải phóng canvas WebGL
+        # Đổi liên tiếp trong lúc three.js đang tải (review #6): 3D + đổi kiểu → đúng 1 canvas; 3D rồi 2D ngay → 0 canvas.
+        flip = (
+            "([a, b]) => { const r = document.querySelector('#office-renderer'), t = document.querySelector('#office-theme');"
+            " r.value = a; r.dispatchEvent(new Event('change')); if (b === 'theme') { t.value = 'cafe';"
+            " t.dispatchEvent(new Event('change')); } else { r.value = b; r.dispatchEvent(new Event('change')); } }"
+        )
+        page.evaluate(flip, ["3d", "theme"])
+        page.wait_for_timeout(1500)
+        self.assertEqual(page.locator("canvas.office-3d").count(), 1)
+        self.assertEqual(page.locator(".office-labels").count(), 1)
+        page.select_option("#office-renderer", "2d")
+        page.evaluate(flip, ["3d", "2d"])
+        page.wait_for_timeout(1500)
+        self.assertEqual(page.locator("canvas.office-3d").count(), 0)
+        self.assertEqual(page.locator(".office-labels").count(), 0)
         assert_clean(self, page, watch, self.origin)
 
 

@@ -28,7 +28,7 @@ WORKING = frozenset({"continue", "verify"})
 WAITING = frozenset({"done-pending-human", "blocked", "budget"})
 # Lần chạy cuối cũ hơn cửa sổ này → bàn không còn "đang làm" (agent có thể đã dừng mà task vẫn mở).
 FRESH = _dt.timedelta(minutes=30)
-SKEW = _dt.timedelta(minutes=2)  # lệch đồng hồ chấp nhận cho thời điểm ở tương lai
+SKEW = _dt.timedelta(minutes=5)  # lệch đồng hồ chấp nhận cho thời điểm ở tương lai — như _evidence_time_problem
 
 
 def _now() -> _dt.datetime:
@@ -41,16 +41,14 @@ def _fresh(ctx: Ctx, row: Dict[str, Any]) -> bool:
     return at is not None and -SKEW <= _now() - at <= FRESH
 
 
-_XT_ERRORS = (OSError, ValueError, KeyError, TypeError, AttributeError)
+_XT_ERRORS = (OSError, ValueError, KeyError, TypeError, AttributeError, RecursionError)
 
 
 def _tasks(ctx: Ctx, state: Dict[str, Any]) -> Dict[str, Dict[str, str]]:
     """id → {state, title} của PLAN đang dùng; không có/hỏng → {}."""
-    rel = _plan_file(ctx, state)
-    if rel is None:
-        return {}
     try:
-        tasks = ctx.xt.parse_plan(ctx.base / rel)
+        rel = _plan_file(ctx, state)  # đường PLAN hỏng (NUL…) → ValueError khi resolve
+        tasks = ctx.xt.parse_plan(ctx.base / rel) if rel is not None else []
     except (OSError, ValueError):
         return {}
     return {t["id"]: {"state": t["state"], "title": t["title"]} for t in tasks}
@@ -86,15 +84,22 @@ def _task_ref(task_id: Any, tasks: Dict[str, Dict[str, str]]) -> Optional[Dict[s
     return {"id": task_id, "title": tasks.get(task_id, {}).get("title", "")}
 
 
-def _state_of(ctx: Ctx, key: str, verdict: str, row: Optional[Dict[str, Any]], tasks: Dict[str, Dict[str, str]]) -> str:
+def _state_of(
+    ctx: Ctx, key: str, verdict: str, row: Optional[Dict[str, Any]], tasks: Dict[str, Dict[str, str]], live: bool
+) -> str:
+    """`live`: có lần chạy (của bất kỳ agent nào) trong cửa sổ FRESH — bàn Điều phối chỉ "đang làm" khi có bằng chứng."""
     if key in UNTRACKED:
         return "untracked"
-    return _main_state(verdict) if key == "main" else _seat_state(ctx, row, tasks, verdict in WORKING)
+    if key == "main":
+        st = _main_state(verdict)
+        return "idle" if st == "work" and not live else st
+    return _seat_state(ctx, row, tasks, verdict in WORKING)
 
 
 def _seats(
     ctx: Ctx, verdict: str, rows: List[Dict[str, Any]], tasks: Dict[str, Dict[str, str]]
 ) -> List[Dict[str, Any]]:
+    live = any(_fresh(ctx, r) for r in rows)
     last: Dict[Optional[str], Dict[str, Any]] = {}
     for r in rows:
         ex = r.get("executor")
@@ -102,7 +107,7 @@ def _seats(
     out: List[Dict[str, Any]] = []
     for key, label, agent in SEATS:
         row = last.get(agent)
-        st = _state_of(ctx, key, verdict, row, tasks)
+        st = _state_of(ctx, key, verdict, row, tasks, live)
         open_task = row is not None and tasks.get(str(row.get("task")), {}).get("state") == " " and _fresh(ctx, row)
         task = _task_ref(row.get("task"), tasks) if row is not None and open_task and st in ("work", "fail") else None
         out.append({"key": key, "label": label, "state": st, "task": task})
