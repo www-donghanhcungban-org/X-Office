@@ -62,7 +62,7 @@ const COMPANY_PROPS = [
   { kind: "plant", x: 13.1, y: 6.6 },
   // Phòng họp
   { kind: "meeting", x: 15.6, y: 2.8, seats: 6 },
-  { kind: "screen", x: 17.0, w: 4.0 },
+  { kind: "screen", x: 17.0, w: 4.2 },
   { kind: "plant", x: 23.0, y: 0.6 },
   // Server
   { kind: "rack", x: 24.6, y: 1.0 }, { kind: "rack", x: 25.8, y: 1.0 }, { kind: "rack", x: 27.0, y: 1.0 },
@@ -80,7 +80,7 @@ const COMPANY_PROPS = [
   { kind: "pool", x: 33.0, y: 9.6, w: 8.0, d: 4.4 },
   { kind: "tree", x: 31.0, y: 15.4 }, { kind: "tree", x: 41.8, y: 15.0, color: "#c2410c" }, { kind: "tree", x: 36.2, y: 19.4 },
   { kind: "bench", x: 32.6, y: 18.6 }, { kind: "bench", x: 38.4, y: 17.0 },
-  { kind: "umbrella", x: 42.0, y: 10.4 },
+  { kind: "umbrella", x: 42.6, y: 10.0 },
 ];
 
 const COMPANY_BASE_WALLS = [
@@ -102,7 +102,7 @@ const COMPANY_LAYOUT_WALLS = {
 function company(layout) {
   return {
     W: CW, D: CD, H: 4, tile: 2, outdoor: true, levels: 0,
-    windows: [[1.6, 4.4], [9.2, 3.2], [15.2, 3.2], [19.6, 3.2], [30.0, 2.6], [37.0, 2.6], [40.6, 2.6]],
+    windows: [[9.2, 3.2], [14.4, 2.4], [21.4, 2.4], [30.0, 2.6], [37.0, 2.6], [40.6, 2.6]], // lễ tân: logo; họp: màn hình giữa
     leftWindows: [[1.8, 4.0], [10.0, 3.0], [15.6, 3.0]],
     desks: COMPANY_DESKS.slice(0, 5),
     extraDesks: COMPANY_DESKS.slice(5),

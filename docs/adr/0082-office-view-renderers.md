@@ -34,8 +34,7 @@ MIT; gói không có bản `.min`, `build/three.module.js` + `build/three.core.j
 
 Chọn **3**.
 
-- Một nguồn cảnh: kiểu văn phòng (`office/themes.js`), quy mô/mặt bằng (`office/plans.js`: nhóm nhỏ, công ty, tập đoàn —
-  thêm 2026-11-19 theo yêu cầu "tuỳ chọn cấp độ công ty"), bố cục (`LAYOUTS` trong `scene.js`: mở chung, nhiều phòng liên
+- Một nguồn cảnh: kiểu văn phòng (`office/themes.js`), bố cục (`LAYOUTS` trong `scene.js`: mở chung, nhiều phòng liên
   thông, mỗi người một phòng) và lớp mùa là dữ liệu dùng chung cho cả hai bộ vẽ — thêm kiểu/bố cục không sửa bộ vẽ.
 - three.js 0.187.0 chép nguyên văn vào `scripts/app/vendor/three/` kèm `LICENSE` và `SOURCE` (URL tarball, sha1 tarball,
   sha256 từng tệp, gitHead, ngày lấy); `xt.py vendor-check --dirs scripts/app/vendor --strict` xanh. Test `OfficeVendorTest`

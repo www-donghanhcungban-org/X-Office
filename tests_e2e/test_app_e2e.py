@@ -289,8 +289,14 @@ class OfficeTest(AppCase):
         self.assertEqual(layouts, ["open", "connected", "private"])
         self.assertEqual(scales, ["team", "company", "corp"])
         frames = "() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))"
+        seasons = page.eval_on_selector_all("#office-season option", "os => os.map(o => o.value)")
+        self.assertLessEqual({"noel", "tet"}, set(seasons))
         for scale in scales:
             page.select_option("#office-scale", scale)
+            for season in seasons:  # lớp mùa đặt theo `plan.season` của từng quy mô
+                page.select_option("#office-season", season)
+                page.evaluate(frames)
+            page.select_option("#office-season", "auto")
             for layout in layouts:
                 page.select_option("#office-layout", layout)
                 for theme in themes:
@@ -304,14 +310,58 @@ class OfficeTest(AppCase):
         self.assertEqual(segs[0], [0, 0.6])
         self.assertTrue(all(not (a < 1.4 and b > 0.6) and not (a < 7.6 and b > 6.8) for a, b in segs))
         self.assertAlmostEqual(sum(b - a for a, b in segs), 12.6 - 0.8 - 0.8)
-        # Quy mô công ty: nút "Tới phòng" đủ 8 phòng + Toàn cảnh; bấm → nút đó aria-pressed; bấm tên agent → tới bàn.
+        # Dữ liệu mặt bằng (plans.js): 3 quy mô; công ty đủ phòng chức năng; 5 bàn agent thật đứng trước bàn minh hoạ.
+        plan = page.evaluate(
+            "async () => { const m = await import('/office/plans.js'); const p = m.planFor('company', 'open');"
+            " return {scales: m.SCALES.map(s => s.id), rooms: p.rooms.map(r => r.id), desks: p.desks.length,"
+            " extra: p.extraDesks.length, corp: m.planFor('corp', 'open').levels}; }"
+        )
+        self.assertEqual(plan["scales"], scales)
+        self.assertEqual(
+            set(plan["rooms"]), {"reception", "director", "meeting", "server", "pantry", "nap", "work", "garden"}
+        )
+        self.assertEqual((plan["desks"], plan["extra"]), (5, 23))
+        self.assertGreater(plan["corp"], 0)
+        # Quy mô công ty: nút "Tới phòng" đủ 8 phòng + Toàn cảnh; bấm → chỉ nút đó aria-pressed và cảnh đổi; tới bàn →
+        # không nút nào pressed (kể cả Toàn cảnh).
         page.select_option("#office-scale", "company")
         rooms = page.locator(".office-rooms button")
         self.assertEqual(rooms.count(), 9)
+        canvas2d = page.locator("canvas.office-canvas")
+        page.evaluate(frames)
+        whole = canvas2d.screenshot()
         page.click(".office-rooms button[data-room='meeting']")
+        pressed = (
+            "() => [...document.querySelectorAll('.office-rooms button')].map(b => b.getAttribute('aria-pressed'))"
+        )
+        self.assertEqual(page.evaluate(pressed).count("true"), 1)
         self.assertEqual(page.get_attribute(".office-rooms button[data-room='meeting']", "aria-pressed"), "true")
+        page.evaluate(frames)
+        self.assertNotEqual(whole, canvas2d.screenshot())  # camera tới phòng họp
         page.locator("main tbody tr th button").first.click()
-        self.assertEqual(page.get_attribute(".office-rooms button[data-room='meeting']", "aria-pressed"), "false")
+        self.assertEqual(page.evaluate(pressed).count("true"), 0)
+        # Làm mới (poll) với dữ liệu không đổi không gỡ nút đang giữ focus (WCAG 2.4.3).
+        first = page.locator("main tbody tr th button").first
+        first.focus()
+        page.evaluate(
+            "() => [...document.querySelectorAll('main button')].find(b => b.textContent === 'Làm mới').click()"
+        )
+        page.wait_for_timeout(500)
+        self.assertTrue(
+            page.evaluate("() => document.activeElement === document.querySelector('main tbody tr th button')")
+        )
+        # 2D: phím mũi tên khi canvas có focus → dời góc nhìn; "0" → về giữa.
+        page.click(".office-rooms button[data-room='']")
+        canvas2d.focus()
+        page.keyboard.press("0")  # phím trước ảnh mốc: vòng :focus-visible có mặt ở cả hai ảnh
+        page.evaluate(frames)
+        centred = canvas2d.screenshot()
+        page.keyboard.press("ArrowLeft")
+        page.evaluate(frames)
+        self.assertNotEqual(centred, canvas2d.screenshot())
+        page.keyboard.press("0")
+        page.evaluate(frames)
+        self.assertEqual(centred, canvas2d.screenshot())
         self.assertRegex(page.text_content(".office-counters") or "", r"^5 agent \+ \d+ nhân viên minh hoạ")
         page.uncheck("#office-npc")
         self.assertRegex(page.text_content(".office-counters") or "", r"^5 agent · ")
@@ -320,7 +370,29 @@ class OfficeTest(AppCase):
         canvas3d = page.locator("canvas.office-3d")
         canvas3d.wait_for()
         self.assertTrue(page.locator("canvas.office-canvas:not(.office-3d)").is_hidden())
-        page.locator(".office-labels .office-tag:not([hidden])").nth(4).wait_for()  # 5 nhãn tên, bám nhân vật
+        page.wait_for_function(  # đúng 5 nhãn tên agent hiện, bám nhân vật (nhãn phòng/trạng thái là loại khác)
+            "() => document.querySelectorAll('.office-labels .office-tag[data-kind=agent]:not([hidden])').length === 5"
+        )
+        # 3D ở Tập đoàn (review PR quy mô 🔴): camera nhắm đúng tầng thượng — toàn cảnh, tới phòng, tới bàn đều giữ nhãn
+        # trong khung (nhãn ngoài stage = phòng/agent bị đẩy ra ngoài hình).
+        inside = (
+            "(sel) => { const s = document.querySelector('.office-stage').getBoundingClientRect();"
+            " return [...document.querySelectorAll(sel)].filter(e => !e.hidden).map(e => {"
+            " const r = e.getBoundingClientRect(); return [e.textContent, r.top >= s.top - 1 && r.bottom <= s.bottom + 1"
+            " && r.left >= s.left - 1 && r.right <= s.right + 1]; }); }"
+        )
+        page.evaluate(frames)
+        rooms3d = page.evaluate(inside, ".office-labels .office-tag[data-kind=room]")
+        self.assertEqual(len(rooms3d), 8)
+        self.assertTrue(all(ok for _, ok in rooms3d), rooms3d)
+        page.click(".office-rooms button[data-room='meeting']")
+        page.evaluate(frames)
+        self.assertIn(["▸ Phòng họp", True], page.evaluate(inside, ".office-labels .office-tag[data-kind=room]"))
+        page.locator("main tbody tr th button").first.click()
+        page.evaluate(frames)
+        agents = page.evaluate(inside, ".office-labels .office-tag[data-kind=agent]")
+        self.assertTrue(agents and agents[0][1], agents)
+        page.click(".office-rooms button[data-room='']")
         page.get_by_role("button", name="Làm mới").focus()  # Tab tới canvas: vòng focus vẽ TRONG canvas — WCAG 2.4.7
         for _ in range(20):  # Tab qua các nút (Tới phòng…) tới canvas
             page.keyboard.press("Tab")
@@ -374,6 +446,12 @@ class OfficeMotionTest(AppCase):
         saved = page.evaluate("() => JSON.parse(localStorage.getItem('xt-office'))")
         self.assertTrue(saved["motion"])
         self.assertGreater(saved["zoom"], 1)
+        for _ in range(12):  # thu/phóng có biên 0.5–4
+            page.click("button[aria-label='Thu nhỏ']")
+        self.assertEqual(page.evaluate("() => JSON.parse(localStorage.getItem('xt-office')).zoom"), 0.5)
+        for _ in range(12):
+            page.click("button[aria-label='Phóng to']")
+        self.assertEqual(page.evaluate("() => JSON.parse(localStorage.getItem('xt-office')).zoom"), 4)
         self.assertEqual(watch.take(), [])
 
 

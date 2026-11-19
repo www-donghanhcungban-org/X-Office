@@ -261,19 +261,9 @@ class OfficeThemesStaticTest(unittest.TestCase):
             kinds |= set(re.findall(r'kind: "(\w+)"', (office / name).read_text(encoding="utf-8")))
         body = re.findall(r"^const BOX_PROPS = \{([^}]*)\}", scene, re.M)[0]
         drawn = {k.split(":")[0].strip() for k in body.split(",") if k.strip()}
-        drawn |= set(re.findall(r'p\.kind === "(\w+)"', scene))  # flatProp: loại phẳng (thảm, bảng, logo, hồ bơi…)
+        # flatProp: loại phẳng (thảm, bảng, logo, hồ bơi…) — chỉ nhánh `if (p.kind === "…")`, không phải so sánh khác.
+        drawn |= set(re.findall(r'^\s*if \(p\.kind === "(\w+)"\)', scene, re.M))
         self.assertEqual(kinds - drawn, set())
-
-    def test_scales_and_company_rooms(self) -> None:
-        """Ba quy mô; mặt bằng công ty có đủ phòng chức năng; bàn agent thật đứng trước bàn minh hoạ."""
-        plans = (ROOT / "scripts" / "app" / "office" / "plans.js").read_text(encoding="utf-8")
-        self.assertEqual(
-            re.findall(r'^\s{2}\{ id: "(\w+)", name: "[^"]+" \},', plans, re.M), ["team", "company", "corp"]
-        )
-        rooms = set(re.findall(r'\{ id: "(\w+)", name: "[^"]+", x:', plans))
-        self.assertEqual(rooms, {"reception", "director", "meeting", "server", "pantry", "nap", "work", "garden"})
-        self.assertIn("desks: COMPANY_DESKS.slice(0, 5)", plans)
-        self.assertIn("extraDesks: COMPANY_DESKS.slice(5)", plans)
 
 
 if __name__ == "__main__":

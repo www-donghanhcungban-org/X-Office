@@ -54,6 +54,13 @@ Bản < 3.20.0: [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md) (T-3651; `changel
 
 ### Fixed
 
+- Màn Văn phòng (review PR quy mô công ty): nút "Toàn cảnh" không còn báo đang chọn khi camera đang ở bàn một agent;
+  poll 10 giây không gỡ nút đang giữ focus bàn phím (bảng chỉ dựng lại khi dữ liệu đổi); canvas 2D nhận focus — phím mũi
+  tên dời góc nhìn, `+`/`-` phóng, `0` về giữa; kéo để dời chỉ với chuột (chạm/bút vẫn cuộn trang) và có giới hạn; trước
+  lần tải đầu bộ đếm báo "chưa có dữ liệu"; chú thích đổi theo tuỳ chọn nhãn tên/nhân viên minh hoạ; nhãn phòng tách loại
+  với nhãn agent (`data-kind`); nhân viên minh hoạ ở 2D và bảng đếm khớp nhau; quy mô công ty/tập đoàn bỏ quầng sáng hộp
+  (nhanh hơn), 3D chỉ bật bóng ở nhóm nhỏ và khung camera vừa đúng hộp nhìn; cửa sổ không còn đè vách phòng, ghế dù không
+  rơi ra ngoài mép vườn.
 - `xt.py`: đọc tệp JSON của vòng (`.autopilot/state.json`…) lồng quá sâu (RecursionError khi giải mã) nay coi như hỏng —
   trả `None` như JSON sai — thay vì ném lỗi; màn Tổng quan và Văn phòng của `xt.py app` không còn trả 500 (review #6).
 - Hook cổng commit (`pre-bash-guard.sh`): commit trong git worktree của **chính repo** (dưới gốc dự án, vd
