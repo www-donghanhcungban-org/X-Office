@@ -47,31 +47,34 @@ Chỉ mục đầy đủ theo vai đọc: [`framework/README.md`](framework/READ
 
 ## Dùng cho một dự án
 
+Để có MVP từ một ý tưởng web, mở repo khung trong Claude Code và chạy `/factory "Sổ ghi chú cho nhóm"`.
+Agent tạo repo sản phẩm, triển khai một luồng nghiệp vụ theo ý tưởng và thử luồng đó trên bản dev trước khi trình.
+Xem [quy trình /factory](.claude/skills/factory/SKILL.md) và [gói web-api-ts](framework/templates/packs/web-api-ts/README.md).
+
+Để tự tạo repo khởi đầu với cùng gói, dùng CPython 3.15.x và thay `/đường/dẫn/dự-án` bằng thư mục mới hoặc rỗng.
+
 ```bash
-# 1) Chọn CPython 3.15 trên PATH, rồi cài khung vào dự án
 git clone https://github.com/www-donghanhcungban-org/X-Office /tmp/x-office
-python3 /tmp/x-office/scripts/install.py /đường/dẫn/dự-án --with-github
-
-# 2) Chọn hồ sơ, ngành, quy mô rồi ghép checklist
+python3 /tmp/x-office/scripts/install.py /đường/dẫn/dự-án --new --name so-ghi-chu --pack web-api-ts --idea "Sổ ghi chú cho nhóm"
 cd /đường/dẫn/dự-án
-python3 .xtemplates/scripts/xt.py list profiles
-python3 .xtemplates/scripts/xt.py compose --profile web-app --industry ecommerce --scale M --out BLUEPRINT.md
-
-# 3) Theo dõi; --strict trả exit 1 khi còn MUST chưa đạt hoặc lệnh `— Kiểm:` của mục đã tick đỏ (--run; cổng phát hành)
-python3 .xtemplates/scripts/xt.py blueprint-status BLUEPRINT.md --strict --run
+python3 .xtemplates/scripts/xt.py stage status
+python3 .xtemplates/scripts/xt.py blueprint-status BLUEPRINT.md
 ```
 
-Dự án đã cài bản ≤ 2.x (thư mục `.xstored/`, `xs.py`, `xs.yaml`): chạy lại bước 1 — `install.py` tự chuyển sang
-`.xtemplates/`, `xt.py`, `xt.yaml` và liệt kê file còn nhắc tên cũ để sửa tay ([ADR-0007](docs/adr/0007-rename-technical-identifiers-to-xtemplates.md)).
+`--new` tạo repo git, starter, blueprint quy mô S và sổ giai đoạn 1 (MVP). `PROJECT.md` lưu ý tưởng và
+dành bốn dòng Khung cho bước xác định MVP. Lệnh hoàn tất sau `doctor --offline`. Để chạy bản dev cần cài phụ
+thuộc của gói và có Docker Compose. Khi phát hành, kiểm các mục MUST bằng `blueprint-status BLUEPRINT.md --strict --run`.
 
-Với **dự án mới** muốn người duyệt mọi merge, thêm `--preset safe`: tạo `xt.yaml` với `L1` / `human` / `harden`.
-Xem trước bằng `install.py <dự-án> --preset safe --plan`. `--preset autonomous` dùng `L3` / `auto` / `build` như mẫu
-hiện tại; không truyền cờ giữ hành vi cũ. Cài lại giữ preset và tùy chỉnh đã có, kể cả khi truyền preset khác.
-Preset chỉ chọn chính sách merge/review, **không tạo sandbox** ([ADR-0055](docs/adr/0055-optional-install-policy-presets.md)).
-Dự án mới muốn khoá ba giai đoạn sản phẩm (MVP → hoàn thiện → tối ưu) thêm `--stage-init`; installer không tự đoán giai
-đoạn — dự án đã chạy: người `xt.py stage init --adopt 2|3 --evidence …`. Sổ có sẵn giữ nguyên và được kiểm bằng bản mới
-([ADR-0058](docs/adr/0058-product-stages-machine-lock.md)).
-Sau cài đặt, khai lệnh thật ở `xt.yaml`, chạy `doctor`, rồi kiểm Gate trước khi dùng autopilot.
+**Repo đã có mã.** Chạy `python3 /tmp/x-templates/scripts/install.py /đường/dẫn/dự-án --with-github`. Với bản ≤ 2.x,
+installer chuyển sang `.xtemplates/`, `xt.py`, `xt.yaml` và liệt kê tên cũ cần sửa
+([ADR-0007](docs/adr/0007-rename-technical-identifiers-to-xtemplates.md)). Ở lần cài thông thường, thêm `--stage-init`
+để khởi tạo giai đoạn 1 nếu chưa có sổ. Với sản phẩm đang ở giai đoạn 2 hoặc 3, chủ dự án dùng
+`xt.py stage init --adopt 2|3 --evidence …` ([ADR-0058](docs/adr/0058-product-stages-machine-lock.md)).
+
+Khi cài vào repo có sẵn và tạo `xt.yaml` lần đầu, `--preset safe` chọn `L1` / `human` / `harden`,
+`--preset autonomous` chọn `L3` / `auto` / `build`. Cài lại giữ chính sách đã chọn. Xem trước bằng
+`install.py <dự-án> --preset safe --plan`. Sau cài đặt, khai lệnh thật ở `xt.yaml`, chạy `doctor` rồi kiểm Gate
+([ADR-0055](docs/adr/0055-optional-install-policy-presets.md)).
 
 Quy mô quyết định khối lượng: `web-app` có 70 MUST ở **S** (prototype), 473 ở **M** (production), 1.146 ở **L** (đo 2026-10-19).
 `--out BLUEPRINT.md` ghi file chính chỉ chứa MUST theo quy mô (web-app + ecommerce: 41 KB ở S thay vì ~690 KB) và
@@ -139,6 +142,8 @@ nghe 127.0.0.1, đòi token mỗi lần chạy, kiểm `Host`/`Origin` và đặ
 | `python3 scripts/xt.py guard-check -- <lệnh>` | exit 126 nếu guard cấm lệnh, lỗi nạp hoặc fallback cũng hỏng (ADR-0054); `dev-task.sh`, Gate/`Kiểm:` qua cùng kiểm (LOOP-STOP-027). Dự án chưa cài harness giữ tương thích |
 | `python3 scripts/xt.py harness-check` | lệnh kiểm chỉ đọc cho mục hàng rào (`LOOP-ORCH-003`, `LOOP-STOP-001/002`): guard của dự án chặn bộ lệnh mẫu, `permissions.ask` rỗng, agent khai `tools:` tường minh, không `permissionMode`, không `Agent`/`Task`, `reviewer*` không `Edit`/`Write`; exit 1 nếu hàng nào hỏng |
 | `python3 scripts/xt.py release-check [--blueprint F] [--status F] [--unchecked-must {warn,fail}] [--json]` | Cổng G7 máy đọc (ADR-0029): gom `blueprint-status --strict --run`, `audit check --strict`, kiểm lại cuối khớp cây, cây git sạch + HEAD, đề xuất "Khi chạy thật" chờ người, pha `harden`, giai đoạn sản phẩm (`stage`: MVP chưa mở Production — ADR-0058) và nợ review sau SHA quét (ADR-0031; file chỉ đổi bởi PR đã merge có review sạch ở head được phủ — ADR-0057), lệnh `attack`/`perf` và cổng production `migration_check`/`acceptance`/`rollback` của xt.yaml (ADR-0042, ADR-0062), `go_no_go` (`GO-NO-GO*.md` nhắc `v<VERSION>` ở `docs/ops/`, `docs/`, gốc có chữ ký §5 — thiếu/chưa ký = BLOCKER chờ người ở mọi quy mô; AUD-HAR-197), số + tỉ lệ MUST tick không có lệnh kiểm (`unchecked_must`: `warn` mặc định, `fail` = NO-GO) → PASS/WARN/FAIL/N-A có bằng chứng, `verdict` GO / GO (chờ người) / NO-GO; exit 1 khi NO-GO — phần máy của `GO-NO-GO.md` |
+| `python3 scripts/xt.py deploy run --env dev [--json]` | Triển khai artifact của gói `web-api-ts` lên loopback, thử luồng nghiệp vụ, đối chiếu digest HTTP và ghi biên nhận. Trong repo sản phẩm dùng `.xtemplates/scripts/xt.py`. |
+| `python3 scripts/xt.py deploy rollback --env dev [--json]` | Khởi động lại ảnh đã lưu của bản trước, kiểm bản đang phục vụ rồi cập nhật sổ triển khai. |
 | `python3 scripts/xt.py deploy status [--env E] [--json]` | Đọc bản triển khai gần nhất được xác nhận theo ADR-0077. JSON gồm sổ và `metrics` theo môi trường, tính trên các sự kiện còn lưu (`runs`, `rollback_rate` từ 0 đến 1, `durations_seconds` theo thứ tự sự kiện). Exit 2 nếu cấu hình môi trường hoặc sổ hỏng. |
 | `python3 scripts/xt.py release-sign --note TEXT [--file F]` | Agent ký §5 GO-NO-GO của `v<VERSION>` ([ADR-0074](docs/adr/0074-agent-release-signoff.md)): chỉ khi xt.yaml ở cây và nhánh chính khai `release_signoff: agent`, `release-check` không FAIL BLOCKER và việc người còn lại chỉ là chữ ký, dòng `subject:` khớp; ô tên ghi `agent`; từ chối → exit 2, không ghi file |
 | `python3 scripts/xt.py stage status/init/submit/reopen/approve/new-cycle` | Giai đoạn sản phẩm (ADR-0058): sổ `docs/autopilot/STAGE.json`; agent `init`/`submit --evidence` (HEAD cây sạch)/`reopen`; **người** `approve --sha --note` (mở giai đoạn kế) và `init --adopt 2\|3 --evidence` (dự án đã chạy) ở terminal ngoài phiên agent; agent được duyệt MVP khi bật [ADR-0069](docs/adr/0069-agent-stage-approval.md); PLAN khai `Giai đoạn sản phẩm: N (C-NNN)` — `loop init/next/record` từ chối giai đoạn khoá |
@@ -179,7 +184,7 @@ nghe 127.0.0.1, đòi token mỗi lần chạy, kiểm `Host`/`Origin` và đặ
 | `scripts/dev-task.sh test-weights` · `python3 scripts/xt.py test-weights --unit CMD --out FILE` | Đo lại file `test_weights` (id từ stdin, chạy lần lượt, giây làm tròn 0.1, JSON khoá sắp xếp; id đỏ → exit 1, không ghi). Chạy tay rồi commit; CI không chạy |
 
 Biến môi trường (đều tuỳ chọn): `XT_FRAMEWORK` (thư mục khung, mặc định cạnh `scripts/`) · `XT_FRAMEWORK_LINK` (gốc liên kết
-trong blueprint, mặc định `.xtemplates/framework`; ghép lại `BLUEPRINT.md` của chính repo khung: đặt `framework`, nếu không mục đã tick bị coi đổi chữ — AUD-HAR-113) · `XT_RECORD_TIMEOUT` (giây, mặc định 1800) · `XT_PROGRESS_BASE` (nhánh chính cho `progress-check` và `audit check`, mặc định `origin/HEAD` → `origin/main` → `origin/master`; rỗng = tắt) · `CLAUDE_PROJECT_DIR` (gốc dự án cho
+trong blueprint, mặc định `.xtemplates/framework`; ghép lại `BLUEPRINT.md` của chính repo khung: đặt `framework`, nếu không mục đã tick bị coi đổi chữ — AUD-HAR-113) · `XT_RECORD_TIMEOUT` (giây, mặc định 1800) · `XT_DEPLOY_TIMEOUT` (số giây cho mỗi bước của adapter dev, mặc định 1200, phạm vi 1–99999) · `XT_PROGRESS_BASE` (nhánh chính cho `progress-check` và `audit check`, mặc định `origin/HEAD` → `origin/main` → `origin/master`; rỗng = tắt) · `CLAUDE_PROJECT_DIR` (gốc dự án cho
 `loop`; không đặt thì: bản cài `.xtemplates/scripts/xt.py` → cha của `.xtemplates`; nếu không, thư mục cha gần nhất có
 `.autopilot`/`xt.yaml`/`.xtemplates`, rồi gần nhất có `.git` — thư mục cha là repo khác (vd `$HOME` dotfiles) sẽ thắng; không thấy thì cwd) · `CLAUDE_CONFIG_DIR` (thư mục cấu hình người dùng của Claude Code mà `doctor`/`loop init` đọc; mặc định `~/.claude` + `~/.claude.json`) · `XT_DEBUG=1` (in traceback khi lỗi) · `XT_GUARD_POLICY=strict` (hook hỏi người như trước ADR-0018; mặc định không hỏi) · `XT_FRAMEWORK_REPO` (repo GitHub để `doctor` so bản phát hành mới nhất, mặc định `www-donghanhcungban-org/X-Office`) · `XT_STEWARD_UPDATE=off` (`pr steward` không tự cập nhật nhánh tụt base — workflow chạy bằng `GITHUB_TOKEN`) · `XT_CHANGED_FILES` (mỗi dòng một file đổi; `dev-task.sh gate-fast` đặt, `test-select` đọc để chọn lớp test liên quan; không đặt = chạy cả suite) · `XT_MIN_TESTS` (số lớp test tối thiểu `dev-task.sh test-shard` đòi, mặc định 1; liệt kê hỏng không được xanh) · `XT_JOBS` (số tiến trình pytest-xdist cho lệnh `test` tự dò của `dev-task.sh`: nguyên dương, trần 4×số nhân; `1` = `pytest -q` tuần tự; không đặt/rác = `auto`) · `XT_FRAMEWORK_PYTHON` (đường dẫn Python để `dev-task.sh` chạy CLI của khung, CI mẫu đặt tự động) · `XT_COV_DIR` (thư mục dữ liệu coverage `dev-task.sh test-shard`/`test-combine` dùng, đặt bởi chính script) · `XT_SHARD`, `XT_GATE_ALL_TESTS` (cổng test của `dev-task.sh`, tự đặt) · `XT_CI_WORKFLOW` (tên workflow CI khi khác `ci.yml`) · `XT_GUARD_PHASE=harden` (ép guard vào pha harden, ADR-0040) · `CLAUDE_CODE_SESSION_ID` (id phiên, do Claude Code đặt; chỉ đọc).
 

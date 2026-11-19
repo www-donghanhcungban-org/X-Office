@@ -15,7 +15,7 @@ function build(): string {
 
 beforeAll(() => {
   work = mkdtempSync(join(tmpdir(), "build-"));
-  for (const f of ["package.json", "pnpm-lock.yaml", "src", "contract"]) {
+  for (const f of ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "src", "contract", "ops"]) {
     cpSync(f, join(work, f), { recursive: true });
   }
   mkdirSync(join(work, "scripts"));
@@ -37,4 +37,18 @@ it("đóng gói cây lớn hơn 1 MiB, digest khớp file và build lại ra cù
   expect(readdirSync(join(work, "dist")).sort()).toEqual(["app.tgz", "app.tgz.sha256"]); // không để lại app.tar tạm
   build();
   expect(readFileSync(join(work, "dist/app.tgz.sha256"), "utf8")).toBe(`${digest}  app.tgz\n`);
+});
+
+it("thay công thức dựng bản dev cũng làm đổi digest của artifact", () => {
+  build();
+  const before = readFileSync(join(work, "dist/app.tgz.sha256"), "utf8");
+  const recipe = join(work, "ops/dev/Dockerfile");
+  const original = readFileSync(recipe);
+  try {
+    writeFileSync(recipe, Buffer.concat([original, Buffer.from("\n# alternate recipe\n")]));
+    build();
+    expect(readFileSync(join(work, "dist/app.tgz.sha256"), "utf8")).not.toBe(before);
+  } finally {
+    writeFileSync(recipe, original);
+  }
 });

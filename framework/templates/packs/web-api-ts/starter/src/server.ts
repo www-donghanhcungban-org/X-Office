@@ -1,8 +1,10 @@
 // API HTTP tối giản (node:http, không framework). Hợp đồng: contract/openapi.json — test/contract.test.ts kiểm cả hai
 // chiều (không đổi không tương thích so với contract/baseline.json; phản hồi thật có đủ trường bắt buộc).
+import { readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { authenticate, login, type Principal } from "./auth.ts";
 import { createDb, type Db, withTenant } from "./db.ts";
+import { serveNotesUi } from "./notes-ui.ts";
 
 const MAX_BODY = 64 * 1024;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -197,6 +199,7 @@ export function loginConcurrencyFromEnv(env: NodeJS.ProcessEnv = process.env): n
 
 export interface AppOptions {
   loginConcurrency?: number;
+  buildDigest?: string;
 }
 
 export function createApp(db: Db, opts: AppOptions = {}): Server {
@@ -206,8 +209,9 @@ export function createApp(db: Db, opts: AppOptions = {}): Server {
     // (`GET http://[::1 HTTP/1.1`) — lỗi lọt ra ngoài handler async là unhandled rejection, Node thoát.
     try {
       const path = parsePath(req.url);
+      if (serveNotesUi(req.method, path, res)) return;
       if (req.method === "GET" && path === "/healthz") {
-        send(res, 200, { status: "ok" });
+        send(res, 200, { status: "ok", ...(opts.buildDigest ? { digest: opts.buildDigest } : {}) });
         return;
       }
       const found = route(req.method ?? "", path);
@@ -234,5 +238,10 @@ if (import.meta.main) {
     process.exit(2);
   }
   const port = Number(process.env.PORT ?? 3000);
-  createApp(createDb(url)).listen(port, () => console.log(`nghe :${port}`));
+  const opts: AppOptions = {};
+  if (process.env.XT_PREVIEW_BUILD === "1") {
+    opts.buildDigest = readFileSync(new URL("../.build-digest", import.meta.url), "utf8").trim();
+    if (!/^[a-f0-9]{64}$/.test(opts.buildDigest)) throw new Error("Digest bản dev không hợp lệ");
+  }
+  createApp(createDb(url), opts).listen(port, () => console.log(`nghe :${port}`));
 }

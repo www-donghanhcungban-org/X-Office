@@ -13,6 +13,8 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+# Log của công cụ agent khác ghi ở gốc repo (Codex CLI): chứa ID tài khoản cá nhân
+/error.log
 # Claude Code cục bộ
 .claude/settings.local.json
 # Bản sao repo của subagent (worktree tạm)

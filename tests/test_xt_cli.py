@@ -1115,7 +1115,7 @@ class RepoBlueprintKiemTest(TmpRepoCase):
 
     def test_base_sec_006_dockerfile_red_under_pipefail(self):
         """AUD-CI-026: `! git ls-files | grep -q…` xanh giả khi grep thoát sớm và `git ls-files` nhận SIGPIPE (pipefail).
-        Repo ~4000 tệp có Dockerfile phải đỏ mọi lần; không Dockerfile → xanh (đỏ đúng lý do)."""
+        Repo ~4000 tệp có Dockerfile thiếu USER phải đỏ mọi lần."""
         for i in range(4000):
             (self.repo / "src" / "module_with_long_name" / f"file_{i:04d}.txt").parent.mkdir(
                 parents=True, exist_ok=True
@@ -1123,15 +1123,35 @@ class RepoBlueprintKiemTest(TmpRepoCase):
             (self.repo / "src" / "module_with_long_name" / f"file_{i:04d}.txt").write_text("", encoding="utf-8")
         self.git("add", "-A")
         self.link_scripts()
+        (self.repo / "tests").symlink_to(ROOT / "tests", target_is_directory=True)
         self.assertEqual(self.kiem("BASE-SEC-006"), [])
         (self.repo / "Dockerfile").write_text("FROM scratch\n", encoding="utf-8")
         self.git("add", "Dockerfile")
         for _ in range(10):
             self.assertEqual(self.kiem("BASE-SEC-006"), ["BASE-SEC-006"])
 
+        nested = self.repo / "other image" / "Dockerfile.dev"
+        nested.parent.mkdir()
+        nested.write_text("FROM scratch\nUSER 1001:1001\n", encoding="utf-8")
+        self.git("add", "--", str(nested.relative_to(self.repo)))
+        for body, expected in (
+            ("FROM scratch\nUSER node\n", []),
+            ("FROM scratch AS build\nUSER node\nFROM scratch\n", ["BASE-SEC-006"]),
+            ("FROM scratch\nUSER node\nUSER 00:1000\n", ["BASE-SEC-006"]),
+            ("FROM scratch\nRUN <<EOF\nUSER node\nEOF\n", ["BASE-SEC-006"]),
+            ("FROM scratch\nRUN echo ok \\\n USER node\n", ["BASE-SEC-006"]),
+        ):
+            with self.subTest(body=body):
+                (self.repo / "Dockerfile").write_text(body, encoding="utf-8")
+                self.assertEqual(self.kiem("BASE-SEC-006"), expected)
+        (self.repo / "Dockerfile").write_text("FROM scratch\nUSER node\n", encoding="utf-8")
+        nested.write_text("FROM scratch\nUSER root:app\n", encoding="utf-8")
+        self.assertEqual(self.kiem("BASE-SEC-006"), ["BASE-SEC-006"])
+
     def test_base_sec_006_red_when_ls_files_fails(self):
         """AUD-TEST-058: `git ls-files` lỗi (index hỏng) → Kiểm `BASE-SEC-006` đỏ, không xanh vì danh sách rỗng."""
         self.link_scripts()
+        (self.repo / "tests").symlink_to(ROOT / "tests", target_is_directory=True)
         self.assertEqual(self.kiem("BASE-SEC-006"), [])
         (self.repo / ".git" / "index").write_bytes(b"rac")
         self.assertEqual(self.kiem("BASE-SEC-006"), ["BASE-SEC-006"])

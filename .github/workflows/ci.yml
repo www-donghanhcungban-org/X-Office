@@ -255,8 +255,7 @@ jobs:
           set -euo pipefail
           d=$(mktemp -d)
           awk '/^## Dùng cho một dự án/{f=1} f&&/^```bash/{g=1;next} g&&/^```/{exit} g' README.md \
-            | grep -v '^git clone' | sed "s#/tmp/x-office#$PWD#g; s#/đường/dẫn/dự-án#$d#g" \
-            | sed '$ s/$/ || test $? -eq 1/' > "$RUNNER_TEMP/readme.sh"   # --strict trả 1 vì blueprint mới chưa tick
+            | grep -v '^git clone' | sed "s#/tmp/x-office#$PWD#g; s#/đường/dẫn/dự-án#$d#g" > "$RUNNER_TEMP/readme.sh"
           cat "$RUNNER_TEMP/readme.sh"
           bash -euo pipefail "$RUNNER_TEMP/readme.sh"
           test -f "$d/AGENTS.md" && test -f "$d/.claude/settings.json" && test -f "$d/.github/rulesets/main.json"

@@ -4,7 +4,7 @@
 |---|---|
 | ID tính năng | F-111 (tạo dự án mới một lệnh), F-112 (skill một bước), F-113 (kênh vào bằng issue), F-114 (báo cáo pilot) — chủ dự án 2026-11-11 "con người chỉ nêu ý tưởng", ADR-0075 §Quyết định 1 |
 | Trạng thái | **F-111, F-112, F-114: Approved for implementation** (phiên chính tự duyệt, ADR-0008 — D-422, D-423). **F-113 (kênh issue): Draft** — còn câu hỏi [chặn] ở §9; T-3862 quyết bằng D-NNN rồi mới chuyển Approved (D-424) |
-| Phiên bản | 1 |
+| Phiên bản | 2 |
 | Dữ kiện | [`research/2026-11-11-factory-e2e-facts.md`](../../research/2026-11-11-factory-e2e-facts.md) §2, §3 |
 | Kế hoạch | [`PLAN-factory-e2e.md`](../autopilot/PLAN-factory-e2e.md) T-3845…T-3847, T-3862 |
 
@@ -47,20 +47,22 @@ Skill `/factory "<ý tưởng>"` (trần kích thước như các skill quy trì
 | 1 | `install.py --new` vào thư mục sản phẩm | exit 0, `doctor` sạch |
 | 2 | Điền bốn dòng Khung + chọn quy mô; mỗi lựa chọn một D-NNN | `PROJECT.md`, sổ quyết định |
 | 3 | SPEC cho lát MVP; `acceptance-author` viết bộ nghiệm thu; `acceptance lock` | sổ nghiệm thu |
-| 4 | `/autopilot` tới hết PLAN của giai đoạn 1 | `loop status` = `done`/`done-pending-human` |
-| 5 | `stage submit` → `stage approve` (agent, khi khoá cho phép; không thì ghi vào checklist) | sổ giai đoạn |
-| 6 | Build artifact → `xt.py deploy run --env dev` | sổ triển khai `deployed` |
-| 7 | `xt.py admin-plan --out docs/ops/SETUP-ONCE.md` | file checklist |
-| 8 | Báo cáo §2.4 | file báo cáo |
+| 4 | Dùng `/autopilot` triển khai một luồng nghiệp vụ theo SPEC. Đưa cả bước 5 vào PLAN giai đoạn 1 trước khi chạy | mã sản phẩm và Gate của các task |
+| 5 | Build, chạy `xt.py deploy run --env dev`, thử luồng nghiệp vụ trên trình duyệt và mở lại dữ liệu ở phiên mới | receipt `deployed`, artifact, digest quan sát được và kết quả nghiệp vụ khớp ứng viên |
+| 6 | Trình ứng viên đã thử bằng `stage submit` trên cây sạch, rồi chạy `stage approve` khi quyền duyệt và SHA hợp lệ | sổ giai đoạn ghi SHA trình và bằng chứng bước 5, giữ trạng thái chờ nếu thiếu quyền duyệt |
+| 7 | Skill ghi một checklist `docs/ops/SETUP-ONCE.md` gồm các mục còn chờ trong lần chạy | repo/remote, đường xem bản dev, quyết định đang chờ và quyền/đích thật cần cho bước kế |
+| 8 | Báo cáo §2.4 và giao repo hoặc bundle | báo cáo, bằng chứng và đường mở sản phẩm |
 
 Luật của skill:
-- **Không hỏi người.** Chỗ hở của ý tưởng → giả định đảo ngược được, ghi D-NNN và dòng "(mặc định khung — chưa chủ xác
-  nhận)". Việc thuộc tiền, dữ liệu thật, khoá thật → `loop defer`, vào checklist.
-- **Không mất việc khi container bị thu hồi:** nếu phiên có quyền tạo repo remote thì tạo và đẩy (mục `repo` đạt); nếu
-  không, cuối bước 6 đóng gói toàn bộ lịch sử (`git bundle`) vào thư mục người dùng mở được và báo đường dẫn — mục `repo`
-  nằm đầu checklist.
-- Nếu môi trường phiên cho người dùng xem cổng của bản dev thì skill báo cổng sau bước 6; khả năng này ở phiên cloud
-  **chưa xác minh** (T-3844 thử) — báo cáo không được khai "xem được" khi chưa thử.
+- **Không hỏi người giữa chừng.** Chỗ hở của ý tưởng → giả định đảo ngược được, ghi D-NNN và dòng "(mặc định khung — chưa
+  chủ xác nhận)". Việc thuộc tiền, dữ liệu thật, khoá thật → `loop defer`, vào checklist.
+- Bước 5 phải xanh trước khi trình. Khi commit sổ hoặc tài liệu làm HEAD khác SHA đã build, đối chiếu lại nội dung ứng
+  viên và artifact theo hợp đồng `subject`. Build và thử lại nếu ứng viên thay đổi. Thiếu quyền duyệt vẫn giao bản dev.
+- Khi phiên được phép tạo và đẩy tới repo remote, ghi đường dẫn đã giao. Nếu thiếu quyền, đóng gói lịch sử đã commit
+  bằng `git bundle`, kiểm bằng `git bundle verify` và giao bundle cùng bằng chứng. Ghi mục `repo` đầu checklist.
+- Ghi phạm vi truy cập URL đã thử (ví dụ loopback của runner). Để xác nhận người dùng xem được, hãy kiểm từ môi trường của họ.
+- Checklist ngắn của pilot có thể ghi ngay sau bản dev. T-3859 triển khai `xt.py admin-plan` cho checklist đầy đủ trước
+  production ([đặc tả thiết lập](SPEC-factory-setup.md)). Chờ thiết lập và quyết định duyệt được tính riêng khỏi thời gian tới bản dev.
 - Trần: `--hours` (mặc định 24) và trần chi phí của phiên; ≥ 80 % → bàn giao theo luật sẵn có.
 - Ý tưởng yêu cầu thứ gói không có (vd ứng dụng di động) → D-NNN ghi phần làm được với gói hiện có và phần ngoài phạm vi;
   không tự thêm công nghệ ngoài gói mà không `/research`.
@@ -87,6 +89,23 @@ lệnh đầu tới `deployed`, chi phí (`null` nếu không đo được), s�
 0)** · bằng chứng (digest, receipt, khoá nghiệm thu) · việc chờ người (trỏ checklist) · điều chưa làm được. Hai pilot
 của PLAN (T-3847, T-3863) dùng đúng khuôn này, ghi ở `docs/ops/FACTORY-PILOT-1.md` và `FACTORY-PILOT-2.md`.
 
+Pilot 1 dùng ý tưởng sổ ghi chú. Trong repo khung, tạo thư mục cạnh báo cáo, cùng tên và bỏ đuôi `.md`.
+Từ gốc sản phẩm, chạy `bash tests_e2e/preview.sh --output <đường-dẫn-tuyệt-đối>/preview-browser.json` trỏ tới thư mục đó.
+Nếu bản dev đã lên và có Playwright/Chromium, dùng `python3 tests_e2e/pack_preview.py --output <đường-dẫn-tuyệt-đối>/preview-browser.json`
+để thử lại trên bản đang chạy. Sau khi trình duyệt đạt, chép ngay sổ `docs/ops/DEPLOYS.json` của sản phẩm vào cùng thư mục
+để ghi lại đúng lần triển khai. Báo cáo chứa đúng một khối `json` theo bảng sau.
+
+| Trường | Giá trị từ lần chạy |
+|---|---|
+| `idea`, `started` | Ý tưởng gốc và thời điểm UTC khi bắt đầu thực hiện ý tưởng |
+| `head`, `digest` | `dev.current.subject.head` và `.digest` của ứng viên đã thử |
+| `tasks`, `failed_gates`, `human_questions` | Số task đã làm, số lượt Gate đỏ và số lần cần hỏi người |
+| `cost_usd` | Số USD đo được, hoặc `null` khi không có số liệu |
+
+Từ repo khung, chạy Gate của T-3847. Gate tính thời gian từ `started` tới `dev.current.finished` (mốc deploy của bản
+đã qua trình duyệt) và tính lại digest từ các artifact trong receipt. SHA, digest phục vụ và hash archive phải khớp kết quả đăng nhập → tạo → đọc lại.
+Nghiệm thu độc lập của T-3848 vẫn được lưu cùng SPEC và repo sản phẩm.
+
 ## 3. Tiêu chí chấp nhận
 
 ### S-201 Tạo dự án mới
@@ -111,13 +130,14 @@ của PLAN (T-3847, T-3863) dùng đúng khuôn này, ghi ở `docs/ops/FACTORY-
 - Given không có mạng · When S-201 · Then vẫn exit 0
 
 ### S-207 Skill đi hết dây chuyền (pilot 1)
-- Given repo khung, một câu ý tưởng hợp với gói, Docker dùng được
-- When chạy skill một bước
-- Then có sổ triển khai `dev.current` = `deployed`; `SETUP-ONCE.md`; báo cáo §2.4 ghi "số lần phải hỏi người: 0"; mọi
-  dòng Khung do máy điền mang dấu "(mặc định khung — chưa chủ xác nhận)"
+- Given repo khung, thư mục sản phẩm sạch và runner có thể chạy Docker Compose + trình duyệt
+- When chạy skill với ý tưởng sổ ghi chú
+- Then `dev.current.result` là `deployed`. Các thao tác đăng nhập, tạo ghi chú và đọc lại cùng ghi chú ở phiên mới thành công trên
+  đúng artifact. Báo cáo §2.4, receipt, kết quả trình duyệt và checklist ghi nhận lần chạy thực với số lần phải hỏi người bằng 0.
+  Mọi dòng Khung do máy điền mang dấu "(mặc định khung — chưa chủ xác nhận)".
 
 ### S-208 Không có quyền tạo repo
-- Given phiên không tạo được repo remote · When skill xong bước 6
+- Given phiên không tạo được repo remote · When giao kết quả bước 8
 - Then có file bundle ở thư mục người dùng mở được; `git bundle verify` exit 0; checklist có `repo` = `thiếu` ở đầu
 
 ### S-209 Issue của người có quyền ghi
@@ -143,7 +163,7 @@ của PLAN (T-3847, T-3863) dùng đúng khuôn này, ghi ở `docs/ops/FACTORY-
 | Cực đại | Ý tưởng 4 000 ký tự, nhiều dòng | Nhận; giữ nguyên xuống dòng trong khối trích | S-203 |
 | Trùng lặp | Cùng ý tưởng gửi hai lần qua issue | Hai lần chạy độc lập, tên thư mục/nhánh khác nhau theo số issue | S-212 |
 | Song song | Hai `--new` cùng thư mục | Lệnh sau thấy thư mục không rỗng → exit 2 | S-202 |
-| Mất mạng | Kéo ảnh container lỗi ở bước 6 | `deploy run` exit 1/2; skill ghi `loop defer` hoặc thử lại theo luật, không khai xong | S-207 |
+| Mất mạng | Kéo ảnh container lỗi ở bước 5 | `deploy run` exit 1/2; skill ghi `loop defer` hoặc thử lại theo luật, không khai xong | S-207 |
 | Thời gian | Ngày trong tên báo cáo | UTC | — |
 | Quyền | Thư mục đích nằm ngoài nơi phiên được ghi | exit 2 | S-202 |
 | Quyền | Chính thư mục đích là symlink | `--new` từ chối (exit 2) — `install.py` hiện chỉ chặn symlink bên trong đích, nên đây là kiểm mới | S-202 |
@@ -184,3 +204,4 @@ Báo cáo §2.4 là nguồn của chỉ số chính của ADR-0075 (thời gian 
 | Phiên bản | Ngày | Gì | Duyệt |
 |---|---|---|---|
 | 1 | 2026-11-11 | tạo; sửa trước khi công bố theo review độc lập: commit đầu trước khi cài git hook, kiểm quyền ghi bằng API quyền, kênh issue khởi động phiên điều phối (không phải worker lát), xếp hàng bằng nhãn, điều chưa xác minh về xem cổng | D-422, D-423 |
+| 2 | 2026-11-19 | Thử luồng nghiệp vụ trên bản dev trước khi trình, tách checklist pilot khỏi T-3859 và quy định bằng chứng pilot 1. | Chờ rà soát thay đổi |
