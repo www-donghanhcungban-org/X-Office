@@ -17,6 +17,7 @@ export class Iso {
     this.ctx = ctx;
     this.view = view; // {scale, ox, oy}
     this.glow = true;
+    this.glowBoxes = true;
   }
 
   p(x, y, z) {
@@ -43,7 +44,7 @@ export class Iso {
     const { x, y, z, w, d, h } = b;
     const P = (a, c, e) => this.p(a, c, e);
     const ctx = this.ctx;
-    const lit = this.glow && b.glow;
+    const lit = this.glow && this.glowBoxes && b.glow;
     if (lit) {
       ctx.save();
       ctx.shadowColor = b.glow;
@@ -74,6 +75,7 @@ export class Iso {
   }
 
   // Nhãn bo góc ở điểm thế giới (x,y,z), neo đáy-giữa.
+  // `kind` (agent/state/room) chỉ dùng cho bộ vẽ 3D (thuộc tính data-kind của nhãn HTML) — 2D bỏ qua.
   tag(x, y, z, text, bg, fg, border) {
     const ctx = this.ctx;
     const [sx, sy] = this.p(x, y, z);

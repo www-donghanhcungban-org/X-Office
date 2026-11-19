@@ -11,7 +11,20 @@ const MAX_OFFSET_UNITS = 4000;
 const AZ = [0.17, 1.4]; // giới hạn góc xoay ngang (rad): luôn nhìn từ phía hai bức tường mở
 const EL = [0.35, 1.1];
 
+// Màu đã phân tích, dùng lại giữa các khung hình (quy mô lớn có hàng nghìn lệnh mỗi khung — không cấp phát lại).
+const COLORS = new Map();
 function parseColor(str) {
+  const key = str || "#ffffff";
+  let hit = COLORS.get(key);
+  if (!hit) {
+    hit = parseColorNew(key);
+    if (COLORS.size > 4096) COLORS.clear();
+    COLORS.set(key, hit);
+  }
+  return hit;
+}
+
+function parseColorNew(str) {
   const m = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*([\d.]+)\s*)?\)$/i.exec(str || "");
   if (m) return { color: new THREE.Color(+m[1] / 255, +m[2] / 255, +m[3] / 255).convertSRGBToLinear(), alpha: m[4] === undefined ? 1 : +m[4] };
   return { color: new THREE.Color(str || "#ffffff"), alpha: 1 };
@@ -42,7 +55,7 @@ class Collector {
   panel(f) { this.panels.push(f); }
   dot(x, y, z, r, color) { this.dots.push({ x, y, z, r, color }); }
   ring(x, y, z, r, tilt, color) { this.rings.push({ x, y, z, r, tilt, color }); }
-  tag(x, y, z, text, bg, fg, border) { this.tags.push({ x, y, z, text, bg, fg, border }); }
+  tag(x, y, z, text, bg, fg, border, kind) { this.tags.push({ x, y, z, text, bg, fg, border, kind: kind || "" }); }
 }
 
 class Pool {
@@ -160,6 +173,7 @@ export function createThreeView(stage) {
       }
       const p = new THREE.Vector3(t.x, t.z, t.y).project(camera);
       el.textContent = t.text;
+      el.dataset.kind = t.kind; // agent | state | room — test và CSS phân biệt nhãn agent với nhãn phòng
       el.hidden = false;
       el.style.setProperty("left", ((p.x + 1) / 2) * rect.w + "px");
       el.style.setProperty("top", ((1 - p.y) / 2) * rect.h + "px");
@@ -172,26 +186,37 @@ export function createThreeView(stage) {
 
   // Camera nhìn hộp `v` (thế giới x,y,z → three x,z,y); mặt trời + vùng bóng đổ phủ cả mặt bằng `plan`.
   function place(zoom, v, plan) {
-    target.set((v.x0 + v.x1) / 2, (v.z0 + v.z1) / 3, (v.y0 + v.y1) / 2);
-    const span = Math.max((v.x1 - v.x0 + v.y1 - v.y0) * 0.62, (v.z1 - v.z0) * 1.6, 4);
-    const half = Math.max(plan.W, plan.D) * 0.75 + 4;
-    Object.assign(sun.shadow.camera, { left: -half, right: half, top: half, bottom: -half, far: half * 4 });
+    // Tâm ở giữa hộp nhìn (kể cả cao độ sàn tầng thượng z0 của toà nhà); khung chiếu khớp đúng 8 góc hộp trong không gian
+    // camera — "Tới phòng/tới bàn" luôn nằm trọn trong khung ở mọi góc xoay.
+    target.set((v.x0 + v.x1) / 2, (v.z0 + v.z1) / 2, (v.y0 + v.y1) / 2);
+    const sh = Math.max(plan.W, plan.D) * 0.75 + 4;
+    Object.assign(sun.shadow.camera, { left: -sh, right: sh, top: sh, bottom: -sh, far: sh * 4 });
     sun.shadow.camera.updateProjectionMatrix();
     sun.target.position.set(plan.W / 2, 0, plan.D / 2);
-    sun.position.set(plan.W / 2 + half * 0.8, half * 1.1 + (v.z1 || 0), plan.D / 2 + half * 0.5);
+    sun.position.set(plan.W / 2 + sh * 0.8, sh * 1.1 + (v.z1 || 0), plan.D / 2 + sh * 0.5);
     const aspect = view.w / view.h;
-    camera.left = (-span * aspect) / 2;
-    camera.right = (span * aspect) / 2;
-    camera.top = span / 2;
-    camera.bottom = -span / 2;
-    camera.zoom = zoom || 1;
-    const r = 60;
+    const r = 60 + Math.max(plan.W, plan.D);
     camera.position.set(
       target.x + Math.sin(view.az) * Math.cos(view.el) * r,
       target.y + Math.sin(view.el) * r,
       target.z + Math.cos(view.az) * Math.cos(view.el) * r,
     );
     camera.lookAt(target);
+    camera.updateMatrixWorld();
+    let hx = 0.5, hy = 0.5;
+    for (const x of [v.x0, v.x1]) for (const y of [v.y0, v.y1]) for (const z of [v.z0, v.z1]) {
+      const p = new THREE.Vector3(x, z, y).applyMatrix4(camera.matrixWorldInverse);
+      hx = Math.max(hx, Math.abs(p.x));
+      hy = Math.max(hy, Math.abs(p.y));
+    }
+    const half = Math.max(hy, hx / aspect) * 1.06;
+    camera.left = -half * aspect;
+    camera.right = half * aspect;
+    camera.top = half;
+    camera.bottom = -half;
+    camera.near = 0.1;
+    camera.far = r * 2 + Math.max(plan.W, plan.D) * 2;
+    camera.zoom = zoom || 1;
     camera.updateProjectionMatrix();
   }
 
@@ -232,8 +257,10 @@ export function createThreeView(stage) {
     },
     draw(opts) {
       const glowOn = opts.quality !== "low";
-      renderer.shadowMap.enabled = glowOn;
-      sun.castShadow = glowOn;
+      // Bóng đổ nhân đôi draw call; ở quy mô công ty/tập đoàn (1–2 nghìn mesh) chỉ bật cho nhóm nhỏ để giữ khung hình.
+      const shadows = glowOn && (opts.scale || "team") === "team";
+      renderer.shadowMap.enabled = shadows;
+      sun.castShadow = shadows;
       scene.background = parseColor(opts.theme.bg).color;
       const sink = new Collector();
       const { plan } = compose(sink, opts, false);

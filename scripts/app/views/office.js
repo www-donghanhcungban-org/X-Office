@@ -67,10 +67,12 @@ export async function render(main, { api, h, error }) {
   const [npcBox, npcLabel] = check(h, "office-npc", "Nhân viên minh hoạ", prefs.npc);
   const rooms = h("div", { class: "office-rooms", role: "group", "aria-label": "Tới phòng" });
   const counters = h("p", { class: "office-counters" });
+  const legend = h("p", { class: "muted" });
   const zoomOut = h("button", { type: "button", "aria-label": "Thu nhỏ" }, "−");
   const zoomIn = h("button", { type: "button", "aria-label": "Phóng to" }, "+");
   const refresh = h("button", { type: "button" }, "Làm mới");
-  const canvas = h("canvas", { class: "office-canvas", role: "img", "aria-label": "Văn phòng đang tải" });
+  // tabindex 0: canvas 2D nhận focus để dời góc nhìn bằng phím mũi tên (thay cho kéo chuột — WCAG 2.1.1).
+  const canvas = h("canvas", { class: "office-canvas", role: "img", tabindex: "0", "aria-label": "Văn phòng đang tải" });
   const stage = h("div", { class: "office-stage" }, canvas);
   const summary = h("p", { class: "muted", "aria-live": "polite" });
   const table = h("tbody", null);
@@ -88,7 +90,7 @@ export async function render(main, { api, h, error }) {
       h("span", null, namesBox, namesLabel), h("span", null, npcBox, npcLabel), h("span", null, motionBox, motionLabel),
       h("span", null, zoomOut, zoomIn, refresh)),
     rooms, msg, rmsg, stage, counters, summary,
-    h("p", { class: "muted" }, "Người có nhãn là agent thật của vòng; người không nhãn là nhân viên minh hoạ (chỉ để trang trí, không mang trạng thái)."),
+    legend,
     h("h2", null, "Ai đang làm gì"),
     h("table", null, h("thead", null, h("tr", null, h("th", { scope: "col" }, "Bàn"), h("th", { scope: "col" }, "Trạng thái"), h("th", { scope: "col" }, "Task"))), table),
     h("h2", null, "Việc cần người"), human,
@@ -96,12 +98,27 @@ export async function render(main, { api, h, error }) {
   );
 
   let data = { seats: [], feed: [], pending_human: [], tasks: { open: 0, done: 0, skipped: 0 }, loop: { verdict: "inactive" } };
+  let loaded = false;
   let dirty = true;
+  let seatsKey = "";
+
+  // Bảng chỉ dựng lại khi dữ liệu bàn đổi — poll 10 s không được gỡ nút đang giữ focus bàn phím (WCAG 2.4.3); đổi thật thì
+  // trả focus về đúng nút "tới bàn" cùng vị trí.
+  function renderSeats(seats) {
+    const key = JSON.stringify(seats);
+    if (key === seatsKey) return;
+    seatsKey = key;
+    const buttons = [...table.querySelectorAll("button")];
+    const at = buttons.indexOf(document.activeElement);
+    table.replaceChildren(...seatRows(h, seats, goSeat));
+    if (at >= 0) table.querySelectorAll("button")[Math.min(at, seats.length - 1)]?.focus();
+  }
 
   function apply(d) {
     data = d;
+    loaded = true;
     dirty = true;
-    table.replaceChildren(...seatRows(h, d.seats, goSeat));
+    renderSeats(d.seats);
     human.replaceChildren(d.pending_human.length
       ? h("ul", null, d.pending_human.map((x) => h("li", null, h("strong", null, x.id), x.reason ? " — " + x.reason : "")))
       : h("p", null, "Không có việc chờ người."));
@@ -147,21 +164,35 @@ export async function render(main, { api, h, error }) {
 
   // Bộ đếm: agent thật + nhân viên minh hoạ (số bàn có người minh hoạ của mặt bằng) · đang làm · đang chờ.
   function count() {
+    if (!loaded) {
+      counters.textContent = "Chưa có dữ liệu agent (đang tải hoặc máy chủ lỗi).";
+      return;
+    }
     const plan = planFor(prefs.scale, prefs.layout);
     const npc = prefs.npc ? npcSeated(plan) : 0;
     const working = data.seats.filter((s) => s.state === "work" || s.state === "fail").length;
     const waiting = data.seats.filter((s) => s.state === "wait").length;
     counters.textContent = data.seats.length + " agent" + (npc ? " + " + npc + " nhân viên minh hoạ" : "") +
       " · đang làm " + working + " · đang chờ " + waiting;
+    legend.textContent = !prefs.names
+      ? "Nhãn tên đang tắt — xem trạng thái từng agent ở bảng \"Ai đang làm gì\" dưới đây."
+      : npc
+        ? "Người có nhãn là agent thật của vòng; người không nhãn là nhân viên minh hoạ (chỉ trang trí, không mang trạng thái)."
+        : "Mỗi người trong cảnh là một agent của vòng, có nhãn tên.";
   }
 
   function setFocus(focus, seat) {
     view.focus = focus;
     view.seat = seat;
     view.pan = { x: 0, y: 0 };
-    for (const b of rooms.querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.room === (focus || "")));
+    for (const b of rooms.querySelectorAll("button")) b.setAttribute("aria-pressed", String(pressed(b.dataset.room)));
     dirty = true;
     if (three) three.dirty = true;
+  }
+
+  // Nút phòng đang được nhìn: "Toàn cảnh" chỉ khi không nhìn phòng NÀO và không nhìn bàn nào (WCAG 4.1.2).
+  function pressed(room) {
+    return room ? room === view.focus : view.focus === null && view.seat === null;
   }
 
   function goSeat(i) {
@@ -174,7 +205,7 @@ export async function render(main, { api, h, error }) {
     const plan = planFor(prefs.scale, prefs.layout);
     const list = [{ id: "", name: "Toàn cảnh" }, ...plan.rooms];
     rooms.replaceChildren(h("span", { class: "muted" }, "Tới phòng: "), ...list.map((r) => {
-      const b = h("button", { type: "button", "data-room": r.id, "aria-pressed": String(r.id === (view.focus || "")) }, r.name);
+      const b = h("button", { type: "button", "data-room": r.id, "aria-pressed": String(pressed(r.id)) }, r.name);
       b.addEventListener("click", () => setFocus(r.id || null, null));
       return b;
     }));
@@ -284,16 +315,30 @@ export async function render(main, { api, h, error }) {
   };
   zoomIn.addEventListener("click", () => zoomBy(1.25));
   zoomOut.addEventListener("click", () => zoomBy(0.8));
-  // 2D: kéo để dời góc nhìn (3D: kéo để xoay — three-view.js tự xử lý trên canvas của nó).
+  // 2D: kéo CHUỘT để dời góc nhìn (chạm/bút: để trang cuộn bình thường); phím mũi tên khi canvas có focus. Dời giới hạn
+  // trong một khung canvas để cảnh không bị kéo mất khỏi tầm nhìn. (3D: three-view.js tự xử lý xoay trên canvas của nó.)
+  const panTo = (x, y) => {
+    const lim = { x: cssW, y: cssH };
+    view.pan = { x: Math.max(-lim.x, Math.min(lim.x, x)), y: Math.max(-lim.y, Math.min(lim.y, y)) };
+    dirty = true;
+  };
   let drag = null;
   canvas.addEventListener("pointerdown", (e) => {
+    if (e.pointerType !== "mouse") return;
     drag = { x: e.clientX, y: e.clientY, pan: { ...view.pan } };
     canvas.setPointerCapture(e.pointerId);
   });
   canvas.addEventListener("pointermove", (e) => {
-    if (!drag) return;
-    view.pan = { x: drag.pan.x + e.clientX - drag.x, y: drag.pan.y + e.clientY - drag.y };
-    dirty = true;
+    if (drag) panTo(drag.pan.x + e.clientX - drag.x, drag.pan.y + e.clientY - drag.y);
+  });
+  canvas.addEventListener("keydown", (e) => {
+    const step = { ArrowLeft: [40, 0], ArrowRight: [-40, 0], ArrowUp: [0, 40], ArrowDown: [0, -40] }[e.key];
+    if (step) {
+      e.preventDefault();
+      panTo(view.pan.x + step[0], view.pan.y + step[1]);
+    } else if (e.key === "+" || e.key === "=") zoomBy(1.25);
+    else if (e.key === "-") zoomBy(0.8);
+    else if (e.key === "0") setFocus(view.focus, view.seat); // về giữa phòng/bàn đang nhìn
   });
   for (const ev of ["pointerup", "pointercancel"]) canvas.addEventListener(ev, () => { drag = null; });
   refresh.addEventListener("click", load);

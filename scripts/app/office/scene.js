@@ -245,8 +245,8 @@ function bench(p, out) {
 function umbrella(p, out) {
   out.push(box(p.x + 0.45, p.y + 0.45, 0, 0.1, 0.1, 2.2, "#e5e7eb"));
   out.push(box(p.x - 0.4, p.y - 0.4, 2.2, 1.8, 1.8, 0.18, "#38bdf8", { top: "#7dd3fc" }));
-  out.push(box(p.x - 1.6, p.y + 1.4, 0.25, 1.6, 0.6, 0.12, "#f8fafc"));
-  out.push(box(p.x + 0.4, p.y + 1.4, 0.25, 1.6, 0.6, 0.12, "#fde68a"));
+  out.push(box(p.x - 0.8, p.y + 1.4, 0.25, 0.6, 1.6, 0.12, "#f8fafc")); // hai ghế phơi nắng dọc trục y, dưới tán dù
+  out.push(box(p.x + 0.2, p.y + 1.4, 0.25, 0.6, 1.6, 0.12, "#fde68a"));
 }
 
 function fence(p, out) {
@@ -552,7 +552,7 @@ export function compose(sink, opts, sorted = true) {
   if (opts.npc !== false) {
     plan.extraDesks.forEach(([x, y], k) => {
       const npc = { state: "npc", label: "" };
-      if (rnd(k * 7 + 3) > 0.15) { // cùng quy tắc với npcSeated
+      if (npcAt(k)) {
         deskBoxes(th, x, y, npc, floorItems, t, motion);
         person(th, x, y, k + 5, npc, floorItems, t, motion, season);
       } else deskBoxes(th, x, y, { state: "idle" }, floorItems, t, motion);
@@ -567,21 +567,27 @@ export function compose(sink, opts, sorted = true) {
 
   const [bg, fg, border] = th.label;
   if (opts.names !== false) {
-    for (const r of plan.rooms) top.tag(r.x + r.w / 2, r.y + r.d / 2, 3.4, r.name, "rgba(255,255,255,0.88)", "#1f2937", th.trim);
+    // Nhãn phòng: viên màu nhấn của kiểu (khác hẳn nhãn agent), đặt sát tường sau của phòng — không đứng trên đầu ai.
+    for (const r of plan.rooms) top.tag(r.x + r.w / 2, r.y + 0.6, 3.7, "▸ " + r.name, th.trim, "#ffffff", null, "room");
   }
   for (const { seat, at } of heads) {
-    if (opts.names !== false) top.tag(at.x, at.y, at.z, seat.label, bg, fg, border);
+    if (opts.names !== false) top.tag(at.x, at.y, at.z, seat.label, bg, fg, border, "agent");
     if (!QUIET.has(seat.state)) {
       const what = seat.task && seat.task.id ? seat.task.id + " · " : "";
-      top.tag(at.x, at.y, at.z + 0.75, what + STATE_TEXT[seat.state], STATE_COLOR[seat.state], "#0b0f19");
+      top.tag(at.x, at.y, at.z + 0.75, what + STATE_TEXT[seat.state], STATE_COLOR[seat.state], "#0b0f19", null, "state");
     }
   }
   return { items: items.length, plan };
 }
 
+// Bàn phụ thứ k có nhân viên minh hoạ không — MỘT quy tắc cho cả compose (vẽ) lẫn npcSeated (bộ đếm).
+function npcAt(k) {
+  return rnd(k * 7 + 3) > 0.15;
+}
+
 // Bàn phụ có nhân viên minh hoạ (cùng quy tắc với compose) — để bộ đếm của màn khớp đúng cảnh.
 export function npcSeated(plan) {
-  return plan.extraDesks.filter((_, k) => rnd(k * 7 + 3) > 0.15).length;
+  return plan.extraDesks.filter((_, k) => npcAt(k)).length;
 }
 
 // Điểm góc của hộp nhìn (cho fitPoints 2D và camera 3D).
@@ -599,6 +605,8 @@ export function drawScene(ctx, cw, ch, opts) {
   ctx.fillRect(0, 0, cw, ch);
   const iso = new Iso(ctx, fitPoints(viewCorners(opts).pts, cw, ch, opts.zoom || 1, opts.pan));
   iso.glow = opts.quality !== "low";
+  // Quy mô lớn: hàng trăm hộp phát sáng (shadowBlur) vượt ngân sách khung hình 2D — chỉ mặt phẳng (cửa sổ, biển) còn sáng.
+  iso.glowBoxes = (opts.scale || "team") === "team";
   // Nhãn vẽ sau hạt nền (tuyết không che chữ): hoãn tag tới cuối.
   const tags = [];
   const tag = iso.tag.bind(iso);
