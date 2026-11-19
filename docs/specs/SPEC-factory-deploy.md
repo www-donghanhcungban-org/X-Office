@@ -8,6 +8,19 @@
 | Dữ kiện | [`research/2026-11-11-factory-e2e-facts.md`](../../research/2026-11-11-factory-e2e-facts.md) §1 |
 | Kế hoạch | [`PLAN-factory-e2e.md`](../autopilot/PLAN-factory-e2e.md) T-3841…T-3844, T-3860 |
 
+## Phạm vi đã triển khai
+
+Lát dev hiện tại của `web-api-ts` chạy từ gốc repo sản phẩm. Sau `pnpm build`, dùng
+`python3 .xtemplates/scripts/xt.py deploy run --env dev` để đưa `dist/app.tgz` lên Docker Compose.
+CLI yêu cầu đúng bốn lệnh `node scripts/dev-preview.mjs` và URL loopback do gói khai. Khi có bản trước,
+CLI có thể tự quay lui khi smoke hoặc digest sai. Để chủ động quay lui, dùng `deploy rollback --env dev`.
+`deploy status --env dev --json` đọc và kiểm sổ schema 1 theo §5.
+
+Hợp đồng dưới đây mô tả cả những phần đang mở trong PLAN. Chạy lệnh triển khai tuỳ biến và guard chống ghi tay
+`DEPLOYS.json` (S-112) còn chờ. Hàng `deploy` trong `release-check` và việc đồng bộ registry thuộc T-3843.
+Quyền, thiết lập và triển khai production thuộc T-3859/T-3860. Schema 1 dùng chung để lưu và đọc bằng chứng,
+còn các tiêu chí nghiệm thu toàn bộ hợp đồng nằm ở §3. [Kế hoạch triển khai](../autopilot/PLAN-factory-e2e.md)
+
 ## 1. User story
 Là chủ dự án chỉ nêu ý tưởng, tôi muốn máy tự đưa đúng bản đã kiểm lên một môi trường chạy được, kiểm nó sống, và ghi
 lại bản nào đang chạy ở đâu, để "đã phát hành" là dữ kiện máy đọc chứ không phải lời khai; hỏng thì máy tự quay về bản

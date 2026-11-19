@@ -14368,6 +14368,234 @@ def _deploy_metrics(ledger: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
     }
 
 
+DEV_DRIVER = "node scripts/dev-preview.mjs"
+DEV_ACTIONS = ("deploy", "smoke", "digest", "rollback")
+
+
+class DevGuardDenied(DeployError):
+    """Một bước bị guard chặn trước khi đụng môi trường."""
+
+
+def _dev_preflight(base: Path, env: str) -> int:
+    """Lát dev dùng adapter của pack, argv cố định. Không chạy lệnh triển khai tuỳ ý hoặc production."""
+    if env != "dev" or "dev" not in _deploy_envs(base):
+        raise DeployError("chỉ hỗ trợ môi trường dev đã khai")
+    config = _xt_keys(base)
+    commands = [config.get(action + "_dev", "") for action in DEV_ACTIONS]
+    blocked = next((reason for reason in guard_blocks([*commands, f"{DEV_DRIVER} candidate"], base) if reason), "")
+    if blocked:
+        raise DevGuardDenied(blocked)
+    if commands != [f"{DEV_DRIVER} {action}" for action in DEV_ACTIONS]:
+        raise DeployError("dev cần đủ bốn lệnh của adapter web-api-ts trong xt.yaml")
+    if config.get("url_dev") != "http://127.0.0.1:4317":
+        raise DeployError("url_dev phải là địa chỉ loopback của adapter web-api-ts")
+    if not (base / "scripts/dev-preview.mjs").is_file():
+        raise DeployError("thiếu scripts/dev-preview.mjs của gói")
+    timeout = os.environ.get("XT_DEPLOY_TIMEOUT", "1200")
+    if not re.fullmatch(r"[1-9][0-9]{0,4}", timeout):
+        raise DeployError("XT_DEPLOY_TIMEOUT cần số giây dương, tối đa 99999")
+    return int(timeout)
+
+
+@contextlib.contextmanager
+def _dev_lock(base: Path) -> Iterator[Path]:
+    """Một bản dev trên checkout chính của gói. Giữ khoá riêng xuyên suốt cả deploy và rollback."""
+    tree = _git_tree(base)
+    if tree != (base, base / ".git") or not (base / ".git").is_dir():
+        raise DeployError("cần checkout chính ở gốc repository (không chạy trong linked worktree)")
+    state = base / ".git/xt-preview/dev"
+    if state.resolve() != state:
+        raise DeployError("thư mục trạng thái dev không được qua symlink")
+    state.mkdir(mode=0o700, parents=True, exist_ok=True)
+    fc = _fcntl()
+    if fc is None:
+        raise DeployError("triển khai dev cần flock trên Linux")
+    fd = os.open(state / "coordinator.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    try:
+        fc.flock(fd, fc.LOCK_EX | fc.LOCK_NB)
+        yield state
+    finally:
+        os.close(fd)
+
+
+def _dev_candidate(base: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    row, arts = _release_artifacts(base)
+    if row is None or row["result"] != "PASS" or [a["path"] for a in arts] != ["dist/app.tgz"]:
+        raise DeployError("cần dist/app.tgz đã build, khớp release_artifacts và sidecar (nếu có)")
+    head = _release_git_stdout(base, "rev-parse", "--verify", "HEAD").strip()
+    subject, why = _release_subject(base, arts, head, tree_readable=True)
+    identity = {key: subject[key] for key in ("head", "content", "digest")}
+    if why or not _deploy_subject_ok(identity):
+        raise DeployError("không tính được định danh của cây ứng viên")
+    return identity, [{"path": a["path"], "sha256": a["sha256"]} for a in arts]
+
+
+@dataclass
+class DevPreview:
+    base: Path
+    state: Path
+    timeout: int
+    subject: dict[str, Any]
+    previous: str
+
+    def invoke(self, action: str) -> tuple[dict[str, Any], Optional[str]]:
+        """digest đọc giá trị quan sát ở đích; không truyền sẵn đáp án. Sổ không giữ stdout/stderr."""
+        cmd = f"{DEV_DRIVER} {action}"
+        env = {k: v for k, v in os.environ.items() if not k.startswith("XT_DEPLOY_")}
+        env.update(XT_DEPLOY_ENV="dev", XT_DEPLOY_STATE=str(self.state), XT_DEPLOY_ARTIFACTS="dist/app.tgz")
+        if action != "digest":
+            env.update(XT_DEPLOY_DIGEST=self.subject["digest"], XT_DEPLOY_PREVIOUS=self.previous)
+        with tempfile.TemporaryFile() as sink:
+            rc = self.run(cmd.split(), env, sink)
+            sink.seek(0)
+            raw = sink.read(67)
+        digest = raw[:64].decode("ascii") if re.fullmatch(rb"[0-9a-f]{64}(?:\r?\n)?", raw) else None
+        return {"cmd_sha256": hashlib.sha256(cmd.encode()).hexdigest(), "exit_code": rc}, digest
+
+    def run(self, argv: list[str], env: dict[str, str], sink: BinaryIO) -> int:
+        try:
+            proc = subprocess.Popen(
+                argv,
+                cwd=self.base,
+                env=env,
+                stdin=subprocess.DEVNULL,
+                stdout=sink,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+        except OSError:
+            return 127
+        try:
+            return proc.wait(timeout=self.timeout)
+        except subprocess.TimeoutExpired:
+            _stop_group(proc)
+            return 124
+        except BaseException:
+            _stop_group(proc)
+            raise
+
+    def confirm(self) -> tuple[dict[str, Any], Optional[str]]:
+        smoke, _ = self.invoke("smoke")
+        if smoke["exit_code"]:
+            return smoke, None
+        step, digest = self.invoke("digest")
+        return smoke, digest if step["exit_code"] == 0 else None
+
+
+def _dev_receipt(candidate: dict[str, Any], artifacts: list[dict[str, Any]], prior: str) -> dict[str, Any]:
+    run_id = os.environ.get("GITHUB_RUN_ID", "")
+    repo = os.environ.get("GITHUB_REPOSITORY", "")
+    on_ci = os.environ.get("GITHUB_ACTIONS") == "true" and run_id.isdecimal()
+    return {
+        "env": "dev",
+        "subject": candidate,
+        "artifacts": artifacts,
+        "started": now_iso(),
+        "previous_digest": prior or None,
+        "url": "http://127.0.0.1:4317",
+        "deploy": None,
+        "rollback": None,
+        "smoke": None,
+        "served_digest": None,
+        "runner": {
+            "kind": "ci" if on_ci else "local",
+            "run_id": run_id if on_ci else None,
+            "run_url": f"https://github.com/{repo}/actions/runs/{run_id}"
+            if on_ci and re.fullmatch(r"[\w.-]+/[\w.-]+", repo)
+            else None,
+        },
+        "session": None,
+    }
+
+
+def _dev_restore(driver: DevPreview, receipt: dict[str, Any], explicit: bool) -> bool:
+    step, _ = driver.invoke("rollback")
+    receipt["rollback"] = step
+    if explicit:
+        receipt["deploy"] = step
+    confirmed = None
+    if step["exit_code"] == 0:
+        smoke, confirmed = driver.confirm()
+        if explicit:
+            receipt["smoke"] = smoke
+    receipt["served_digest"] = confirmed
+    ok = driver.previous == confirmed
+    receipt["result"] = "rolled_back" if ok else "rollback_failed"
+    return ok
+
+
+def _dev_install(driver: DevPreview, receipt: dict[str, Any]) -> bool:
+    step, _ = driver.invoke("deploy")
+    receipt["deploy"] = step
+    if step["exit_code"] == 0:
+        receipt["smoke"], receipt["served_digest"] = driver.confirm()
+    if receipt["served_digest"] == driver.subject["digest"]:
+        receipt["result"] = "deployed"
+        return True
+    if driver.previous:
+        _dev_restore(driver, receipt, False)
+    else:
+        receipt["result"] = "failed"
+    return False
+
+
+def _dev_write(base: Path, ledger: dict[str, Any]) -> None:
+    path = base / DEPLOY_LEDGER
+    if path.resolve() != path:
+        raise DeployError("không ghi sổ triển khai qua symlink")
+    write_atomic(path, json.dumps(_validate_deploy_ledger(ledger), ensure_ascii=False, indent=2) + "\n", keep_mode=True)
+
+
+def _dev_execute(base: Path, state: Path, timeout: int, explicit: bool) -> tuple[dict[str, Any], bool]:
+    ledger = read_deploy_ledger(base)
+    slot = ledger["envs"].setdefault("dev", {"current": None, "previous": None, "unknown": False})
+    current, previous = slot["current"], slot["previous"]
+    if explicit:
+        if previous is None:
+            raise DeployError("chưa có bản dev trước để quay lui")
+        source = current or previous
+        subject, artifacts, target = source["subject"], source["artifacts"], previous
+    else:
+        subject, artifacts = _dev_candidate(base)
+        target = current or previous
+    prior_digest = target["subject"]["digest"] if target else ""
+    receipt = _dev_receipt(subject, artifacts, prior_digest)
+    driver = DevPreview(base, state, timeout, subject, prior_digest)
+    if not explicit:
+        check, _ = driver.invoke("candidate")
+        if check["exit_code"]:
+            raise DeployError("không xác nhận được dist/app.tgz từ mã hiện tại; chạy pnpm build rồi thử lại")
+    # Nếu tiến trình bị ngắt sau khi chạm đích, lần sau chỉ có thể tin bản đã xác nhận sau khi smoke lại.
+    slot.update(current=None, previous=target, unknown=True)
+    _dev_write(base, ledger)
+    if explicit:
+        ok = _dev_restore(driver, receipt, True)
+    else:
+        ok = _dev_install(driver, receipt)
+    receipt["finished"] = now_iso()
+    if receipt["result"] == "deployed":
+        fallback = previous if prior_digest == subject["digest"] else target
+        slot.update(current=receipt, previous=fallback, unknown=False)
+    elif receipt["result"] == "rolled_back":
+        slot.update(current=target, previous=current if explicit else previous, unknown=False)
+    ledger["events"].append(receipt)
+    _dev_write(base, ledger)
+    return receipt, ok
+
+
+def cmd_deploy_dev(args: argparse.Namespace) -> int:
+    base = loop_root(project_dir())
+    try:
+        timeout = _dev_preflight(base, args.env)
+        with _dev_lock(base) as state:
+            receipt, ok = _dev_execute(base, state, timeout, args.deploy_cmd == "rollback")
+    except (DeployError, OSError, ValueError, _ReleaseTreeError) as exc:
+        print(f"✗ deploy dev: {exc}", file=sys.stderr)
+        return 126 if isinstance(exc, DevGuardDenied) else 2
+    print(json.dumps(receipt) if args.json else f"dev: {receipt['result']} — {receipt['url']} ({DEPLOY_LEDGER})")
+    return 0 if ok else 1
+
+
 def cmd_deploy_status(args: argparse.Namespace) -> int:
     base = project_dir()
     env = args.env
@@ -20847,6 +21075,11 @@ def build_parser() -> argparse.ArgumentParser:
     ds.add_argument("--env", help="chỉ in biên nhận của môi trường này")
     ds.add_argument("--json", action="store_true", help="in sổ schema 1 và số liệu theo môi trường dưới dạng JSON")
     ds.set_defaults(fn=cmd_deploy_status)
+    for op in ("run", "rollback"):
+        action = dsub.add_parser(op, allow_abbrev=False, help="áp dụng hoặc quay lui bản dev của gói web-api-ts")
+        action.add_argument("--env", required=True, help="dev")
+        action.add_argument("--json", action="store_true", help="in receipt schema 1")
+        action.set_defaults(fn=cmd_deploy_dev)
     prg = sub.add_parser(
         "registry",
         help="registry sản phẩm đích: lệch core/gói so với VERSION khung, ngoại lệ hết hạn (ADR-0068 lát E)",

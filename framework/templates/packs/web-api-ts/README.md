@@ -7,7 +7,7 @@ updated: 2026-11-19
 # Gói `web-api-ts`
 
 > Stack lấy từ dự án đích hotel-manager (`www-donghanhcungban-org/hotel-manager@30492c9`, đọc 2026-11-05): Node 24, pnpm,
-> TypeScript, `pg` + `kysely`, `vitest`, `biome` và PostgreSQL. Gói đầu chưa có UI (D-359).
+> TypeScript, `pg` + `kysely`, `vitest`, `biome` và PostgreSQL. Giao diện ghi chú cho phép đăng nhập, ghi và xem lại theo tenant.
 > Hạn hỗ trợ nằm ở `support_until` trong `pack.json`.
 
 Phiên bản pnpm và các gói npm nằm trong `starter/package.json` ở cây nguồn của gói. Sau khi cài starter, xem
@@ -29,6 +29,22 @@ Phiên bản pnpm và các gói npm nằm trong `starter/package.json` ở cây 
 
 Chạy cục bộ: `DATABASE_URL=postgres://…/postgres pnpm test` (vai trò có quyền `CREATE DATABASE`; mỗi file test tạo cơ sở
 riêng). Không có `DATABASE_URL` → test đỏ, không bỏ qua.
+
+## Chạy thử bản dev
+
+Trong repo sản phẩm mới, dùng Node 24, CPython 3.15 và Docker Engine cục bộ với Compose v2. Lần đầu dựng ảnh cần mạng. Mỗi dự án có hai tài khoản demo và một volume PostgreSQL riêng. Cổng 4317 trên loopback cần trống.
+
+```bash
+node scripts/build.ts
+python3 .xtemplates/scripts/xt.py deploy run --env dev --json
+node scripts/dev-preview.mjs credentials
+```
+
+Mở <http://127.0.0.1:4317/> trên máy chạy Docker. Lấy tài khoản `owner` từ đầu ra lệnh cuối để đăng nhập, tạo ghi chú rồi tải lại trang. Chỉ xem mật khẩu demo ở terminal riêng. Lệnh triển khai thử đăng nhập, ghi/đọc lại ghi chú, kiểm tenant thứ hai nhận 404 và so digest phục vụ với artifact. Bằng chứng được ghi vào `docs/ops/DEPLOYS.json`. Sau khi đổi mã, chạy lại hai lệnh đầu để cập nhật bản dùng thử.
+
+`node scripts/dev-preview.mjs verify` dựng lại artifact trong thư mục tạm, so với receipt và `/healthz`, rồi kiểm trang HTML. `python3 .xtemplates/scripts/xt.py deploy rollback --env dev --json` nạp ảnh ứng dụng đã lưu của lần triển khai trước. Giữ migration tương thích ngược với ảnh cũ vì rollback ứng dụng dùng lại volume dữ liệu. `node scripts/dev-preview.mjs stop` dừng dịch vụ và giữ volume. Các bản ảnh dùng để quay lui được lưu cục bộ trong thư mục Git, cùng thông tin truy cập dev.
+
+Để dựng và nghiệm thu bằng Chromium từ gốc repo sản phẩm, chạy `bash tests_e2e/preview.sh`. Kết quả ở `dist/preview-browser.json` sau khi một phiên mới đọc lại ghi chú đã tạo. Workflow `dev-preview` của starter chạy cùng lệnh trên PR và khi chọn **Run workflow**. Mã bài kiểm thuộc dự án. Xem hướng dẫn đổi đường dẫn bằng chứng trong `tests_e2e/README.md` của repo sản phẩm.
 
 ## Quét phụ thuộc
 
@@ -68,5 +84,4 @@ phải làm đỏ đúng test ghi ở `expect_fail`.
 - Contract so bằng tập con của OpenAPI (giới hạn ghi ở đầu `contract.test.ts`): không bắt đổi thuộc tính tuỳ chọn,
   `enum`, ràng buộc — cần bộ so chuyên dụng ở CI của dự án.
 - Phiên đăng nhập không có thu hồi/giới hạn tần suất theo người dùng/IP (chỉ giới hạn số scrypt đồng thời của tiến trình);
-  `purgeExpiredSessions` chưa được lên lịch sẵn; không có MFA; không UI; không staging/deploy thật (promote = digest +
-  chữ ký GO-NO-GO §5 của khung).
+  `purgeExpiredSessions` chưa được lên lịch sẵn; không có MFA. Bản Compose chỉ dành cho dev trên loopback. Staging và production cần đích triển khai riêng.

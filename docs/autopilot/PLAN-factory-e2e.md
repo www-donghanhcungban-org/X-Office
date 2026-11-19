@@ -11,8 +11,8 @@
 ## Tóm tắt (cổng duyệt)
 - Mục tiêu: một câu ý tưởng → bản dev có receipt, không hỏi người; rồi một checklist thiết lập → production tự host.
   Chỉ số: thời gian và chi phí từ ý tưởng tới bản dev (pilot 1 đo lần đầu), thời gian chờ người, lỗi lọt sau merge.
-- Thứ tự: bản dev trước (Lát 1–2, kết bằng pilot 1) → cơ chế chất lượng bù (Lát 3) → song song (Lát 4) → mọi quy mô
-  (Lát 5, chỉ sau Lát 3) → thiết lập một lần và production (Lát 6) → vòng học, kênh vào, pilot 2 (Lát 7).
+- Lát 1 cung cấp bản dev. Pilot 1 ở Lát 2 cần nghiệm thu độc lập và kiểm thử trình duyệt ở Lát 3.
+  Sau pilot, thứ tự là song song (Lát 4) → mọi quy mô (Lát 5) → thiết lập một lần và production (Lát 6) → vòng học, kênh vào, pilot 2 (Lát 7).
 - Ràng buộc giữ: không tách `xt.py`; một gói trong 3.x (UI vào `web-api-ts`); trần byte; CLI chỉ stdlib; khoá nới nằm
   trong `HARD_GATED_KEYS`; mẫu dự án đích để khoá nới trống.
 - `files:` chưa khai ở PLAN này: trước T-3851/T-3852 lời khai không được máy đối chiếu và mọi PR cùng chạm
@@ -42,7 +42,8 @@
 - Số vòng tối đa: bỏ trống · Chi phí: 0 đồng ngoài phiên tới hết Lát 5 · Timeout Gate: 1200 giây · Hạn: xét lại 2027-01-21
 
 ## Điểm dừng bắt buộc về hành động
-- Không việc người nào trước pilot 1. Sau bản dev, chủ dự án làm **một lần** theo checklist của T-3859: GitHub App/token,
+- Pilot 1 dùng dữ liệu mẫu. Sau khi kiểm bản dev, skill liệt kê việc chờ người trong checklist của sản phẩm
+  (đặc tả intake §2.2). Trước production, T-3859 tổng hợp checklist đầy đủ gồm GitHub App/token,
   đích và khoá production, trần chi phí scheduled task, merge PR bật khoá `HARD_GATED` (`release_signoff`, khoá giai đoạn).
 - Tiền thật, dữ liệu người dùng thật, pháp nhân đứng tên: `- grant:` hoặc `loop defer`, ở mọi quy mô.
 
@@ -53,18 +54,18 @@
 - [x] `T-3841` ADR hợp đồng triển khai: khoá `xt.yaml` theo môi trường, schema receipt, hàng `release-check`, đích dev mặc định ([ADR-0077](../adr/0077-deployment-receipts.md); sau: T-3866) — Gate: `git grep --untracked -qiE '^# ADR-[0-9]+: .*receipt' -- docs/adr`
 
 ### Lát 1 — Bản dev có receipt
-- [ ] `T-3842` xt.py: lệnh triển khai đọc khoá `xt.yaml`, ghi receipt (môi trường · digest · thời điểm · smoke), smoke đỏ thì quay lui; fixture âm sai digest, smoke đỏ, receipt cũ (sau: T-3841; topo: review) — Gate: `python3 -m unittest tests.test_deploy_receipt`
+- [ ] `T-3842` xt.py: lệnh triển khai đọc khoá `xt.yaml`, ghi receipt (môi trường · digest · thời điểm · smoke), smoke đỏ thì quay lui; fixture âm sai digest, smoke đỏ, receipt cũ (sau: T-3841; topo: review) — Gate: `python3 -m unittest tests.test_deploy_receipt tests.test_deploy_run`
 - [ ] `T-3843` `release-check` đối chiếu digest ở receipt với `subject.digest`; `registry` đọc receipt vào `environments`/`release` (sau: T-3842; topo: review) — Gate: `python3 -m unittest tests.test_deploy_release_row`
 - [ ] `T-3844` Gói `web-api-ts`: ảnh + compose dev (app + Postgres), khoá triển khai dev ở `pack.json`; workflow gói: repo sạch → bản dev → receipt → quay lui, ca sai cố ý đỏ (sau: T-3842) — Gate: `python3 -m unittest tests.test_pack_dev_deploy`
 
 ### Lát 2 — Ý tưởng tới repo đang chạy
-- [x] `T-3845` `install.py`: một lệnh từ thư mục trống ra dự án mới (git, khung + gói, `PROJECT.md` 4 dòng Khung với giả định ghi "(mặc định khung — chưa chủ xác nhận)", blueprint, `doctor` sạch) (topo: review) — Gate: `python3 -m unittest tests.test_install_new`
-- [ ] `T-3846` Skill một bước ý tưởng → bản dev (T-3845 → `/autopilot` → giai đoạn 1 → triển khai dev → báo cáo); repo sản phẩm là repo riêng hoặc bundle (sau: T-3844, T-3845, T-3848) — Gate: `python3 -m unittest tests.test_skill_factory`
-- [ ] `T-3847` Pilot 1: một ý tưởng mẫu → bản dev có receipt trên repo sạch; ghi thời gian, chi phí, số lần phải hỏi người (sau: T-3846) — Gate: `test -s docs/ops/FACTORY-PILOT-1.md`
+- [x] `T-3845` `install.py`: một lệnh từ thư mục trống ra dự án mới (git, khung + gói, `PROJECT.md` giữ ý tưởng và bốn dòng Khung để skill điền, blueprint, `doctor` sạch) (topo: review) — Gate: `python3 -m unittest tests.test_install_new`
+- [ ] `T-3846` Skill một bước ý tưởng → bản dev (T-3845 → `/autopilot` ở giai đoạn 1 → deploy và thử luồng nghiệp vụ → trình MVP để duyệt → báo cáo và giao repo riêng hoặc bundle) (sau: T-3844, T-3845, T-3848, T-3849) — Gate: `python3 -m unittest tests.test_skill_factory`
+- [ ] `T-3847` Pilot 1 từ ý tưởng sổ ghi chú đến bản dev trên repo mới. Đối chiếu báo cáo với receipt và lượt đăng nhập, tạo và đọc lại ghi chú trên cùng bản (sau: T-3846) — Gate: `python3 tests_e2e/verify_factory_pilot.py docs/ops/FACTORY-PILOT-1.md`
 
 ### Lát 3 — Chất lượng bù: nghiệm thu độc lập, UI
 - [ ] `T-3848` Bộ nghiệm thu do agent khác người viết sinh từ SPEC trước khi viết mã, khoá bằng digest; việc đổi file đã khoá làm Gate đỏ trừ khi có D-NNN và reviewer độc lập; dựng trên `QA-STRAT-023` và khoá `acceptance`/`acceptance_report` sẵn có (topo: review) — Gate: `python3 -m unittest tests.test_acceptance_lock`
-- [ ] `T-3849` Gói thêm UI tối thiểu và E2E trình duyệt trong workflow gói; kiểm giao diện thành Gate máy của task UI (sau: T-3844) — Gate: `python3 -m unittest tests.test_pack_ui`
+- [ ] `T-3849` Gói thêm UI tối thiểu và E2E trình duyệt. Repo sản phẩm chạy `bash tests_e2e/preview.sh` để dựng bản dev và kiểm đăng nhập, tạo, đọc lại ghi chú trong phiên mới. Workflow `dev-preview` chạy cùng lệnh trên PR hoặc khi gọi thủ công (sau: T-3844) — Gate: `python3 -m unittest tests.test_pack_ui`
 
 ### Lát 4 — Song song theo file
 - [ ] `T-3850` ADR song song theo file và worker ngoài phiên — thay một phần D-142; đối chiếu `LOOP-STOP-014`, ADR-0009 §4, `LOOP-ORCH-006/007/020/024` ở mục Thay/Giữ; thử trên git/GitHub thật năm điểm [chặn] của đặc tả parallel §10 rồi chuyển F-131/F-133 sang Approved (sau: T-3866) — Gate: `git grep --untracked -qiE '^# ADR-[0-9]+: .*worker ngoài phiên' -- docs/adr`

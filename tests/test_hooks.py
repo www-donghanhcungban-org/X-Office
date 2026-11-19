@@ -524,6 +524,267 @@ class CommitGateXtPyHookTest(CommitGateFastHookBase):
                 self.assertNotIn("FAST-RAN", err)
 
 
+@unittest.skipIf(shutil.which("bash") is None or shutil.which("git") is None, "cần bash + git")
+class CommitGateWorktreeBase(unittest.TestCase):
+    """AUD-HAR-442: commit trong git worktree của CHÍNH repo dự án (dưới gốc `.claude/worktrees/<tên>` hay ngoài gốc) từng
+    rơi vào nhánh "repo lồng có cổng riêng"/"repo ngoài dự án" → mặc định cho qua KHÔNG chạy cổng. Nay cổng chạy trên chính
+    worktree (tệp đổi, xt.yaml, `commit_gate`, cấu hình cổng đổi đều tính theo worktree); repo KHÁC giữ luật AUD-SEC-015.
+    Cổng giả: `test` chạm `gate-ran` ở thư mục nó chạy (gốc cổng) và đỏ khi gốc đó có tệp `broken`. Lớp gốc không có test:
+    mỗi ca là một lần commit qua hook thật, chia hai lớp để không lớp nào chặn shard CI."""
+
+    YAML = "test: sh -c 'touch gate-ran; test ! -e broken'\n" + 'build: ""\ntypecheck: ""\nlint: ""\nformat_check: ""\n'
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp()).resolve()
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.proj = self.tmp / "proj"
+        (self.proj / "scripts").mkdir(parents=True)
+        subprocess.run(["git", "init", "-q", str(self.proj)], check=True)
+        shutil.copy(ROOT / "scripts" / "dev-task.sh", self.proj / "scripts" / "dev-task.sh")
+        (self.proj / "xt.yaml").write_text(self.YAML, encoding="utf-8")
+        (self.proj / ".gitignore").write_text(
+            "gate-ran\nbroken\nfast-ran\n.claude/worktrees/\nvendor/\n", encoding="utf-8"
+        )
+        self.git(self.proj, "add", "-A")
+        self.git(self.proj, "commit", "-q", "-m", "init")
+        self.inner = self.proj / ".claude" / "worktrees" / "wt"
+        self.outer = self.tmp / "outer"
+        self.git(self.proj, "worktree", "add", "-q", str(self.inner), "-b", "wt")
+        self.git(self.proj, "worktree", "add", "-q", str(self.outer), "-b", "outer")
+
+    @staticmethod
+    def git(repo: Path, *args: str) -> None:
+        subprocess.run(["git", "-C", str(repo), "-c", "user.email=t@t", "-c", "user.name=t", *args], check=True)
+
+    def hook(
+        self, cmd: str, cwd: Path | None = None, policy: str = "", proj: Path | None = None
+    ) -> tuple[int, str, str]:
+        p = proj or self.proj
+        payload = {"tool_input": {"command": cmd}, "cwd": str(cwd or p)}
+        return run_hook("pre-bash-guard.sh", payload, p, extra_env={"XT_GUARD_POLICY": policy, "XT_MIN_TESTS": "0"})
+
+
+class CommitGateWorktreeTest(CommitGateWorktreeBase):
+    """Cổng chạy trên worktree cùng repo (trong/ngoài gốc dự án); repo khác và thư mục giả làm worktree giữ AUD-SEC-015."""
+
+    def test_gate_runs_on_worktree_inside_and_outside_project(self):
+        (self.proj / "broken").write_text("", encoding="utf-8")  # cổng của gốc phiên đỏ: chạy nhầm gốc thì lộ
+        # ba cách nhắm worktree: phiên đứng sẵn trong worktree (payload cwd — như hook-probe), `cd … &&`, `git -C …`
+        forms = [("git commit -m x", self.inner), (f"cd {self.inner} && git commit -m x", None)]
+        forms += [(f"git -C {self.inner} commit -m x", None), ("git commit -m x", self.outer)]
+        for cmd, cwd in forms:
+            wt = cwd or self.inner
+            with self.subTest(cmd=cmd, cwd=cwd):
+                (wt / "gate-ran").unlink(missing_ok=True)
+                (wt / "broken").unlink(missing_ok=True)
+                code, out, err = self.hook(cmd, cwd)
+                self.assertEqual((code, decision(out)), (0, None), err)
+                self.assertTrue((wt / "gate-ran").exists(), err)  # cổng THẬT chạy, trên worktree
+                self.assertFalse((self.proj / "gate-ran").exists(), err)
+                self.assertIn("GATE XANH", err)
+        for wt in (self.inner, self.outer):
+            with self.subTest(red=wt.name):
+                (wt / "broken").write_text("", encoding="utf-8")
+                code, out, err = self.hook("git commit -m x", wt)
+                self.assertEqual(code, 2, out + err)
+                self.assertIn(f"Cổng trước commit ĐỎ (gate: build/typecheck/lint/test) ở {wt}.", err)
+
+    def other_repo(self, path: Path, mark: Path) -> Path:
+        (path / "scripts").mkdir(parents=True)
+        (path / "scripts" / "dev-task.sh").write_text(f"#!/bin/sh\ntouch {mark}\n", encoding="utf-8")
+        (path / "scripts" / "dev-task.sh").chmod(0o755)
+        (path / "xt.yaml").write_text(f"test: touch {mark}\n", encoding="utf-8")
+        return path
+
+    def test_other_repos_keep_aud_sec_015(self):
+        """Repo KHÁC (lồng có xt.yaml, ngoài dự án) và thư mục lạ giả làm worktree (`.git` trỏ vào gitdir của repo dự án
+        hoặc gitdir tự dựng có `commondir` trỏ về — cùng `--git-common-dir` nhưng không liên kết ngược: `.git` không phải
+        thư mục common-dir, tệp `gitdir` của worktree không trỏ về nó) → không chạy cổng của nó; strict → hỏi."""
+        mark = self.tmp / "PWNED"
+        nested = self.other_repo(self.proj / "vendor" / "lib", mark)
+        subprocess.run(["git", "init", "-q", str(nested)], check=True)
+        foreign = self.other_repo(self.tmp / "foreign", mark)
+        subprocess.run(["git", "init", "-q", str(foreign)], check=True)
+        fake = self.other_repo(self.proj / "vendor" / "fake", mark)
+        (fake / ".git").write_text(f"gitdir: {self.proj / '.git' / 'worktrees' / 'wt'}\n", encoding="utf-8")
+        fake2 = self.other_repo(self.proj / "vendor" / "fake2", mark)
+        (fake2 / "g").mkdir()
+        (fake2 / "g" / "HEAD").write_text("ref: refs/heads/wt\n", encoding="utf-8")
+        (fake2 / "g" / "commondir").write_text(f"{self.proj / '.git'}\n", encoding="utf-8")
+        (fake2 / ".git").write_text(f"gitdir: {fake2 / 'g'}\n", encoding="utf-8")
+        # Review F2: worktree thật có đường dẫn chứa xuống dòng — `worktree list --porcelain` không `-z` in ra thêm dòng
+        # `worktree <evil>` giả; `evil/.git` (TỆP) trỏ thẳng common-dir.
+        evil = self.other_repo(self.tmp / "evil", mark)
+        self.git(self.proj, "worktree", "add", "-q", f"{self.tmp / 'nl'}\nworktree {evil}", "-b", "nl")
+        (evil / ".git").write_text(f"gitdir: {self.proj / '.git'}\n", encoding="utf-8")
+        nested_why, out_why = "repo lồng có cổng riêng", "repo ngoài dự án"
+        cases = [(f"git -C {r} commit -m x", None, nested_why) for r in (nested, fake, fake2)]
+        cases += [("git commit -m x", fake2, nested_why), (f"git -C {foreign} commit -m x", None, out_why)]
+        cases += [("git commit -m x", evil, out_why)]
+        self.assert_not_gated(cases, mark)
+
+    def assert_not_gated(self, cases: list[tuple[str, Path | None, str]], mark: Path) -> None:
+        for cmd, cwd, why in cases:
+            with self.subTest(cmd=cmd, cwd=cwd):
+                code, out, err = self.hook(cmd, cwd, policy="strict")
+                self.assertEqual((code, decision(out)), (0, "ask"), err)
+                self.assertIn(why, out)
+                self.assertFalse(mark.exists(), err)
+                code, out, err = self.hook(cmd, cwd)
+                self.assertEqual((code, decision(out)), (0, None), err)
+                self.assertFalse(mark.exists(), err)
+                self.assertFalse((self.proj / "gate-ran").exists(), err)
+
+    def test_symlinked_git_dir_is_not_a_checkout(self):
+        """Review #680 R2-1: thư mục lạ có `.git` là SYMLINK tới common-dir (tuyệt đối, tương đối `../../.git` — giải nén
+        được từ tar —, hay ở ngoài dự án) từng được nhận là "checkout chính" vì `-d` đi theo symlink → hook chạy
+        dev-task.sh của nó trước bước hỏi, kể cả strict. `.git` symlink tới admin của worktree thật cũng từ chối."""
+        mark = self.tmp / "PWNED"
+        s1 = self.other_repo(self.proj / "vendor" / "s1", mark)
+        (s1 / ".git").symlink_to(self.proj / ".git")
+        s2 = self.other_repo(self.proj / "vendor" / "s2", mark)
+        (s2 / ".git").symlink_to(Path("..") / ".." / ".git")
+        s3 = self.other_repo(self.tmp / "outside", mark)
+        (s3 / ".git").symlink_to(self.proj / ".git")
+        f2 = self.other_repo(self.proj / "vendor" / "f2", mark)
+        (f2 / ".git").symlink_to(self.proj / ".git" / "worktrees" / "wt")
+        nested_why, out_why = "repo lồng có cổng riêng", "repo ngoài dự án"
+        cases = [("git commit -m x", s1, nested_why), ("git -C vendor/s2 commit -m x", None, nested_why)]
+        cases += [(f"git -C {s3} commit -m x", None, out_why), ("git commit -m x", f2, nested_why)]
+        self.assert_not_gated(cases, mark)
+
+
+class CommitGateWorktreeConfigTest(CommitGateWorktreeBase):
+    """Cấu hình/tệp đổi theo worktree, hai worktree commit đồng thời, gốc qua symlink, phiên trong worktree, monorepo,
+    git cũ/không trả lời."""
+
+    def shim(self, body: str) -> dict[str, str]:
+        """PATH có `git` giả đứng trước git thật; `body` là thân bash, `$REAL` = git thật."""
+        d = self.tmp / "shim"
+        d.mkdir(exist_ok=True)
+        (d / "git").write_text(f"#!/bin/bash\nREAL={shutil.which('git')}\n{body}", encoding="utf-8")
+        (d / "git").chmod(0o755)
+        return {"PATH": f"{d}{os.pathsep}{os.environ['PATH']}"}
+
+    def test_old_git_still_gates_worktree_and_unknown_warns(self):
+        """Review F3: git < 2.31 không biết `--path-format` (in nguyên cờ ra stdout như rev-parse cũ), < 2.36 không có
+        `worktree list -z`, < 2.13 không có `--absolute-git-dir` → cổng vẫn chạy trên worktree, không lỗi rác. Git không
+        trả lời được common-dir → luật cũ (không chạy cổng) nhưng in cảnh báo, không chặn."""
+        old = (
+            'a=(); for x in "$@"; do case "$x" in --path-format=*|--absolute-git-dir) echo "$x" ;; *) a+=("$x") ;; esac\n'
+            'done\ncase " $* " in *" worktree "*" -z "*) echo "unknown switch" >&2; exit 129 ;; esac\n'
+            'exec "$REAL" "${a[@]}"\n'
+        )
+        env = {"XT_GUARD_POLICY": "", "XT_MIN_TESTS": "0", **self.shim(old)}
+        payload = {"tool_input": {"command": "git commit -m x"}, "cwd": str(self.inner)}
+        code, out, err = run_hook("pre-bash-guard.sh", payload, self.proj, extra_env=env)
+        self.assertEqual((code, decision(out)), (0, None), err)
+        self.assertTrue((self.inner / "gate-ran").exists(), err)
+        self.assertNotIn("invalid option", err)
+        (self.inner / "gate-ran").unlink()
+        mute = 'for x in "$@"; do [ "$x" = --git-common-dir ] && exit 128; done\nexec "$REAL" "$@"\n'
+        for policy, want in (("", None), ("strict", "ask")):
+            with self.subTest(policy=policy):
+                env = {"XT_GUARD_POLICY": policy, "XT_MIN_TESTS": "0", **self.shim(mute)}
+                code, out, err = run_hook("pre-bash-guard.sh", payload, self.proj, extra_env=env)
+                self.assertEqual((code, decision(out)), (0, want), err)
+                self.assertIn(f"Không xác định được {self.inner} có phải worktree", err)
+                self.assertIn("cổng commit KHÔNG chạy cho commit này", err)
+                self.assertFalse((self.inner / "gate-ran").exists(), err)
+        # repo lồng thật (`.git` là thư mục) mà git không trả lời: không cảnh báo nhầm "trông như worktree"
+        nested = self.proj / "vendor" / "lib"
+        nested.mkdir(parents=True)
+        subprocess.run(["git", "init", "-q", str(nested)], check=True)
+        (nested / "xt.yaml").write_text("test: true\n", encoding="utf-8")
+        payload = {"tool_input": {"command": "git commit -m x"}, "cwd": str(nested)}
+        code, out, err = run_hook("pre-bash-guard.sh", payload, self.proj, extra_env=env)
+        self.assertEqual((code, decision(out)), (0, "ask"), err)
+        self.assertNotIn("Không xác định được", err)
+
+    def test_worktree_gate_reads_worktree_config_and_changes(self):
+        # `commit_gate: fast` chỉ khai ở worktree; gốc phiên vẫn `full` và cây sạch → tệp đổi/cấu hình cổng đổi tính theo
+        # worktree: đổi dev-task.sh ở worktree không được tự hạ cổng (`gate_config_changed` trên worktree).
+        fast = "commit_gate: fast\ntest_fast: sh -c 'touch fast-ran'\n"
+        (self.inner / "xt.yaml").write_text(self.YAML + fast, encoding="utf-8")
+        self.git(self.inner, "commit", "-q", "-am", "fast")
+        (self.inner / "a.txt").write_text("x\n", encoding="utf-8")
+        code, out, err = self.hook("git commit -m x", self.inner)
+        self.assertEqual((code, decision(out)), (0, None), err)
+        self.assertIn("Commit nhanh (commit_gate: fast)", err)
+        self.assertTrue((self.inner / "fast-ran").exists(), err)
+        self.assertFalse((self.inner / "gate-ran").exists(), err)
+        (self.inner / "fast-ran").unlink()
+        with open(self.inner / "scripts" / "dev-task.sh", "a", encoding="utf-8") as f:
+            f.write("# đổi\n")
+        code, out, err = self.hook("git commit -m x", self.inner)
+        self.assertEqual((code, decision(out)), (0, None), err)
+        self.assertIn("đụng cấu hình cổng nên cổng nhanh chạy MỌI lớp test", err)
+        self.assertTrue((self.inner / "gate-ran").exists(), err)
+        self.assertFalse((self.inner / "fast-ran").exists(), err)
+        self.assertFalse((self.proj / "gate-ran").exists(), err)
+
+    def test_concurrent_commits_in_two_worktrees_gate_their_own_tree(self):
+        (self.outer / "broken").write_text("", encoding="utf-8")
+        with concurrent.futures.ThreadPoolExecutor(2) as ex:
+            got = list(ex.map(lambda wt: self.hook("git commit -m x", wt), (self.inner, self.outer)))
+        self.assertEqual(got[0][0], 0, got[0][2])
+        self.assertEqual(got[1][0], 2, got[1][2])
+        self.assertIn(f"ở {self.outer}.", got[1][2])
+        self.assertTrue((self.inner / "gate-ran").exists())
+        self.assertTrue((self.outer / "gate-ran").exists())
+
+    def test_project_behind_symlink_and_session_in_worktree(self):
+        link = self.tmp / "link"
+        link.symlink_to(self.proj)
+        code, out, err = self.hook(f"git -C {self.outer} commit -m x", proj=link)
+        self.assertEqual((code, decision(out)), (0, None), err)
+        self.assertTrue((self.outer / "gate-ran").exists(), err)
+        # phiên mở trong worktree, commit vào checkout chính (cùng repo) → cổng trên checkout chính
+        code, out, err = self.hook(f"git -C {self.proj} commit -m x", proj=self.outer)
+        self.assertEqual(code, 0, err)
+        self.assertTrue((self.proj / "gate-ran").exists(), err)
+
+    def test_monorepo_worktree_gates_project_subdir(self):
+        mono = self.tmp / "mono"
+        web = mono / "apps" / "web"
+        (web / "scripts").mkdir(parents=True)
+        subprocess.run(["git", "init", "-q", str(mono)], check=True)
+        shutil.copy(ROOT / "scripts" / "dev-task.sh", web / "scripts" / "dev-task.sh")
+        (web / "xt.yaml").write_text(self.YAML, encoding="utf-8")
+        (mono / ".gitignore").write_text("gate-ran\n", encoding="utf-8")
+        self.git(mono, "add", "-A")
+        self.git(mono, "commit", "-q", "-m", "init")
+        mwt = self.tmp / "mono-wt"
+        self.git(mono, "worktree", "add", "-q", str(mwt), "-b", "wt")
+        code, out, err = self.hook(f"git -C {mwt} commit -m x", proj=web)
+        self.assertEqual((code, decision(out)), (0, None), err)
+        self.assertTrue((mwt / "apps" / "web" / "gate-ran").exists(), err)
+        self.assertFalse((web / "gate-ran").exists(), err)
+        # Rà symlink (review #680 R2-1): `apps/web` trên worktree là symlink sang thư mục lạ → không lấy làm gốc cổng
+        # (luật cũ: repo ngoài dự án — hỏi ở strict), không chạy dev-task.sh của thư mục lạ.
+        mark = self.tmp / "PWNED"
+        evil = self.tmp / "evil-web" / "scripts"
+        evil.mkdir(parents=True)
+        (evil / "dev-task.sh").write_text(f"#!/bin/sh\ntouch {mark}\n", encoding="utf-8")
+        (evil / "dev-task.sh").chmod(0o755)
+        (evil.parent / "xt.yaml").write_text(f"test: touch {mark}\n", encoding="utf-8")
+        shutil.rmtree(mwt / "apps" / "web")
+        (mwt / "apps" / "web").symlink_to(evil.parent)
+        for policy, want in (("strict", "ask"), ("", None)):
+            with self.subTest(policy=policy):
+                code, out, err = self.hook(f"git -C {mwt} commit -m x", policy=policy, proj=web)
+                self.assertEqual((code, decision(out)), (0, want), err)
+                self.assertFalse(mark.exists(), err)
+
+    def test_gitdir_file_without_trailing_newline(self):
+        """Review #680 R2-2: tệp `gitdir` trong admin của worktree không có xuống dòng cuối (`read` trả 1) vẫn đọc được."""
+        admin = self.proj / ".git" / "worktrees" / "wt" / "gitdir"
+        admin.write_text(str(self.inner / ".git"), encoding="utf-8")
+        code, out, err = self.hook("git commit -m x", self.inner)
+        self.assertEqual((code, decision(out)), (0, None), err)
+        self.assertTrue((self.inner / "gate-ran").exists(), err)
+
+
 @unittest.skipIf(shutil.which("bash") is None, "cần bash")
 class SessionStartUtf8Test(unittest.TestCase):
     def test_session_start_utf8_cut_is_valid(self):

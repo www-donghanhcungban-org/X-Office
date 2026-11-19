@@ -150,5 +150,5 @@
 ## Đợt 17 — cổng commit: worktree và tệp chưa track (D-517)
 > Đính chính đợt 16: 12 phút mỗi commit ở checkout chính là do 4 tệp chưa track không ánh xạ được (cả 697 lớp), không phải do chọn theo tệp; commit trong worktree dưới gốc dự án không qua cổng (hook `exit 0`).
 
-- [ ] `T-3964` 🟠 AUD-HAR-442: commit trong worktree cùng repo chạy cổng của dự án trên worktree đó — Gate: `python3 -m unittest tests.test_hooks.CommitGateWorktreeTest` (files: .claude/hooks/pre-bash-guard.sh, tests/test_hooks.py)
-- [ ] `T-3965` 🟢 AUD-HAR-443: tệp chưa track không ánh xạ được không đẩy `gate-fast` lên cả bộ test — Gate: `python3 -m unittest tests.test_commit_gate` (files: scripts/dev-task.sh, scripts/xt.py, tests/)
+- [x] `T-3964` 🟠 AUD-HAR-442: commit trong worktree cùng repo chạy cổng của dự án trên worktree đó — Gate: `python3 -m unittest tests.test_hooks.CommitGateWorktreeTest` (files: .claude/hooks/pre-bash-guard.sh, tests/test_hooks.py)
+- [ ] `T-3965` 🟢 AUD-HAR-443 (hoãn, D-518: bản đầu sai tiền đề, rút khỏi #680): commit là `git commit` đứng một mình (trường mới của guard.py) → loại tệp chưa track khỏi tập tệp đổi — Gate: `python3 -m unittest tests.test_commit_gate` (files: .claude/hooks/guard.py, .claude/hooks/pre-bash-guard.sh, scripts/dev-task.sh, tests/)
