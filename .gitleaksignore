@@ -12,3 +12,6 @@ d0df2efc44878d095e153647ee1fde0c72d50205:tests/test_stage.py:private-key:377
 721cc7d0d99fb90c9419f14b790863dd82df70c9:tests/test_stage.py:private-key:377
 # Header PEM viết nguyên văn trong bằng chứng phát hiện AUD-SEC-184 (docs/ops/AUDIT-STATUS.md) ở commit 44409f4 (PR #360) — không phải khoá; đã thay bằng `‹PEM-BEGIN …›`; giữ để quét dải commit của PR không đỏ.
 44409f426320dc0f687870e840e4d8a8e93422a0:docs/ops/AUDIT-STATUS.md:private-key:622
+# Khoá PEM giả trong test che đuôi log (tests/test_stage.py) vào X-Office qua merge commit khởi tạo a7724f8 (clone X-Templates,
+# fingerprint mới vì SHA khác) — dòng nguồn nay ghép chuỗi lúc chạy; giữ để quét lịch sử không đỏ.
+a7724f851e57a24f9f2b85127a1819bdf8aad464:tests/test_stage.py:private-key:396

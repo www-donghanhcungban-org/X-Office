@@ -393,10 +393,9 @@ class StageCliTest(TmpRepoCase):
 
     def test_gate_tail_redacts_then_cuts(self):
         """Review #336: che bí mật trên cả output rồi mới cắt đuôi; hết giờ giữ dòng `timeout:`."""
-        pem = "-----BEGIN PRIVATE KEY-----\nQUJDREVGR0g=\nSUpLTE1OT1A=\n-----END PRIVATE KEY-----\nfail"
-        self.assertEqual(
-            xt._gate_tail(1, pem), "-----BEGIN PRIVATE KEY----- *** fail"
-        )  # cắt trước → lộ thân; chữ sau giữ
+        begin, end = "-----BEGIN " + "PRIVATE KEY-----", "-----END " + "PRIVATE KEY-----"  # ghép lúc chạy: gitleaks
+        pem = f"{begin}\nQUJDREVGR0g=\nSUpLTE1OT1A=\n{end}\nfail"  # không coi dòng nguồn là khoá (như tests/test_xt.py)
+        self.assertEqual(xt._gate_tail(1, pem), f"{begin} *** fail")  # cắt trước → lộ thân; chữ sau giữ
         self.assertEqual(xt._gate_tail(1, "deploy --password\nhunter2-secret"), "deploy --password ***")
         self.assertEqual(xt._gate_tail(124, "timeout: quá 1 giây\na\nb\nc"), "timeout: quá 1 giây a b c")
         self.assertEqual(xt._gate_tail(124, "timeout: quá 1 giây\na"), "timeout: quá 1 giây a")
