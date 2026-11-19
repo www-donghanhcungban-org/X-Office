@@ -41,6 +41,8 @@ Bản < 3.20.0: [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md) (T-3651; `changel
 
 ### Fixed
 
+- `xt.py`: đọc tệp JSON của vòng (`.autopilot/state.json`…) lồng quá sâu (RecursionError khi giải mã) nay coi như hỏng —
+  trả `None` như JSON sai — thay vì ném lỗi; màn Tổng quan và Văn phòng của `xt.py app` không còn trả 500 (review #6).
 - `/complete` Bước 1: sau khi PR đặt `delivery_phase: harden` được merge, chạy lại `doctor` và nâng khung nếu nó báo
   bản cài cũ — trước đó `doctor` chỉ chạy ở Bước 0 khi còn `build` (pha build không báo chậm MINOR/PATCH, ADR-0081)
   nên "nâng khung ở ranh giới pha" không xảy ra (AUD-HAR-440, T-3963). Dự án đích: nhận khi chạy lại `install.py`.

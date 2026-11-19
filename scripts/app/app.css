@@ -170,6 +170,7 @@ pre.md { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 60vh; overf
 .office-bar select { font: inherit; max-width: 100%; }
 .office-stage { position: relative; border: 1px solid var(--border); border-radius: 0.5rem; overflow: hidden; }
 .office-3d { cursor: grab; touch-action: none; }
+.office-3d:focus-visible { outline-offset: -3px; } /* stage overflow:hidden cắt vòng focus vẽ ngoài canvas (WCAG 2.4.7) */
 .office-3d:active { cursor: grabbing; }
 .office-labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .office-tag {

@@ -71,11 +71,14 @@ def _main_state(verdict: str) -> str:
 
 
 def _seat_state(ctx: Ctx, row: Optional[Dict[str, Any]], tasks: Dict[str, Dict[str, str]], active: bool) -> str:
-    """Bàn của agent con: lần chạy cuối (trong cửa sổ FRESH) là task còn mở của vòng đang chạy → làm (xanh) / sửa (đỏ);
-    khác → rảnh."""
-    if row is None or not active or tasks.get(str(row.get("task")), {}).get("state") != " " or not _fresh(ctx, row):
+    """Bàn của agent con, theo lần chạy CUỐI trong cửa sổ FRESH của vòng đang chạy: task còn mở → làm (xanh) / sửa (đỏ);
+    task đã tick sau lần chạy xanh (`loop record` tự tick) → xong; khác → rảnh."""
+    if row is None or not active or not _fresh(ctx, row):
         return "idle"
-    return "work" if row.get("exit_code") == 0 else "fail"
+    state = tasks.get(str(row.get("task")), {}).get("state")
+    if state == " ":
+        return "work" if row.get("exit_code") == 0 else "fail"
+    return "done" if state == "x" and row.get("exit_code") == 0 else "idle"
 
 
 def _task_ref(task_id: Any, tasks: Dict[str, Dict[str, str]]) -> Optional[Dict[str, str]]:

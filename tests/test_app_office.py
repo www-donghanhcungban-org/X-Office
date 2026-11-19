@@ -171,6 +171,31 @@ class OfficeApiTest(unittest.TestCase):
         with mock.patch.object(xt, "read_runs", side_effect=RecursionError("sâu")):
             self.assertEqual(call(self.base)["feed"], [])
 
+    def test_last_run_and_task_state_rules(self) -> None:
+        """Lần chạy CUỐI của agent quyết định bàn (đỏ rồi xanh → làm); task đã tick sau lần xanh → xong; lần đỏ trên task đã
+        tick → rảnh (review #6 — đảo từng luật thì test này đỏ)."""
+        runs = [
+            run("T-003", 1, "executor-deep", "2026-11-19T10:10:00Z"),
+            run("T-003", 0, "executor-deep", "2026-11-19T10:20:00Z"),
+            run("T-001", 0, "executor", "2026-11-19T10:25:00Z"),
+        ]
+        project(self.base, runs)
+        with mock.patch.object(xt, "loop_verdict", return_value={"verdict": "continue", "reason": ""}):
+            got = call(self.base)
+        self.assertEqual(seat(got, "executor-deep")["state"], "work")
+        self.assertEqual(seat(got, "executor"), {"key": "executor", "label": "Thực thi", "state": "done", "task": None})
+        project(self.base, [run("T-001", 1, "executor", "2026-11-19T10:25:00Z")])
+        with mock.patch.object(xt, "loop_verdict", return_value={"verdict": "continue", "reason": ""}):
+            self.assertEqual(seat(call(self.base), "executor")["state"], "idle")
+
+    def test_deeply_nested_state_json_is_200(self) -> None:
+        """state.json lồng quá sâu (RecursionError khi giải mã) — đường loop_verdict cũng không được thành 500."""
+        project(self.base, [])
+        write(self.base, ".autopilot/state.json", "[" * 200000 + "]" * 200000)
+        got = call(self.base)
+        self.assertEqual(got["loop"]["verdict"], "inactive")
+        self.assertEqual({s["state"] for s in got["seats"]} - {"untracked"}, {"idle"})
+
     def test_now_is_utc(self) -> None:
         self._now.stop()
         try:

@@ -63,6 +63,7 @@ export async function render(main, { api, h, error }) {
   const human = h("div", null);
   const feed = h("ol", { class: "items office-feed" });
   const msg = h("div", null);
+  const rmsg = h("div", null); // thông báo của bộ vẽ — tách khỏi lỗi API để lần hỏi dữ liệu kế tiếp không xoá
 
   main.replaceChildren(
     h("h1", null, "Văn phòng"),
@@ -72,7 +73,7 @@ export async function render(main, { api, h, error }) {
       h("span", null, themeLabel, themeSel), h("span", null, seasonLabel, seasonSel), h("span", null, qualityLabel, qualitySel),
       h("span", null, namesBox, namesLabel), h("span", null, motionBox, motionLabel),
       h("span", null, zoomOut, zoomIn, refresh)),
-    msg, stage, summary,
+    msg, rmsg, stage, summary,
     h("h2", null, "Ai đang làm gì"),
     h("table", null, h("thead", null, h("tr", null, h("th", { scope: "col" }, "Bàn"), h("th", { scope: "col" }, "Trạng thái"), h("th", { scope: "col" }, "Task"))), table),
     h("h2", null, "Việc cần người"), human,
@@ -157,12 +158,14 @@ export async function render(main, { api, h, error }) {
         const mod = await import("../office/three-view.js");
         if (prefs.renderer !== "3d" || !stage.isConnected) return; // đổi ý / rời màn trong lúc tải
         three = mod.createThreeView(stage);
+        rmsg.replaceChildren();
         canvas.hidden = true;
         three.canvas.setAttribute("aria-label", canvas.getAttribute("aria-label") || "Văn phòng");
       } catch (e) {
         three = null;
         prefs.renderer = rendererSel.value = "2d";
-        msg.replaceChildren(h("p", { class: "state error", role: "alert" },
+        persist(); // không thử lại 3D mỗi lần mở màn
+        rmsg.replaceChildren(h("p", { class: "state error", role: "alert" },
           "Không bật được 3D (" + ((e && e.message) || "WebGL không khả dụng") + ") — dùng bản 2D. Ở dự án đích, bản 3D cần cài bằng `install.py --with-office-3d`."));
       }
     } else if (prefs.renderer !== "3d" && three) {

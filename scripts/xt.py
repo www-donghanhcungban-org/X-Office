@@ -1353,7 +1353,7 @@ def _read_json_obj(p: Path) -> Optional[Dict[str, Any]]:
         return None
     try:
         data = json.loads(p.read_text(encoding="utf-8"))
-    except (OSError, ValueError):  # ValueError gồm JSONDecodeError và file không phải UTF-8 (review #321)
+    except (OSError, ValueError, RecursionError):  # JSONDecodeError, không phải UTF-8 (review #321), lồng quá sâu (#6)
         return None
     return data if isinstance(data, dict) else None
 

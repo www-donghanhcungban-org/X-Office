@@ -286,10 +286,12 @@ class OfficeTest(AppCase):
         layouts = page.eval_on_selector_all("#office-layout option", "os => os.map(o => o.value)")
         self.assertEqual(len(themes), 8)
         self.assertEqual(layouts, ["open", "connected", "private"])
+        frames = "() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))"
         for layout in layouts:
             page.select_option("#office-layout", layout)
             for theme in themes:
                 page.select_option("#office-theme", theme)
+                page.evaluate(frames)  # vẽ thật từng tổ hợp (cờ dirty gộp nhiều lần đổi vào một khung hình)
         self.assertEqual(watch.take(), [])
         # Cửa hẹp hơn 1 ô vẫn mở đúng mép (review #6): đoạn vách không phủ khoảng cửa nào.
         segs = page.evaluate(
@@ -303,6 +305,13 @@ class OfficeTest(AppCase):
         canvas3d.wait_for()
         self.assertTrue(page.locator("canvas.office-canvas:not(.office-3d)").is_hidden())
         page.locator(".office-labels .office-tag:not([hidden])").nth(4).wait_for()  # 5 nhãn tên, bám nhân vật
+        page.get_by_role("button", name="Làm mới").focus()  # Tab tới canvas: vòng focus vẽ TRONG canvas — WCAG 2.4.7
+        page.keyboard.press("Tab")
+        state = page.evaluate(
+            "() => { const c = document.activeElement; return [c.className, c.matches(':focus-visible'),"
+            " getComputedStyle(c).outlineOffset]; }"
+        )
+        self.assertEqual(state, ["office-canvas office-3d", True, "-3px"])
         box = canvas3d.bounding_box()
         assert box is not None
         before = canvas3d.screenshot()
@@ -330,6 +339,23 @@ class OfficeTest(AppCase):
         self.assertEqual(page.locator("canvas.office-3d").count(), 0)
         self.assertEqual(page.locator(".office-labels").count(), 0)
         assert_clean(self, page, watch, self.origin)
+
+
+class OfficeMotionTest(AppCase):
+    """S-017: prefers-reduced-motion thắng "Chuyển động" đã lưu; bấm phóng to không ghi đè lựa chọn đã lưu."""
+
+    def test_reduced_motion_wins_and_is_not_saved(self) -> None:
+        ctx = self.new_context("desktop")
+        ctx.add_init_script("try { localStorage.setItem('xt-office', JSON.stringify({motion: true})); } catch (e) {}")
+        page, watch = self.open_app(ctx)
+        page.emulate_media(reduced_motion="reduce")
+        go(page, "office", "Văn phòng")
+        self.assertFalse(page.is_checked("#office-motion"))
+        page.click("button[aria-label='Phóng to']")
+        saved = page.evaluate("() => JSON.parse(localStorage.getItem('xt-office'))")
+        self.assertTrue(saved["motion"])
+        self.assertGreater(saved["zoom"], 1)
+        self.assertEqual(watch.take(), [])
 
 
 class KeyboardTest(AppCase):
