@@ -260,6 +260,44 @@ function person(th, x, y, i, seat, out, t, motion, season) {
   return { x: bx + 0.45, y: cy + 0.3, z: bz + 1.55 + (season === "noel" ? 0.4 : 0.15) };
 }
 
+// ---------------------------------------------------------------- bố cục: vách ngăn (chia đoạn 1 ô để xếp painter đúng)
+export const LAYOUTS = [
+  { id: "open", name: "Mở chung" },
+  { id: "connected", name: "Nhiều phòng liên thông" },
+  { id: "private", name: "Mỗi người một phòng" },
+];
+const T = 0.16; // độ dày vách
+// [trục, vị trí, từ, đến, [cửa: [từ, đến]…]] — trục "x": vách chạy dọc x tại y = vị trí; "y": chạy dọc y tại x = vị trí.
+const WALLS = {
+  open: [],
+  connected: [
+    ["x", 5.2, 0, ROOM.W, [[1.8, 3.6], [10.2, 12.0]]],
+    ["y", 8.6, 0, ROOM.D, [[2.2, 3.8], [8.2, 9.8]]],
+  ],
+  private: [
+    ["x", 5.2, 0, 12.6, [[0.6, 1.4], [6.8, 7.6], [10.8, 11.6]]],
+    ["y", 4.6, 0, 11.0, [[5.6, 6.0]]],
+    ["y", 8.6, 0, 11.0, [[5.6, 6.0]]],
+    ["y", 12.6, 0, 5.2, []],
+  ],
+};
+
+function layoutWalls(layout, th, out) {
+  const glass = th.edge ? "rgba(120,200,255,0.18)" : "rgba(190,225,245,0.32)";
+  for (const [axis, at, from, to, doors] of WALLS[layout] || []) {
+    for (let u = from; u < to - 1e-6; u = Math.min(to, u + 1)) {
+      const v = Math.min(to, u + 1);
+      const mid = (u + v) / 2;
+      if (doors.some(([a, b]) => mid > a && mid < b)) continue;
+      const seg = (z, h, color, extra) =>
+        out.push(axis === "x" ? box(u, at - T / 2, z, v - u, T, h, color, extra) : box(at - T / 2, u, z, T, v - u, h, color, extra));
+      seg(0, 1.0, th.wall, { top: th.trim });
+      seg(1.0, 1.15, glass, { top: glass, front: glass, side: glass });
+      seg(2.15, 0.08, th.trim, { glow: th.edge || null });
+    }
+  }
+}
+
 // ---------------------------------------------------------------- mùa
 function seasonProps(season, out, t, motion) {
   if (season === "noel") {
@@ -317,37 +355,27 @@ function particles(ctx, kind, cw, ch, t) {
   }
 }
 
-function drawSpecial(iso, b) {
+function drawSpecial(sink, b) {
   if (b.kind === "orb") {
-    iso.dot(b.x, b.y, b.z, b.r, b.color);
-    iso.dot(b.x - 0.12, b.y, b.z + 0.12, b.r * 0.35, "rgba(255,255,255,0.35)");
-    const ctx = iso.ctx;
-    const [sx, sy] = iso.p(b.x, b.y, b.z);
-    ctx.save();
-    ctx.strokeStyle = "#e0f2fe";
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.ellipse(sx, sy, b.r * 1.8 * iso.view.scale, b.r * 0.5 * iso.view.scale, 0.3 + Math.sin(b.ring) * 0.1, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
+    sink.dot(b.x, b.y, b.z, b.r, b.color);
+    sink.dot(b.x - 0.12, b.y, b.z + 0.12, b.r * 0.35, "rgba(255,255,255,0.35)");
+    sink.ring(b.x, b.y, b.z, b.r * 1.8, 0.3 + Math.sin(b.ring) * 0.1, "#e0f2fe");
   } else {
-    iso.dot(b.x, b.y, b.z, b.r, b.color || "rgba(255,255,255,0.55)");
+    sink.dot(b.x, b.y, b.z, b.r, b.color || "rgba(255,255,255,0.55)");
   }
 }
 
 // ---------------------------------------------------------------- vào
-// opts: {theme, season ("noel"|"tet"|"off"), seats: [{key,label,state,task}], names, motion, t, zoom, quality}
-export function drawScene(ctx, cw, ch, opts) {
+// opts: {theme, season ("noel"|"tet"|"off"), layout (LAYOUTS), seats: [{key,label,state,task}], names, motion, t, zoom, quality}
+// Dựng cảnh lên một "sink" có box/panel/dot/ring/tag — Iso (Canvas 2D) hoặc bộ thu của three-view.js (3D).
+// Trả về số hộp đã phát (để test/đo). `sorted`: xếp painter (chỉ 2D cần).
+export function compose(sink, opts, sorted = true) {
   const th = opts.theme;
   const { t = 0, motion = false, season = "off" } = opts;
-  ctx.fillStyle = th.bg;
-  ctx.fillRect(0, 0, cw, ch);
-  const iso = new Iso(ctx, fit(ROOM.W, ROOM.D, ROOM.H, cw, ch, opts.zoom || 1));
-  iso.glow = opts.quality !== "low";
-  drawRoom(iso, th);
-  drawWindows(iso, th, t, motion);
-  for (const p of th.props) flatProp(iso, p, th);
-  seasonWall(iso, season, t, motion);
+  drawRoom(sink, th);
+  drawWindows(sink, th, t, motion);
+  for (const p of th.props) flatProp(sink, p, th);
+  seasonWall(sink, season, t, motion);
 
   const items = [];
   for (const p of th.props) if (BOX_PROPS[p.kind]) BOX_PROPS[p.kind](p, items, th, t, motion);
@@ -358,18 +386,35 @@ export function drawScene(ctx, cw, ch, opts) {
     heads.push({ seat, at: person(th, x, y, i, seat, items, t, motion, season) });
   });
   seasonProps(season, items, t, motion);
-  items.sort((a, b) => depth(a) - depth(b));
-  for (const b of items) (b.kind ? drawSpecial(iso, b) : iso.box(b));
+  layoutWalls(opts.layout || "open", th, items);
+  if (sorted) items.sort((a, b) => depth(a) - depth(b));
+  for (const b of items) (b.kind ? drawSpecial(sink, b) : sink.box(b));
 
-  if (motion) particles(ctx, season === "noel" ? "snow" : th.ambient, cw, ch, t);
   const [bg, fg, border] = th.label;
   for (const { seat, at } of heads) {
-    if (opts.names !== false) iso.tag(at.x, at.y, at.z, seat.label, bg, fg, border);
+    if (opts.names !== false) sink.tag(at.x, at.y, at.z, seat.label, bg, fg, border);
     if (seat.state !== "idle") {
       const what = seat.task && seat.task.id ? seat.task.id + " · " : "";
-      iso.tag(at.x, at.y, at.z + 0.75, what + STATE_TEXT[seat.state], STATE_COLOR[seat.state], "#0b0f19");
+      sink.tag(at.x, at.y, at.z + 0.75, what + STATE_TEXT[seat.state], STATE_COLOR[seat.state], "#0b0f19");
     }
   }
+  return items.length;
+}
+
+// opts: {theme, season ("noel"|"tet"|"off"), layout (LAYOUTS), seats: [{key,label,state,task}], names, motion, t, zoom, quality}
+export function drawScene(ctx, cw, ch, opts) {
+  const th = opts.theme;
+  ctx.fillStyle = th.bg;
+  ctx.fillRect(0, 0, cw, ch);
+  const iso = new Iso(ctx, fit(ROOM.W, ROOM.D, ROOM.H, cw, ch, opts.zoom || 1));
+  iso.glow = opts.quality !== "low";
+  // Nhãn vẽ sau hạt nền (tuyết không che chữ): hoãn tag tới cuối.
+  const tags = [];
+  const tag = iso.tag.bind(iso);
+  iso.tag = (...a) => tags.push(a);
+  compose(iso, opts);
+  if (opts.motion) particles(ctx, opts.season === "noel" ? "snow" : th.ambient, cw, ch, opts.t || 0);
+  for (const a of tags) tag(...a);
 }
 
 // Mô tả văn bản của cảnh cho trình đọc màn hình (canvas role="img").

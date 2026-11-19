@@ -118,7 +118,12 @@ khoá `(method, path)`; `Ctx` có `base` (gốc dự án), `framework` (thư m�
 - S-015 Given vòng đang chạy có lần chạy xanh của `executor` và lần đỏ của `executor-deep` trên task còn mở, When mở màn, Then bàn "Thực thi" hiện "đang làm" kèm ID task, bàn "Thực thi sâu" hiện "đang sửa (đỏ)"; bảng văn bản dưới canvas nêu đúng như vậy; việc `loop defer` nằm ở "Việc cần người".
 - S-016 When chọn kiểu văn phòng (Công ty công nghệ, Studio sáng tạo, Thư viện yên tĩnh, Văn phòng ban đêm, Cyberpunk, Quán cà phê, Vũ trụ, Bệnh viện) hoặc mùa (Tự động, Tắt, Noel, Tết), Then cảnh vẽ lại ngay, lựa chọn nhớ trong `localStorage` (lỗi lưu → vẫn chạy với mặc định).
 - S-017 Given `prefers-reduced-motion: reduce`, When mở màn, Then chuyển động tắt mặc định (bật lại bằng tay được); rời màn thì vòng vẽ và hỏi lại dữ liệu (10 s) dừng.
-- Vẽ bằng Canvas 2D tự viết (không thư viện ngoài, đúng CSP §2); kiểu văn phòng là dữ liệu trong `office/themes.js` — thêm kiểu không sửa mã vẽ. Canvas có `role="img"` + `aria-label` tóm tắt; mọi thông tin của cảnh có bản văn bản tương đương.
+- S-018 When chọn "Bộ vẽ: 3D three.js", Then cảnh dựng lại bằng three.js (tải lười), kéo chuột hoặc phím mũi tên xoay
+góc nhìn, nhãn tên bám nhân vật; không có WebGL → thông báo và quay về 2D. Chọn lại 2D → giải phóng canvas WebGL.
+- S-019 When chọn "Bố cục" (Mở chung, Nhiều phòng liên thông, Mỗi người một phòng), Then vách kính có cửa thông
+được vẽ ở cả 2D lẫn 3D.
+- Bộ vẽ mặc định là Canvas 2D tự viết; 3D dùng three.js vendor ([ADR-0082](../adr/0082-office-view-renderers.md)). Kiểu văn
+phòng là dữ liệu trong `office/themes.js`, bố cục trong `LAYOUTS` của `office/scene.js` — thêm kiểu không sửa mã vẽ. Canvas có `role="img"` + `aria-label` tóm tắt; mọi thông tin của cảnh có bản văn bản tương đương.
 
 ## 5. Ca biên
 | Nhóm | Ca cụ thể | Hành vi mong đợi | Scenario |

@@ -1,10 +1,12 @@
 // F-008 Văn phòng (SPEC-app §4): agent ngồi bàn theo dữ liệu thật của vòng (`GET /api/office`), nhiều kiểu văn phòng.
-// Canvas 2D tự vẽ (không thư viện); bản văn bản tương đương ngay dưới canvas; chuyển động tắt khi prefers-reduced-motion.
+// Bộ vẽ mặc định: Canvas 2D tự viết (không thư viện); tuỳ chọn 3D: three.js vendor, tải lười khi chọn (office/three-view.js).
+// Bản văn bản tương đương ngay dưới canvas; chuyển động tắt khi prefers-reduced-motion.
 import { THEMES, SEASONS, resolveSeason, themeById } from "../office/themes.js";
-import { drawScene, describe, STATE_TEXT } from "../office/scene.js";
+import { drawScene, describe, LAYOUTS, STATE_TEXT } from "../office/scene.js";
 
 const PREF_KEY = "xt-office";
 const POLL_MS = 10000;
+const RENDERERS = [{ id: "2d", name: "2D isometric (nhẹ)" }, { id: "3d", name: "3D three.js (kéo để xoay)" }];
 
 function loadPrefs() {
   try {
@@ -41,7 +43,9 @@ function seatRows(h, seats) {
 
 export async function render(main, { api, h, error }) {
   const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const prefs = { theme: "night", season: "auto", names: true, motion: !reduce, quality: "high", zoom: 1, ...loadPrefs() };
+  const prefs = { renderer: "2d", layout: "open", theme: "night", season: "auto", names: true, motion: !reduce, quality: "high", zoom: 1, ...loadPrefs() };
+  const [rendererLabel, rendererSel] = select(h, "office-renderer", "Bộ vẽ", RENDERERS, prefs.renderer);
+  const [layoutLabel, layoutSel] = select(h, "office-layout", "Bố cục", LAYOUTS, prefs.layout);
   const [themeLabel, themeSel] = select(h, "office-theme", "Kiểu văn phòng", THEMES, prefs.theme);
   const [seasonLabel, seasonSel] = select(h, "office-season", "Mùa", SEASONS, prefs.season);
   const [qualityLabel, qualitySel] = select(h, "office-quality", "Chất lượng",
@@ -63,6 +67,7 @@ export async function render(main, { api, h, error }) {
     h("h1", null, "Văn phòng"),
     h("p", { class: "muted" }, "Trạng thái suy ra từ bằng chứng trên đĩa (PLAN, .autopilot/runs.jsonl, việc chờ người) — không phải tín hiệu thời gian thực."),
     h("div", { class: "office-bar", role: "group", "aria-label": "Tuỳ chọn văn phòng" },
+      h("span", null, rendererLabel, rendererSel), h("span", null, layoutLabel, layoutSel),
       h("span", null, themeLabel, themeSel), h("span", null, seasonLabel, seasonSel), h("span", null, qualityLabel, qualitySel),
       h("span", null, namesBox, namesLabel), h("span", null, motionBox, motionLabel),
       h("span", null, zoomOut, zoomIn, refresh)),
@@ -88,7 +93,7 @@ export async function render(main, { api, h, error }) {
         " " + (r.task ? r.task.id : "?") + " · " + r.agent + (r.at ? " · " + r.at : "")))
       : [h("li", { class: "muted" }, "Chưa có lần chạy Gate nào (loop record).")]));
     summary.textContent = "Vòng: " + d.loop.verdict + " · task mở " + d.tasks.open + ", xong " + d.tasks.done + ".";
-    canvas.setAttribute("aria-label", describe(d.seats, themeById(prefs.theme).name));
+    label();
   }
 
   async function load() {
@@ -100,57 +105,100 @@ export async function render(main, { api, h, error }) {
     }
   }
 
+  let three = null; // bộ vẽ 3D khi đang dùng
+  let dpr = 1;
+  let cssW = 800, cssH = 540;
+
   function size() {
-    const dpr = prefs.quality === "low" ? 1 : Math.min(2, window.devicePixelRatio || 1);
-    const w = Math.max(280, stage.clientWidth || 800);
-    const hgt = Math.round(Math.max(300, Math.min(680, w * 0.68)));
-    canvas.width = Math.round(w * dpr);
-    canvas.height = Math.round(hgt * dpr);
-    canvas.setAttribute("height", String(canvas.height));
+    dpr = prefs.quality === "low" ? 1 : Math.min(2, window.devicePixelRatio || 1);
+    cssW = Math.max(280, stage.clientWidth || 800);
+    cssH = Math.round(Math.max(300, Math.min(680, cssW * 0.68)));
+    canvas.width = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+    if (three) three.resize(cssW, cssH, dpr);
     dirty = true;
-    return dpr;
   }
 
-  let dpr = size();
-  function frame(t) {
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    drawScene(ctx, canvas.width / dpr, canvas.height / dpr, {
-      theme: themeById(prefs.theme), season: resolveSeason(prefs.season), seats: data.seats,
+  function sceneOpts(t) {
+    return {
+      theme: themeById(prefs.theme), season: resolveSeason(prefs.season), layout: prefs.layout, seats: data.seats,
       names: prefs.names, motion: prefs.motion, t, zoom: prefs.zoom, quality: prefs.quality,
-    });
+    };
+  }
+
+  function frame(t) {
+    if (three) {
+      three.draw(sceneOpts(t));
+    } else {
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      drawScene(ctx, canvas.width / dpr, canvas.height / dpr, sceneOpts(t));
+    }
     dirty = false;
+  }
+
+  async function useRenderer() {
+    if (prefs.renderer === "3d" && !three) {
+      try {
+        const mod = await import("../office/three-view.js");
+        three = mod.createThreeView(stage);
+        canvas.hidden = true;
+        three.canvas.setAttribute("aria-label", canvas.getAttribute("aria-label") || "Văn phòng");
+      } catch (e) {
+        three = null;
+        prefs.renderer = rendererSel.value = "2d";
+        msg.replaceChildren(h("p", { class: "state error", role: "alert" },
+          "Không bật được 3D (" + ((e && e.message) || "WebGL không khả dụng") + ") — dùng bản 2D."));
+      }
+    } else if (prefs.renderer !== "3d" && three) {
+      three.dispose();
+      three = null;
+      canvas.hidden = false;
+    }
+    size();
   }
 
   let last = 0;
   function tick(now) {
-    if (!canvas.isConnected) return; // rời màn → dừng vòng vẽ
+    if (!stage.isConnected) { // rời màn → dừng vòng vẽ, giải phóng WebGL
+      if (three) three.dispose();
+      return;
+    }
     const budget = prefs.quality === "low" ? 1000 / 15 : 1000 / 30;
-    if ((prefs.motion && now - last >= budget) || dirty) {
+    if ((prefs.motion && now - last >= budget) || dirty || (three && three.dirty)) {
       last = now;
       frame(now / 1000);
     }
     requestAnimationFrame(tick);
   }
 
-  function changed() {
+  function label() {
+    const text = describe(data.seats, themeById(prefs.theme).name);
+    canvas.setAttribute("aria-label", text);
+    if (three) three.canvas.setAttribute("aria-label", text);
+  }
+
+  async function changed() {
+    prefs.renderer = rendererSel.value;
+    prefs.layout = layoutSel.value;
     prefs.theme = themeSel.value;
     prefs.season = seasonSel.value;
     prefs.quality = qualitySel.value;
     prefs.names = namesBox.checked;
     prefs.motion = motionBox.checked;
     savePrefs(prefs);
-    dpr = size();
-    canvas.setAttribute("aria-label", describe(data.seats, themeById(prefs.theme).name));
+    await useRenderer();
+    label();
   }
-  for (const el of [themeSel, seasonSel, qualitySel, namesBox, motionBox]) el.addEventListener("change", changed);
+  for (const el of [rendererSel, layoutSel, themeSel, seasonSel, qualitySel, namesBox, motionBox]) el.addEventListener("change", changed);
   zoomIn.addEventListener("click", () => { prefs.zoom = Math.min(2, +(prefs.zoom + 0.15).toFixed(2)); savePrefs(prefs); dirty = true; });
   zoomOut.addEventListener("click", () => { prefs.zoom = Math.max(0.6, +(prefs.zoom - 0.15).toFixed(2)); savePrefs(prefs); dirty = true; });
   refresh.addEventListener("click", load);
-  if (window.ResizeObserver) new ResizeObserver(() => { if (canvas.isConnected) dpr = size(); }).observe(stage);
+  if (window.ResizeObserver) new ResizeObserver(() => { if (stage.isConnected) size(); }).observe(stage);
 
   await load();
+  await useRenderer();
   requestAnimationFrame(tick);
-  const timer = setInterval(() => (canvas.isConnected ? load() : clearInterval(timer)), POLL_MS);
+  const timer = setInterval(() => (stage.isConnected ? load() : clearInterval(timer)), POLL_MS);
 }

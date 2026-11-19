@@ -12,9 +12,11 @@ Bản < 3.20.0: [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md) (T-3651; `changel
   `executor`, `executor-deep`, reviewer, researcher) ngồi bàn trong một văn phòng isometric; trạng thái suy từ verdict vòng
   và `.autopilot/runs.jsonl` (đang làm, đang sửa khi Gate đỏ, chờ người, xong, rảnh), kèm feed lần chạy gần đây và việc chờ
   người. Chọn 8 kiểu văn phòng (công nghệ, studio sáng tạo, thư viện, ban đêm, cyberpunk, quán cà phê, vũ trụ, bệnh viện) và lớp mùa
-  (tự động, Noel, Tết); nhãn tên, chuyển động, chất lượng, phóng to/thu nhỏ. Vẽ bằng Canvas 2D tự viết — không thêm phụ
-  thuộc, đúng CSP của app; tắt chuyển động khi `prefers-reduced-motion`; có bảng văn bản tương đương. Dự án đích: nhận khi
-  chạy lại `install.py`.
+  (tự động, Noel, Tết); 3 bố cục (mở chung, nhiều phòng liên thông, mỗi người một phòng); nhãn tên, chuyển động, chất
+  lượng, phóng to/thu nhỏ. Bộ vẽ mặc định Canvas 2D tự viết (không phụ thuộc); tuỳ chọn **3D three.js** (0.187.0, MIT,
+  vendor ở `scripts/app/vendor/three/` kèm `SOURCE`, tải lười khi chọn; kéo/phím mũi tên để xoay; không có WebGL → về 2D)
+  — [ADR-0082](docs/adr/0082-office-view-renderers.md). Tắt chuyển động khi `prefers-reduced-motion`; có bảng văn bản
+  tương đương. Dự án đích: nhận khi chạy lại `install.py` (thêm ≈ 2,1 MB tệp tĩnh three.js).
 
 ### Changed
 

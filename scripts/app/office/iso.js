@@ -97,6 +97,19 @@ export class Iso {
     ctx.fillText(text, sx, top + ph / 2 + 1);
   }
 
+  // Vòng elip (vành hành tinh) quanh điểm thế giới, bán kính r theo đơn vị thế giới.
+  ring(x, y, z, r, tilt, color) {
+    const [sx, sy] = this.p(x, y, z);
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.ellipse(sx, sy, r * this.view.scale, r * 0.28 * this.view.scale, tilt, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   dot(x, y, z, r, color) {
     const [sx, sy] = this.p(x, y, z);
     const ctx = this.ctx;

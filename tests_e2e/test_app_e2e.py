@@ -273,6 +273,43 @@ class ScreensTest(AppCase):
         assert_clean(self, page, watch, self.origin)
 
 
+class OfficeTest(AppCase):
+    """F-008: mọi kiểu × bố cục vẽ không lỗi ở 2D; bộ vẽ 3D (three.js vendor) bật được, kéo xoay được, nhãn đủ 5 bàn."""
+
+    def test_office_options_2d_and_3d(self) -> None:
+        ctx = self.new_context("desktop")
+        serve_axe(ctx, self.origin)
+        page, watch = self.open_app(ctx)
+        go(page, "office", "Văn phòng")
+        page.uncheck("#office-motion")
+        themes = page.eval_on_selector_all("#office-theme option", "os => os.map(o => o.value)")
+        layouts = page.eval_on_selector_all("#office-layout option", "os => os.map(o => o.value)")
+        self.assertEqual(len(themes), 8)
+        self.assertEqual(layouts, ["open", "connected", "private"])
+        for layout in layouts:
+            page.select_option("#office-layout", layout)
+            for theme in themes:
+                page.select_option("#office-theme", theme)
+        self.assertEqual(watch.take(), [])
+        page.select_option("#office-renderer", "3d")
+        canvas3d = page.locator("canvas.office-3d")
+        canvas3d.wait_for()
+        self.assertTrue(page.locator("canvas.office-canvas:not(.office-3d)").is_hidden())
+        page.locator(".office-labels .office-tag:not([hidden])").nth(4).wait_for()  # 5 nhãn tên, bám nhân vật
+        box = canvas3d.bounding_box()
+        assert box is not None
+        before = canvas3d.screenshot()
+        page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+        page.mouse.down()
+        page.mouse.move(box["x"] + box["width"] / 2 + 120, box["y"] + box["height"] / 2, steps=4)
+        page.mouse.up()
+        page.wait_for_timeout(300)
+        self.assertNotEqual(before, canvas3d.screenshot())  # kéo → góc nhìn đổi
+        page.select_option("#office-renderer", "2d")
+        self.assertEqual(page.locator("canvas.office-3d").count(), 0)  # rời 3D → giải phóng canvas WebGL
+        assert_clean(self, page, watch, self.origin)
+
+
 class KeyboardTest(AppCase):
     """Đi bằng bàn phím: link bỏ qua là điểm Tab đầu, Enter không đổi màn; Tab tới nav, Enter chuyển màn, focus vào main."""
 
