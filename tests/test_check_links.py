@@ -1,0 +1,605 @@
+"""Test scripts/check-links.py nạp như module (đo coverage trong tiến trình) — ca CLI nằm ở test_install.py."""
+
+from __future__ import annotations
+
+import contextlib
+import importlib.util
+import io
+import random
+import re
+import tempfile
+import time
+import unittest
+import urllib.error
+import urllib.request
+from pathlib import Path
+from types import ModuleType
+import unittest.mock as mock
+
+ROOT = Path(__file__).resolve().parent.parent
+SCRIPT = ROOT / "scripts" / "check-links.py"
+
+
+def load_module() -> ModuleType:
+    spec = importlib.util.spec_from_file_location("check_links_under_test", SCRIPT)
+    assert spec is not None and spec.loader is not None
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def ref_mask_code_spans(cl: ModuleType, text: str) -> str:
+    """Bản tham chiếu chậm (duyệt từng ký tự) của `mask_code_spans` trước AUD-PERF-027 — chuẩn hành vi."""
+    out: list[str] = []
+    i = 0
+    while i < len(text):
+        if text[i] == "\\":
+            out.append(text[i : i + 2])
+            i += 2
+        elif text[i] != "`":
+            out.append(text[i])
+            i += 1
+        else:
+            j = i
+            while j < len(text) and text[j] == "`":
+                j += 1
+            close = cl._closing_run(text, j, j - i)
+            stop = j if close < 0 else close + (j - i)
+            out.append(text[i:stop] if close < 0 else re.sub(r"[^\n]", " ", text[i:stop]))
+            i = stop
+    return "".join(out)
+
+
+def ref_table_cells(line: str) -> list[str]:
+    """Bản tham chiếu chậm của `table_cells` trước AUD-PERF-027."""
+    cells: list[str] = []
+    cur: list[str] = []
+    i = 0
+    while i < len(line):
+        if line[i] == "\\":
+            cur.append(line[i : i + 2])
+            i += 2
+        elif line[i] == "|":
+            cells.append("".join(cur))
+            cur = []
+            i += 1
+        else:
+            cur.append(line[i])
+            i += 1
+    cells.append("".join(cur))
+    return cells
+
+
+class CheckLinksModuleTest(unittest.TestCase):
+    def setUp(self):
+        self.cl = load_module()
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.repo = Path(tmp.name)
+
+    def write(self, rel: str, text: str) -> None:
+        p = self.repo / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(text, encoding="utf-8")
+
+    def test_root_is_project_when_installed_under_xtemplates(self):
+        # Bản cài ở <dự án>/.xtemplates/scripts/ → gốc là dự án; biên dịch với tên file thật để coverage đếm đúng file.
+        fake = self.repo.resolve() / ".xtemplates" / "scripts" / "check-links.py"
+        ns: dict[str, object] = {"__file__": str(fake), "__name__": "check_links_installed"}
+        exec(compile(SCRIPT.read_text(encoding="utf-8"), str(SCRIPT), "exec"), ns)
+        self.assertEqual(ns["ROOT"], self.repo.resolve())
+        self.assertEqual(self.cl.ROOT, ROOT)  # chạy từ repo khung: gốc là repo
+
+    def test_iter_md_skips_tooling_dirs(self):
+        for rel in ("a.md", "docs/b.md", "node_modules/x.md", ".git/y.md", "sub/.xtemplates/z.md", ".venv/w.md"):
+            self.write(rel, "x\n")
+        names = [p.relative_to(self.repo).as_posix() for p in self.cl.iter_md(self.repo)]
+        self.assertEqual(names, ["a.md", "docs/b.md"])
+
+    def test_check_reports_broken_with_file_and_line(self):
+        self.write("docs/ok.md", "# Neo\n")
+        self.write("a.md", "dòng 1\n[tốt](docs/ok.md#neo) [hỏng](docs/mat.md)\n")
+        self.assertEqual(self.cl.check(self.repo), ["a.md:2: liên kết hỏng -> docs/mat.md"])
+
+    def test_check_accepts_root_absolute_and_skips_urls_anchors(self):
+        self.write("docs/ok.md", "x\n")
+        self.write(
+            "sub/a.md",
+            "## Mục\n[abs](/docs/ok.md) [neo](#mục) [url](https://x.invalid/a) [mail](mailto:a@b.c) [dir](../docs)\n",
+        )
+        self.assertEqual(self.cl.check(self.repo), [])
+
+    def test_check_links_anchor_missing_is_error(self):
+        # Phản hồi dự án đích: `[x](a.md#khong-ton-tai) [y](#cung-khong)` từng qua với exit 0.
+        self.write(
+            "docs/b.md", '# Quyết định chọn `xt.py`\n## Lặp\n## Lặp\n```\n# Trong fence\n```\n<a id="Neo-Tay"></a>\n'
+        )
+        self.write(
+            "a.md",
+            "# Tiêu đề [có link](x.md)\n[x](docs/b.md#khong-ton-tai) [y](#cung-khong) [z](#tiêu-đề-có-link)\n"
+            "[ok](docs/b.md#quyết-định-chọn-xtpy) [ok2](docs/b.md#lặp-1) [ok3](docs/b.md#neo-tay)"
+            " [mã](docs/b.md#trong-fence) [enc](docs/b.md#l%E1%BA%B7p) [py](s.py#L3)\n",
+        )
+        self.write("s.py", "x = 1\n")
+        self.write("x.md", "x\n")
+        self.assertEqual(
+            self.cl.check(self.repo),
+            [
+                "a.md:2: anchor không có trong file -> docs/b.md#khong-ton-tai",
+                "a.md:2: anchor không có trong file -> #cung-khong",
+                "a.md:3: anchor không có trong file -> docs/b.md#trong-fence",
+            ],
+        )
+
+    def test_check_links_anchor_github_heading_forms(self):
+        # Review #238: setext, nhấn `_x_`, link tham chiếu, BOM, tiêu đề trong `>`/danh sách, `#top`, `#L3`, id không nháy.
+        self.write(
+            "b.md",
+            "\ufeff# Bom\nTitle\n=====\nSub\n---\n\n## _Ghi chú_\n## [ref][r] x\n> ## Quote\n- ## Mục\n"
+            "<h2 id=raw>R</h2>\n```\nTrong\n---\n```\n",
+        )
+        (self.repo / "bad.md").write_bytes(b"# Ok\n\xff\xfe\n")
+        links = "bom title sub ghi-chú ref-x quote mục raw top L3 L3-L9"
+        self.write(
+            "a.md",
+            " ".join(f"[{a}](b.md#{a})" for a in links.split()) + " [o](bad.md#ok) [m](b.md#trong)\n",
+        )
+        self.assertEqual(self.cl.check(self.repo), ["a.md:1: anchor không có trong file -> b.md#trong"])
+
+    def test_check_links_anchor_setext_multiline_and_quote(self):
+        # Review #238 🟢: tiêu đề setext nhiều dòng (GitHub nối bằng khoảng trắng) và setext trong `>`; dòng trống cắt đoạn.
+        self.write(
+            "b.md",
+            "Dong mot\ndong hai\n===\n\n> Trich dan\n> ---\n\nTruoc\n\n---\n> a\n> b\n> ===\n"
+            "\n<!-- c -->\nSau html\n---\n\n***\nSau ke\n---\n",
+        )
+        # Review #242: dòng HTML hay `***` trước tiêu đề, và riêng dòng cuối của đoạn, vẫn là anchor hợp lệ (như cũ).
+        links = "dong-mot-dong-hai dong-hai trich-dan a-b sau-html sau-ke"
+        self.write("a.md", " ".join(f"[{a}](b.md#{a})" for a in links.split()) + " [x](b.md#truoc)\n")
+        self.assertEqual(self.cl.check(self.repo), ["a.md:1: anchor không có trong file -> b.md#truoc"])
+
+    def test_check_links_anchor_long_paragraph_is_linear(self):
+        # Tự rà #242: gom đoạn bằng `[*para, body]` chép cả danh sách mỗi dòng → O(n²) (50 000 dòng mất 6 s).
+        self.write("b.md", "chu\n" * 200_000 + "===\n")
+        start = time.monotonic()
+        self.cl.anchors(self.repo / "b.md")
+        self.assertLess(time.monotonic() - start, 5)
+
+    def test_check_absolute_link_missing_is_error(self):
+        self.write("a.md", "[x](/khong/co.md)\n")
+        self.assertEqual(self.cl.check(self.repo), ["a.md:1: liên kết hỏng -> /khong/co.md"])
+
+    def test_check_fence_nesting_is_respected(self):
+        # ``` mở thì ~~~ bên trong không đóng; sau khi đóng đúng loại, link ngoài fence lại được kiểm.
+        self.write("a.md", "```\n~~~\n[in](a1.md)\n~~~\n```\n[out](a2.md)\n")
+        self.assertEqual(self.cl.check(self.repo), ["a.md:6: liên kết hỏng -> a2.md"])
+
+    def test_code_span_links_are_examples_not_links(self):
+        """AUD-CODE-061 (FB-115): cú pháp link trong code span là ví dụ — không kiểm; ngoài span vẫn kiểm."""
+        self.write(
+            "a.md",
+            # Mỗi ca một đoạn (dòng trống giữa): span không vượt đoạn.
+            "Ví dụ `[x](mat0.md)` và ``a ` [y](mat0.md)`` hết.\n\n"  # span 1 và 2 backtick (backtick lẻ bên trong)
+            "a | `[x](mat0.md)` | b\n\n"  # có `|` nhưng không phải bảng (không có dòng phân cách)
+            "\\`[x](mat2.md)\\`\n\n"  # backtick đã escape là chữ thường: link thật
+            "`[x](mat4.md)\n\n"  # backtick không đóng trong đoạn: chữ thường
+            "``[x](mat5.md)`\n\n"  # độ dài chuỗi backtick không khớp: không đóng
+            "\\\\`[x](mat0.md)`\n",  # `\\` là backslash đã escape: backtick sau đó MỞ span
+        )
+        self.assertEqual(
+            self.cl.check(self.repo),
+            [
+                "a.md:5: liên kết hỏng -> mat2.md",
+                "a.md:7: liên kết hỏng -> mat4.md",
+                "a.md:9: liên kết hỏng -> mat5.md",
+            ],
+        )
+
+    def test_code_span_does_not_cross_gfm_table_cells(self):
+        """Hồi quy D-378 F1: backtick lẻ ở hai ô bảng không ghép thành một span che link hỏng ở ô giữa; `\\|` không tách ô."""
+        self.write(
+            "a.md",
+            "| h1 | h2 | h3 |\n"
+            "|---|:-:|---|\n"
+            "| `a | [hỏng](mat1.md) | b` |\n"
+            "| `x\\|[y](mat0.md)` | `[z](mat0.md)` | [w](mat3.md) |\n"
+            "\n"
+            "`a | [ngoài bảng](mat0.md) | b`\n",
+        )
+        self.assertEqual(
+            self.cl.check(self.repo),
+            ["a.md:3: liên kết hỏng -> mat1.md", "a.md:4: liên kết hỏng -> mat3.md"],
+        )
+
+    def test_code_span_across_lines_stays_in_its_block(self):
+        """Review #452 🔴: span ngắt dòng trong cùng đoạn (CommonMark §6.1) đóng ở dòng sau — dấu đóng không được ghép với
+        backtick kế tiếp mà che link thật; span không vượt ranh giới khối (dòng trống, mục danh sách, tiêu đề)."""
+        self.write(
+            "a.md",
+            "text `foo\nbar` and [l](mat1.md) and `baz`\n"  # span `foo\nbar` đóng ở dòng 2: link thật
+            "\n"
+            "x `[y](mat0.md)\nz` w\n"  # span hai dòng che ví dụ
+            "\n"
+            "- a `x\n- b` [l](mat2.md) c\n"  # hai mục danh sách: không có span chung
+            "\n"
+            "`open\n\n[l](mat3.md)`\n",  # dòng trống cắt đoạn: backtick đầu là chữ
+        )
+        self.assertEqual(
+            self.cl.check(self.repo),
+            [
+                "a.md:2: liên kết hỏng -> mat1.md",
+                "a.md:8: liên kết hỏng -> mat2.md",
+                "a.md:12: liên kết hỏng -> mat3.md",
+            ],
+        )
+
+    def test_table_in_quote_and_rows_without_pipe(self):
+        """Review #452 🟠: bảng trong trích dẫn `>` vẫn tách ô; dòng không có `|` là hàng một ô, chưa kết thúc bảng (GFM)."""
+        self.write(
+            "a.md",
+            "> | h1 | h2 | h3 |\n"
+            "> |---|---|---|\n"
+            "> | `a | [l](mat1.md) | b` |\n"
+            "\n"
+            "| h1 | h2 | h3 |\n"
+            "|---|---|---|\n"
+            "row without pipe\n"
+            "| `x | [l](mat2.md) | y` |\n",
+        )
+        self.assertEqual(
+            self.cl.check(self.repo),
+            ["a.md:3: liên kết hỏng -> mat1.md", "a.md:8: liên kết hỏng -> mat2.md"],
+        )
+
+    def test_fast_scan_matches_reference_on_edge_cases_and_fuzz(self):
+        """AUD-PERF-027: bản nhảy-tới-ký-tự-đặc-biệt giữ đúng hành vi bản duyệt từng ký tự (tham chiếu chậm ở đầu file)."""
+        cases = ["", "`", "``", "a`b`c", "``a`b``c", "`a``b`", "\\`a`", "\\\\`a` [l](x)", "a\\", "`a\nb` c", "`x\\`y`"]
+        cases += ["a|b", "a\\|b|c", "|", "||", "\\", "a|`b|c`|d", "x\\\\|y", "`open [l](x.md)", "``` a ``", "é`ü`|ñ"]
+        rnd = random.Random(20261111)
+        cases += ["".join(rnd.choice("ab`\\|\n ") for _ in range(rnd.randint(0, 30))) for _ in range(3000)]
+        for s in cases:
+            self.assertEqual(self.cl.mask_code_spans(s), ref_mask_code_spans(self.cl, s), repr(s))
+            self.assertEqual(self.cl.table_cells(s), ref_table_cells(s), repr(s))
+
+    def test_fast_scan_does_not_visit_every_character(self):
+        """AUD-PERF-027: chữ thường không bị duyệt từng ký tự (số lần chỉ mục `text[i]` tỉ lệ số ký tự đặc biệt, không phải
+        độ dài); dòng rất dài vẫn tuyến tính — nhiều backtick không đóng không làm bậc hai."""
+
+        class Counting(str):
+            hits = 0
+
+            def __getitem__(self, key):
+                Counting.hits += 1
+                return str.__getitem__(self, key)
+
+        prose = "chữ thường " * 5000 + "`a` \\| `b`" + " x" * 5000
+        for fn in (self.cl.mask_code_spans, self.cl.table_cells):
+            Counting.hits = 0
+            fn(Counting(prose))
+            self.assertLess(Counting.hits, 100, fn.__name__)
+        long_line = ("`a` | \\` x " * 40000) + "`" * 3
+        start = time.monotonic()
+        self.assertEqual(self.cl.mask_code_spans(long_line), ref_mask_code_spans(self.cl, long_line))
+        self.assertEqual(self.cl.table_cells(long_line), ref_table_cells(long_line))
+        self.assertLess(time.monotonic() - start, 10.0)
+
+    def test_external_urls_in_table_cells(self):
+        """Review #452 🟠: `--external` không che lần hai dòng đã che theo ô — URL ở ô giữa vẫn được kiểm."""
+        self.write("a.md", "| h1 | h2 | h3 |\n|---|---|---|\n| `a | https://h.org/cell | b` |\n")
+        self.assertEqual(self.cl.external_urls(self.repo), {"https://h.org/cell": "a.md:3"})
+
+    def test_main_success_and_failure_output(self):
+        self.write("ok.md", "[a](ok.md)\n")
+        out = io.StringIO()
+        with mock.patch("sys.argv", ["check-links.py", str(self.repo)]), contextlib.redirect_stdout(out):
+            self.assertEqual(self.cl.main(), 0)
+        self.assertIn("✓ Mọi liên kết Markdown nội bộ", out.getvalue())
+        self.write("bad.md", "[a](nope.md)\n[b](nope2.md)\n")
+        out = io.StringIO()
+        with mock.patch("sys.argv", ["check-links.py", str(self.repo)]), contextlib.redirect_stdout(out):
+            self.assertEqual(self.cl.main(), 1)
+        self.assertIn("✗ bad.md:1: liên kết hỏng -> nope.md", out.getvalue())
+        self.assertIn("2 liên kết hỏng.", out.getvalue())
+
+    def test_main_defaults_to_repo_root(self):
+        out = io.StringIO()
+        with (
+            mock.patch("sys.argv", ["check-links.py"]),
+            mock.patch.object(self.cl, "ROOT", self.repo),
+            contextlib.redirect_stdout(out),
+        ):
+            self.assertEqual(self.cl.main(), 0)
+        self.assertIn("✓", out.getvalue())
+        self.write("bad.md", "[x](missing.md)\n")  # cùng ROOT, giờ có link hỏng → phải đỏ (chứng minh đã quét ROOT)
+        out = io.StringIO()
+        with (
+            mock.patch("sys.argv", ["check-links.py"]),
+            mock.patch.object(self.cl, "ROOT", self.repo),
+            contextlib.redirect_stdout(out),
+        ):
+            self.assertEqual(self.cl.main(), 1)
+        self.assertIn("bad.md:1", out.getvalue())
+
+
+class FakeResp:
+    def __init__(self, status: int):
+        self.status = status
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+class FakeOpener:
+    """Opener giả: `script` là danh sách (method, kết quả) theo thứ tự gọi; kết quả int = trả status, int âm = HTTPError."""
+
+    def __init__(self, script):
+        self.script = list(script)
+        self.calls: list[str] = []
+
+    def open(self, req, timeout=None):
+        self.calls.append(req.get_method())
+        kind, val = self.script.pop(0)
+        assert kind == req.get_method()
+        if isinstance(val, Exception):
+            raise val
+        return FakeResp(val)
+
+
+def http_err(code: int) -> urllib.error.HTTPError:
+    return urllib.error.HTTPError("http://x", code, "m", {}, None)  # type: ignore[arg-type]  # hdrs=None hợp lệ lúc chạy, stub đòi Message
+
+
+class LinkClassificationTest(unittest.TestCase):
+    def setUp(self):
+        self.cl = load_module()
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.repo = Path(tmp.name)
+
+    def test_link_classification_status_table(self):
+        for status, want in [
+            (200, "ok"), (206, "ok"), (301, "moved"), (308, "moved"), (403, "unverified"), (429, "unverified"),
+            (404, "dead"), (410, "dead"), (400, "dead"), (100, "dead"), (408, "transient"), (500, "transient"),
+            (503, "transient"), (599, "transient"),
+        ]:  # fmt: skip
+            self.assertEqual(self.cl.classify_status(status), want, status)
+
+    def test_link_classification_retries_transient_then_gives_up(self):
+        sleeps: list[float] = []
+        calls: list[str] = []
+
+        def fetch(url, timeout):
+            calls.append(url)
+            return 503
+
+        got = self.cl.check_url("http://h/a", fetch, retries=2, sleep=sleeps.append)
+        self.assertEqual(got, ("transient", "HTTP 503"))
+        self.assertEqual(len(calls), 3)
+        self.assertEqual(sleeps, [1.0, 2.0])
+
+    def test_link_classification_recovers_after_transient(self):
+        results = iter([500, 429, 200])
+        got = self.cl.check_url("http://h/a", lambda u, t: next(results), retries=3, sleep=lambda s: None)
+        self.assertEqual(got, ("ok", "HTTP 200"))
+
+    def test_link_classification_timeout_is_transient_and_zero_retries(self):
+        n = []
+
+        def fetch(url, timeout):
+            n.append(1)
+            raise TimeoutError("t")
+
+        got = self.cl.check_url("http://h/a", fetch, retries=0, sleep=lambda s: None)
+        self.assertEqual(got, ("transient", "timeout/lỗi mạng (TimeoutError)"))
+        self.assertEqual(len(n), 1)
+
+    def test_link_classification_no_retry_for_dead_moved_403(self):
+        for status, cat in [(404, "dead"), (301, "moved"), (403, "unverified")]:
+            n = []
+
+            def fetch(url, timeout, status=status, n=n):
+                n.append(1)
+                return status
+
+            self.assertEqual(self.cl.check_url("http://h", fetch, retries=3, sleep=lambda s: None)[0], cat)
+            self.assertEqual(len(n), 1, status)
+
+    def test_link_classification_429_exhausted_is_unverified(self):
+        got = self.cl.check_url("http://h", lambda u, t: 429, retries=1, sleep=lambda s: None)
+        self.assertEqual(got, ("unverified", "HTTP 429"))
+
+    def test_link_classification_external_urls_dedup_skip_fence_and_hosts(self):
+        self.write(
+            "a.md",
+            "[a](https://x.org/p#s) [b](https://x.org/p) [c](https://example.com/z) [d](http://localhost:1/)"
+            " [e](https://h.invalid/q) [f](docs/x.md) [g](mailto:a@b.c)\n```\n[h](https://fence.org/)\n```\n"
+            "[i](https://Y.org/Ünï)\n",
+        )
+        self.write("sub/b.md", "[j](https://x.org/p)\n")
+        urls = self.cl.external_urls(self.repo)
+        self.assertEqual(urls, {"https://x.org/p": "a.md:1", "https://Y.org/Ünï": "a.md:5"})
+
+    def write(self, rel: str, text: str) -> None:
+        p = self.repo / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(text, encoding="utf-8")
+
+    def test_link_classification_autolink_and_bare_urls_found_code_spans_skipped(self):
+        self.write(
+            "a.md",
+            "Nguồn: <https://auto.org/a> · <https://auto.org/b#neo>; xem https://bare.org/x. và (https://bare.org/p_(1))\n"
+            "Ví dụ `![x](https://evil/?d=1)` và `![](https://attacker/?q=<secret>)` và ``a ` <https://span.org/z>``\n"
+            "[https://text.org/](https://dich.org/) [ref]: https://ref.org/r, rồi **https://bold.org/b**\n"
+            "```\n<https://fence.org/>\n```\n"
+            "<https://example.com/x> <mailto:a@b.c> <http://h.test/> ổn <https://Ü.org/ä>\n",
+        )
+        urls = self.cl.external_urls(self.repo)
+        self.assertEqual(
+            urls,
+            {
+                "https://auto.org/a": "a.md:1",
+                "https://auto.org/b": "a.md:1",
+                "https://bare.org/x": "a.md:1",
+                "https://bare.org/p_(1)": "a.md:1",
+                "https://dich.org/": "a.md:3",
+                "https://ref.org/r": "a.md:3",
+                "https://bold.org/b": "a.md:3",
+                "https://Ü.org/ä": "a.md:7",
+            },
+        )
+        self.assertEqual(self.cl.line_urls(""), [])
+        self.assertEqual(self.cl.line_urls("`https://a.org/` `` `x` ``"), [])
+
+    def test_link_classification_dead_autolink_reported_code_span_ignored(self):
+        self.write("a.md", "Nguồn: <https://h.org/gone>\nVí dụ: `<https://h.org/span>` https://h.org/ok\n")
+        fetched: list[str] = []
+
+        def fetch(url, timeout):
+            fetched.append(url)
+            return 404 if url.endswith("gone") else 200
+
+        rep = self.cl.check_external(self.repo, fetch, retries=0, workers=1)
+        self.assertEqual(rep, {"dead": ["a.md:1: https://h.org/gone — HTTP 404"]})
+        self.assertEqual(sorted(fetched), ["https://h.org/gone", "https://h.org/ok"])
+        out = io.StringIO()
+        with mock.patch.object(self.cl, "http_status", fetch), contextlib.redirect_stdout(out):
+            self.assertEqual(self.cl.main([str(self.repo), "--external", "--retries", "0"]), 1)
+        self.assertIn("✗ chết (sửa/bỏ link): a.md:1: https://h.org/gone — HTTP 404", out.getvalue())
+
+    def test_link_classification_check_external_report_groups(self):
+        self.write(
+            "a.md",
+            "[1](http://h/ok) [2](http://h/gone) [3](http://h/moved) [4](http://h/bot) [5](http://h/down)\n",
+        )
+        codes = {"/ok": 200, "/gone": 404, "/moved": 301, "/bot": 403, "/down": 502}
+
+        def fetch(url, timeout):
+            return codes[url[len("http://h") :]]
+
+        rep = self.cl.check_external(self.repo, fetch, retries=0, workers=2)
+        self.assertEqual(set(rep), {"dead", "moved", "unverified", "transient"})
+        self.assertEqual(rep["dead"], ["a.md:1: http://h/gone — HTTP 404"])
+        self.assertNotIn("ok", rep)
+
+    def test_link_classification_main_external_exit_codes_and_output(self):
+        self.write("a.md", "[1](http://h/ok) [2](http://h/moved)\n")
+        out = io.StringIO()
+        with (
+            mock.patch.object(self.cl, "http_status", lambda u, t: 301 if u.endswith("moved") else 200),
+            contextlib.redirect_stdout(out),
+        ):
+            self.assertEqual(self.cl.main([str(self.repo), "--external", "--retries", "-5"]), 0)
+        self.assertIn("! đã đổi (cập nhật URL): a.md:1: http://h/moved — HTTP 301", out.getvalue())
+        self.assertIn("✓ Không có liên kết ngoài chết", out.getvalue())
+        out = io.StringIO()
+        with mock.patch.object(self.cl, "http_status", lambda u, t: 404), contextlib.redirect_stdout(out):
+            self.assertEqual(self.cl.main([str(self.repo), "--external"]), 1)
+        self.assertIn("✗ chết (sửa/bỏ link): a.md:1: http://h/ok — HTTP 404", out.getvalue())
+        self.assertIn("2 liên kết ngoài chết.", out.getvalue())
+
+    def test_link_classification_main_without_external_ignores_urls(self):
+        self.write("a.md", "[1](http://h/never-fetched)\n")
+        with mock.patch.object(self.cl, "http_status", side_effect=AssertionError("không được gọi mạng")):
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(self.cl.main([str(self.repo)]), 0)
+
+    def test_link_classification_http_status_head_then_get_fallback(self):
+        op = FakeOpener([("HEAD", http_err(405)), ("GET", 200)])
+        self.assertEqual(self.cl.http_status("http://h", 1.0, op), 200)
+        self.assertEqual(op.calls, ["HEAD", "GET"])
+        op = FakeOpener([("HEAD", 301)])
+        self.assertEqual(self.cl.http_status("http://h", 1.0, op), 301)
+        self.assertEqual(op.calls, ["HEAD"])
+
+    def test_http_status_encodes_unicode_without_double_encoding(self):
+        opener = mock.Mock()
+        opener.open.return_value = FakeResp(200)
+        self.assertEqual(self.cl.http_status("https://example.invalid/hồ%20sơ?q=tiếng+Việt#phần", 1.0, opener), 200)
+        request = opener.open.call_args.args[0]
+        self.assertEqual(request.selector, "/h%E1%BB%93%20s%C6%A1?q=ti%E1%BA%BFng+Vi%E1%BB%87t")
+
+    def test_review173_head_4xx_retried_with_get(self):
+        """PR #173: HEAD 4xx (trừ 404/410) không đủ kết luận chết — thử GET; 401 là `unverified`."""
+        for head, get, want in [(400, 200, 200), (401, 401, 401), (418, 404, 404), (429, 200, 200)]:
+            with self.subTest(head=head):
+                op = FakeOpener([("HEAD", http_err(head)), ("GET", get if get < 400 else http_err(get))])
+                self.assertEqual(self.cl.http_status("http://h", 1.0, op), want)
+                self.assertEqual(op.calls, ["HEAD", "GET"])
+        for gone in (404, 410):
+            op = FakeOpener([("HEAD", http_err(gone)), ("GET", http_err(gone))])
+            self.assertEqual(self.cl.http_status("http://h", 1.0, op), gone)
+            self.assertEqual(op.calls, ["HEAD", "GET"])
+
+    def test_head_404_confirmed_with_get(self):
+        """NIST nvlpubs và support.google.com trả HEAD 404 nhưng GET 200 (đo 2026-11-16): HEAD 404/410 chưa đủ kết luận
+        chết — xác nhận bằng GET; GET cũng 404/410 mới là chết."""
+        for head in (404, 410):
+            with self.subTest(head=head):
+                op = FakeOpener([("HEAD", http_err(head)), ("GET", 200)])
+                self.assertEqual(self.cl.http_status("http://h", 1.0, op), 200)
+                self.assertEqual(op.calls, ["HEAD", "GET"])
+        op = FakeOpener([("HEAD", http_err(503))])  # 5xx là lỗi tạm: không GET, check_url tự thử lại
+        self.assertEqual(self.cl.http_status("http://h", 1.0, op), 503)
+        self.assertEqual(op.calls, ["HEAD"])
+        self.assertEqual(self.cl.classify_status(401), "unverified")
+        self.assertEqual(self.cl.classify_status(410), "dead")
+
+    def test_link_classification_http_status_error_codes(self):
+        op = FakeOpener([("HEAD", http_err(404)), ("GET", http_err(404))])
+        self.assertEqual(self.cl.http_status("http://h", 1.0, op), 404)
+        op = FakeOpener([("HEAD", http_err(403)), ("GET", http_err(403))])
+        self.assertEqual(self.cl.http_status("http://h", 1.0, op), 403)
+        op = FakeOpener([("HEAD", urllib.error.URLError("dns"))])
+        with self.assertRaises(OSError):
+            self.cl.http_status("http://h", 1.0, op)
+
+    def test_link_classification_http_status_default_opener_does_not_follow_redirects(self):
+        handler = self.cl._NoRedirect()
+        req = urllib.request.Request("http://h/a")
+        self.assertIsNone(handler.redirect_request(req, None, 301, "m", {}, "http://h/b"))
+        with mock.patch("urllib.request.build_opener") as bo:
+            bo.return_value = FakeOpener([("HEAD", 204)])
+            self.assertEqual(self.cl.http_status("http://h", 1.0), 204)
+        bo.assert_called_once_with(self.cl._NoRedirect)
+
+
+class AutonomyPolicySingleHomeTest(unittest.TestCase):
+    HOME = ROOT / "framework" / "11-autonomous-loop" / "stop-points-and-escalation.md"
+    MARKERS = ("### Mức tự chủ L0–L4", "| L3 Tự chủ làn chuẩn", "| L2 Tự chủ làn nhanh", '### Vị từ "làn nhanh"')
+
+    def md_files(self):
+        skip = {".git", "node_modules", ".venv", ".autopilot", "__pycache__", ".xtemplates"}
+        for p in sorted(ROOT.rglob("*.md")):
+            parts = p.relative_to(ROOT).parts
+            # .claude/worktrees: bản sao repo của subagent, không phải nội dung của repo
+            if not any(part in skip for part in parts) and parts[:2] != (".claude", "worktrees"):
+                yield p
+
+    def test_autonomy_policy_single_home_markers_only_in_home(self):
+        home = self.HOME.read_text(encoding="utf-8")
+        for marker in self.MARKERS:
+            self.assertEqual(home.count(marker), 1, marker)
+        others = [p for p in self.md_files() if p != self.HOME]
+        self.assertGreater(len(others), 50)  # chắc chắn đã quét repo, không quét rỗng
+        for p in others:
+            text = p.read_text(encoding="utf-8")
+            for marker in self.MARKERS:
+                self.assertNotIn(marker, text, f"{p.relative_to(ROOT)} chép chính sách tự chủ; chỉ liên kết tới nhà")
+
+    def test_autonomy_policy_single_home_readme_links_home(self):
+        readme = (ROOT / "framework" / "11-autonomous-loop" / "README.md").read_text(encoding="utf-8")
+        self.assertIn("## Chính sách tự chủ: một nhà", readme)
+        self.assertIn("(stop-points-and-escalation.md)", readme.split("## Chính sách tự chủ: một nhà", 1)[1])
+
+    def test_autonomy_policy_single_home_detects_duplicate(self):
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "x.md").write_text("| L3 Tự chủ làn chuẩn | copy |\n", encoding="utf-8")
+            text = (Path(d) / "x.md").read_text(encoding="utf-8")
+            self.assertTrue(any(m in text for m in self.MARKERS))
+
+
+if __name__ == "__main__":
+    unittest.main()

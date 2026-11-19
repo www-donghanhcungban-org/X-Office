@@ -1,0 +1,25 @@
+name: Links
+
+# Kiểm liên kết NGOÀI theo lịch (khung trích hàng trăm nguồn: chuẩn, luật, tài liệu — link chết là nợ ngầm).
+# Liên kết nội bộ đã kiểm ở mỗi PR (scripts/check-links.py). Phân loại lỗi tạm/đổi/chết/chưa xác minh (403/429: trang luật
+# chặn bot) do check-links.py --external làm, luật ở framework/11-autonomous-loop/self-healing-ci.md; chỉ link chết làm đỏ.
+on:
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  external-links:
+    name: external-links
+    runs-on: ubuntu-latest
+    # ~810 URL (autolink + link + URL trần), 8 luồng: thường vài phút; 30 phút chừa chỗ cho một nhóm host chậm/timeout.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.15.2"
+      - run: python3 scripts/check-links.py --external --retries 2 --timeout 20

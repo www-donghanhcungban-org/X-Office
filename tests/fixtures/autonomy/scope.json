@@ -1,0 +1,721 @@
+{
+ "note": "ID bắt buộc (REC §2 + 🔴/🟠 đã sửa) mà corpus autonomy-bench không phủ, kèm lý do; thêm ca thì gỡ ID khỏi đây.",
+ "out_of_scope": [
+  {
+   "reason": "Tài liệu / bằng chứng blueprint — đỡ bằng `validate`, `check-links`, `audit plan`; không phải quyết định cho/chặn của PR, rollup, review hay guard; PLAN của repo đọc được bằng máy (AUD-HAR-192/193): `tests.test_plan_files`; ký tự vô hình thật trong tài liệu agent đọc (AUD-DOC-270): `tests.test_content_facts`",
+   "ids": [
+    "AUD-DOC-215",
+    "AUD-HAR-411",
+    "AUD-DOC-001",
+    "AUD-DOC-002",
+    "AUD-DOC-003",
+    "AUD-DOC-004",
+    "AUD-DOC-005",
+    "AUD-DOC-006",
+    "AUD-DOC-007",
+    "AUD-DOC-008",
+    "AUD-DOC-009",
+    "AUD-DOC-010",
+    "AUD-DOC-011",
+    "AUD-DOC-012",
+    "AUD-DOC-023",
+    "AUD-DOC-044",
+    "AUD-DOC-045",
+    "AUD-HAR-006",
+    "AUD-HAR-014",
+    "AUD-HAR-015",
+    "AUD-HAR-060",
+    "AUD-HAR-062",
+    "AUD-HAR-094",
+    "AUD-HAR-095",
+    "AUD-DOC-112",
+    "AUD-DOC-113",
+    "AUD-DOC-114",
+    "AUD-DOC-136",
+    "AUD-DOC-137",
+    "AUD-HAR-171",
+    "AUD-DOC-155",
+    "AUD-DOC-123",
+    "AUD-DOC-124",
+    "AUD-DOC-162",
+    "AUD-HAR-192",
+    "AUD-HAR-193",
+    "AUD-DOC-172",
+    "AUD-HAR-196",
+    "AUD-DOC-192",
+    "AUD-DOC-195",
+    "AUD-DOC-196",
+    "AUD-DOC-199",
+    "AUD-DOC-203",
+    "AUD-DOC-183",
+    "AUD-DOC-194",
+    "AUD-DOC-235",
+    "AUD-DOC-237",
+    "AUD-DOC-239",
+    "AUD-DOC-243",
+    "AUD-DOC-270",
+    "AUD-DOC-271",
+    "AUD-DOC-273",
+    "AUD-DOC-274",
+    "AUD-CODE-062",
+    "AUD-CODE-063",
+    "AUD-HAR-302"
+   ]
+  },
+  {
+   "reason": "CI, ruleset, phụ thuộc — đỡ bằng `ci-check`, job `protection-guard`, `pip-audit`, `pnpm audit` (job `pack-npm-audit`, dep-audit.yml)",
+   "ids": [
+    "AUD-CI-001",
+    "AUD-CI-002",
+    "AUD-CI-003",
+    "AUD-DEP-001",
+    "AUD-DEP-003",
+    "AUD-DEP-021",
+    "AUD-CI-014",
+    "AUD-CI-016"
+   ]
+  },
+  {
+   "reason": "Subject commit squash (D-254) — thiết lập repo `squash_merge_commit_title` và chỗ nối steward `commit_title`: đỡ bằng `tests.test_merge -k test_steward_dry_run_and_apply`; corpus pr chưa có kiểu ca merge REST, thiết lập repo chưa máy kiểm (AUD-HAR-128)",
+   "ids": [
+    "AUD-HAR-126",
+    "AUD-HAR-127"
+   ]
+  },
+  {
+   "reason": "Che bí mật (`redact`) — đầu ra là chuỗi đã che, không phải quyết định cho/chặn; test `-k redact`",
+   "ids": [
+    "AUD-CFG-001",
+    "AUD-CFG-002",
+    "AUD-CFG-005",
+    "AUD-CFG-006",
+    "AUD-SEC-141",
+    "AUD-SEC-142",
+    "AUD-SEC-143"
+   ]
+  },
+  {
+   "reason": "Hook shell, cổng commit, cài đặt — đường chạy tiến trình (`dev-task.sh`, `pre-*-guard.sh`, `install.py`, `loop record`); test_hooks.py, test_install.py chạy hook thật; khóa state thiếu fcntl/flock và guard lỗi nạp/fallback (ADR-0054) là đường CLI/Gate có file thật: UpdateStateTest, GuardChokePointTest kiểm state bất biến và canary không chạy AUD-SEC-670/655, AUD-HAR-404/405 (symlink của hook/.git/.autopilot): tests.test_install.HooksRealDirTest, tests.test_xt_loop.AutopilotSymlinkStopTest.",
+   "ids": [
+    "AUD-HAR-001",
+    "AUD-HAR-002",
+    "AUD-HAR-003",
+    "AUD-HAR-012",
+    "AUD-HAR-013",
+    "AUD-HAR-025",
+    "AUD-HAR-037",
+    "AUD-SEC-005",
+    "AUD-SEC-015",
+    "AUD-SEC-057",
+    "AUD-SEC-065",
+    "AUD-SEC-066",
+    "AUD-XFEAT-013",
+    "AUD-XFEAT-020",
+    "AUD-CFG-003",
+    "AUD-SEC-616",
+    "AUD-SEC-619",
+    "AUD-SEC-650",
+    "AUD-SEC-651",
+    "AUD-CODE-025",
+    "AUD-SEC-130",
+    "AUD-HAR-125",
+    "AUD-HAR-303",
+    "AUD-HAR-304",
+    "AUD-HAR-305",
+    "AUD-HAR-306",
+    "AUD-HAR-308",
+    "AUD-HAR-311",
+    "AUD-HAR-312",
+    "AUD-SEC-670",
+    "AUD-SEC-655",
+    "AUD-HAR-404",
+    "AUD-HAR-405",
+    "AUD-HAR-415"
+   ]
+  },
+  {
+   "reason": "Luật năng lực reviewer đọc ở cờ `pr reviewed --reviewer-model/--author-model` và `xt.yaml` (`_review_models_error`, `review_family_config_error`) — corpus review chưa có kiểu ca nhận tên model; đỡ bằng `tests.test_merge -k clean_review_judges_name_tail`; PR bot (AUD-SEC-353/354/355 — commit đọc từ REST `pulls/{n}/commits`, corpus review chưa có kiểu ca REST): `-k clean_review_of_bot_pr`",
+   "ids": [
+    "AUD-SEC-105",
+    "AUD-SEC-353",
+    "AUD-SEC-354",
+    "AUD-SEC-355"
+   ]
+  },
+  {
+   "reason": "`harness-check` đọc frontmatter `tools:` của file agent thật — corpus harness chưa có kiểu ca nhận file agent; đỡ bằng `tests.test_xt_cli -k harness_check_reviewer_read_only`",
+   "ids": [
+    "AUD-HAR-106"
+   ]
+  },
+  {
+   "reason": "App cục bộ (`xt.py app`, ADR-0038) — ghi file qua HTTP của chính tiến trình app, không phải quyết định cho/chặn của PR, rollup, review hay guard; đỡ bằng `tests.test_app_compose -k overwrite`",
+   "ids": [
+    "AUD-SEC-103"
+   ]
+  },
+  {
+   "reason": "Phụ thuộc git/REST thật — nhánh hiện tại của repo (AUD-TEST-005), nội dung xt.yaml đọc qua REST contents (AUD-XFEAT-003); fixture tự chứa không tái hiện được",
+   "ids": [
+    "AUD-TEST-005",
+    "AUD-XFEAT-003"
+   ]
+  },
+  {
+   "reason": "Công cụ khác (perf guard, contrast, vendor-check, doctor, prompt-assets-scan) — không thuộc đường merge/guard; AUD-HAR-178: `tests.test_doctor.DoctorOrchestrationTest`; prompt-assets-scan giải mã chỉ chuỗi nháy kép thật YAML/TOML (AUD-SEC-378): đỡ bằng Gate unittest tests.test_xt_cli -k yaml_toml_decode_only_real_double_quoted; đích mặc định vắng bỏ qua (AUD-SEC-390): -k absent_default_targets; dấu tài liệu YAML cột 0 và tag nguyên văn (AUD-SEC-394/395): -k yaml_toml_decode_only_real_double_quoted",
+   "ids": [
+    "AUD-XFEAT-005",
+    "AUD-XFEAT-006",
+    "AUD-XFEAT-007",
+    "AUD-HAR-178",
+    "AUD-SEC-258",
+    "AUD-SEC-272",
+    "AUD-CODE-034",
+    "AUD-DOC-186",
+    "AUD-SEC-259",
+    "AUD-SEC-260",
+    "AUD-SEC-261",
+    "AUD-SEC-262",
+    "AUD-SEC-263",
+    "AUD-SEC-276",
+    "AUD-SEC-361",
+    "AUD-SEC-362",
+    "AUD-SEC-273",
+    "AUD-SEC-357",
+    "AUD-SEC-359",
+    "AUD-SEC-363",
+    "AUD-SEC-364",
+    "AUD-SEC-365",
+    "AUD-SEC-366",
+    "AUD-SEC-367",
+    "AUD-SEC-368",
+    "AUD-SEC-369",
+    "AUD-SEC-370",
+    "AUD-SEC-371",
+    "AUD-SEC-372",
+    "AUD-TEST-059",
+    "AUD-SEC-378",
+    "AUD-SEC-390",
+    "AUD-SEC-394",
+    "AUD-SEC-395"
+   ]
+  },
+  {
+   "reason": "Ngân sách episode `loop ci-triage` qua nhiều run (đếm cùng chữ ký giữ khi đổi/bỏ `--task`) — nhóm ci_log chỉ đo hành động lần đầu của episode, ca một log không tái hiện được; test `-k audit_delta_ci_triage_episode`",
+   "ids": [
+    "AUD-HAR-092"
+   ]
+  },
+  {
+   "reason": "Sổ audit/blueprint — `audit check` đọc SHA và gốc repo git thật (SHA quét trên nhánh chính, `--strict` lấy gốc repo chứa sổ), `blueprint-status` đối chiếu MUST `[x]` với lệnh `— Kiểm:`; không phải quyết định cho/chặn của PR, rollup, review hay guard; test `-k audit_sha_on_base`, `NaReevaluatedTest`, `blueprint-status --run`; `review_debt` đọc `git diff -z --no-renames` thật (AUD-SEC-132, `-k review_debt_special_file_names`; AUD-SEC-133, `-k review_debt_rename_into_docs`; AUD-SEC-138/139, `-k review_debt_dep_manifests_and_runtime_text`); `pr debt` so cây git thật từ review cuối tới head và nhánh đích (AUD-SEC-154, `-k debt_tree_check`); `pr rethink` so cây git thật để ghi head chưa sửa (AUD-HAR-135, `-k rethink_marks_unfixed_head_only_from_debt`); vân tay/file đổi và `pr debt` khi dự án ở thư mục con đọc git thật (AUD-HAR-149, `-k test_monorepo_fingerprint`; AUD-HAR-155, `-k test_debt_monorepo`); gói nghiệm thu hợp việc chờ người của `release-check` tươi (AUD-HAR-151, `-k test_signoff_fresh_release_human`)",
+   "ids": [
+    "AUD-HAR-077",
+    "AUD-HAR-078",
+    "AUD-HAR-079",
+    "AUD-SEC-132",
+    "AUD-SEC-133",
+    "AUD-SEC-138",
+    "AUD-SEC-139",
+    "AUD-SEC-154",
+    "AUD-HAR-135",
+    "AUD-HAR-149",
+    "AUD-HAR-151",
+    "AUD-HAR-155",
+    "AUD-CI-024",
+    "AUD-CI-026"
+   ]
+  },
+  {
+   "reason": "Bộ test của chính khung — ngưỡng CPU cứng đỏ ngẫu nhiên, test ghi vùng bằng chứng thật; không phải quyết định của máy; đỡ bằng `tests.test_perf.CpuBudgetTest`, `LoopRecordBranchesTest` (`RealAutopilotUntouchedMixin`)",
+   "ids": [
+    "AUD-TEST-008",
+    "AUD-TEST-009",
+    "AUD-TEST-088"
+   ]
+  },
+  {
+   "reason": "Bytecode hook — bộ nạp `python3 -I -B` chỉ tin pyc checked-hash là đường tiến trình hook (`_lib.sh`, `PY_LOADER`), không phải quyết định của `_rule_decision`; ca guard cho đường ghi bytecode chứa đường dẫn vùng bằng chứng nên script viết corpus bị chính guard chặn; test `-k guard_cache_tamper`",
+   "ids": [
+    "AUD-SEC-074"
+   ]
+  },
+  {
+   "reason": "`perf guard` không phải guard của hook — không có nhóm ca autonomy-bench cho lệnh này (AUD-SEC-116); đã có Gate unittest `-k test_guard_text_attr tests.test_perf`",
+   "ids": [
+    "AUD-SEC-116"
+   ]
+  },
+  {
+   "reason": "Đo thời gian mẫu / Gate mẫu (perf, `examples/`) — không thuộc lớp quyết định cho/chặn mà autonomy-bench kiểm; đỡ bằng Gate unittest `-k test_sample_timing_resolution` (AUD-PERF-003) và `-k test_gate_example_tamper` (AUD-XFEAT-026, AUD-XFEAT-027)",
+   "ids": [
+    "AUD-PERF-003",
+    "AUD-XFEAT-026",
+    "AUD-XFEAT-027"
+   ]
+  },
+  {
+   "reason": "Grafts trong phép so review của `xt.py` (`_git` đặt `GIT_GRAFT_FILE=/dev/null`) — không thuộc lớp quyết định cho/chặn của guard; đỡ bằng Gate unittest `-k test_review_drift_ignores_grafts tests.test_xt_cli` (AUD-SEC-168)",
+   "ids": [
+    "AUD-SEC-168"
+   ]
+  },
+  {
+   "reason": "Nợ review của file luật agent ở `release-check` hàng `review_debt` (`is_doc_path` ↔ `AGENT_RULE_GLOBS`) — không thuộc lớp quyết định cho/chặn mà autonomy-bench kiểm; đỡ bằng Gate unittest `-k test_delivery_phase_review_debt_agent_rule_files tests.test_delivery_phase` (AUD-XFEAT-030)",
+   "ids": [
+    "AUD-XFEAT-030"
+   ]
+  },
+  {
+   "reason": "Nguồn thân `gh` đọc từ file thật trên đĩa (`cat -n f`, `<<< \\`cat f\\``, `cat < f |`, `<&N`) — corpus chỉ có lệnh, không có file; đỡ bằng Gate unittest `-k test_review_marker_debt_354 tests.test_guard_audit1019` (AUD-SEC-174, AUD-SEC-175, AUD-SEC-176)",
+   "ids": [
+    "AUD-SEC-174",
+    "AUD-SEC-175",
+    "AUD-SEC-176"
+   ]
+  },
+  {
+   "reason": "Hiệu năng quyết định guard (thời gian, không phải cho/chặn) — đỡ bằng Gate unittest `cpu_budget.assert_not_quadratic` trong tests.test_guard_audit1019 (AuditPhase1101GuardTest.test_quote_like_repeat_not_cubic); sed (AUD-PERF-005): AuditRescan1101GuardTest.test_sed_distinct_delimiters_bounded; `GH_POST_RE` (AUD-PERF-012): tests.test_guard_strict -k gh_post_re_linear; glob tên lệnh (AUD-TEST-084, review #446): tests.test_guard_d155 GlobCommandNameTest — thời gian CPU, `ratio` mặc định 10",
+   "ids": [
+    "AUD-PERF-004",
+    "AUD-PERF-005",
+    "AUD-TEST-044",
+    "AUD-SEC-320",
+    "AUD-PERF-012",
+    "AUD-TEST-084"
+   ]
+  },
+  {
+   "reason": "Ghi sổ `.autopilot/reviews.json` đồng thời (đọc–sửa–ghi trong khoá `state.lock`) — toàn vẹn khi hai tiến trình cùng ghi, không phải quyết định cho/chặn; corpus chạy một tiến trình; đỡ bằng Gate unittest tests.test_merge -k reviews_ledger_concurrent",
+   "ids": [
+    "AUD-CODE-036"
+   ]
+  },
+  {
+   "reason": "Hàng `release-check` của cổng phát hành G7 (`go_no_go`: GO-NO-GO khớp VERSION, đã ký; adapter report của `report_result`) — không thuộc nhóm ca PR/rollup/review/guard; đỡ bằng Gate unittest tests.test_xt_cli -k go_no_go và tests.test_report_fixtures (AUD-HAR-315: output thật của gitleaks), tests.test_release_contract (AUD-HAR-318: dòng subject chỉ in khi cây sạch; AUD-HAR-323: dòng ký trong khối code; AUD-TEST-091: pathspec vân tay subject)",
+   "ids": [
+    "AUD-HAR-197",
+    "AUD-HAR-200",
+    "AUD-HAR-315",
+    "AUD-HAR-318",
+    "AUD-HAR-323",
+    "AUD-TEST-091"
+   ]
+  },
+  {
+   "reason": "Hàng `release-check` `prod_switch` đọc sổ quyết định và bản tháng trên đĩa (sổ chính vắng) — không thuộc nhóm ca PR/rollup/review/guard; đỡ bằng Gate unittest tests.test_xt -k prod_switch (AUD-HAR-327/328: `loop decide-prod`, tests.test_xt_cli -k decide_prod; AUD-HAR-329: tests.test_release_contract -k subject)",
+   "ids": [
+    "AUD-HAR-214",
+    "AUD-HAR-327",
+    "AUD-HAR-328",
+    "AUD-HAR-329",
+    "AUD-HAR-331"
+   ]
+  },
+  {
+   "reason": "`doctor` nhóm `sandbox` đọc settings Claude (local đè project), file devcontainer/`.cursor/sandbox.json` (chỉ gợi ý) và môi trường container/sandbox Cursor của máy — công cụ khuyên, không phải quyết định cho/chặn; đỡ bằng Gate unittest tests.test_doctor -k sandbox",
+   "ids": [
+    "AUD-HAR-202",
+    "AUD-HAR-203"
+   ]
+  },
+  {
+   "reason": "`install.py --plan`/cài thật: git hook, adapter, manifest.json — đường cài đặt có repo git thật; đỡ bằng Gate unittest tests.test_install -k plan_lists_git_hooks (AUD-HAR-325: -k worktree_manifest_uses_common_dir)",
+   "ids": [
+    "AUD-HAR-204",
+    "AUD-HAR-325"
+   ]
+  },
+  {
+   "reason": "`loop run` (vòng lặp ngoài): lệnh headless của công cụ agent — không thuộc nhóm ca PR/rollup/review/guard; đỡ bằng Gate unittest tests.test_xt_loop -k claude_runs_in_auto_permission_mode",
+   "ids": [
+    "AUD-HAR-205"
+   ]
+  },
+  {
+   "reason": "Cô lập test khỏi `.autopilot/` thật (snapshot bỏ nhật ký hook `guard-log.jsonl` mà phiên khác ghi song song) — hạ tầng test, không phải quyết định cho/chặn; đỡ bằng Gate unittest `tests.test_xt_core.RealAutopilotGuardTest`",
+   "ids": [
+    "AUD-TEST-054"
+   ]
+  },
+  {
+   "reason": "Hình payload chế độ `guard.py core` (tên tool không chuẩn, `project_dir`) — corpus guard chỉ có lệnh bash; đỡ bằng Gate unittest `tests.test_guard_strict.ReasonCodeLockTest` (ca core) và `tests.test_adapters`; adapter host khác (khoá đối số lệch → UNPARSED, `git push --no-verify` → NO_VERIFY — quyết định của hook Claude không đổi): `tests.test_adapters -k unparsed`, `-k push_no_verify`, `-k config_env` (`--config-env=core.hooksPath=…`, AUD-SEC-383)",
+   "ids": [
+    "AUD-SEC-346",
+    "AUD-HAR-201",
+    "AUD-SEC-349",
+    "AUD-SEC-350",
+    "AUD-SEC-351",
+    "AUD-SEC-352",
+    "AUD-SEC-383"
+   ]
+  },
+  {
+   "reason": "Gói nghiệm thu `next-step --package` (hợp `prod_switch` từ DECISIONS.md, AUD-HAR-169) và `pr debt --fixed` từ chối dòng 🔴 đã sửa từ trước (đọc sổ ở head review qua `git show`, AUD-HAR-182) — cần repo git thật có lịch sử sổ, không phải ca cho/chặn của corpus; đỡ bằng Gate unittest tests.test_next_step -k package và tests.test_merge -k debt_fixed_refuses_row_already_fixed",
+   "ids": [
+    "AUD-HAR-169",
+    "AUD-HAR-182"
+   ]
+  },
+  {
+   "reason": "Nợ review nhóm tài liệu 2026-11-02 (#382/#403/#409/#411/#412) — tài liệu/sổ/PLAN/mẫu, `validate --stale`, `install.py` chọn file research, bước cài bun của CI: không phải quyết định cho/chặn của PR, rollup, review hay guard; đỡ bằng Gate unittest tests.test_xt -k stale_verifications, tests.test_install -k research, tests.test_template_contracts, tests.test_ci -k pinned_bun, tests.test_plan_files và `changelog-check`",
+   "ids": [
+    "AUD-DOC-159",
+    "AUD-DOC-184",
+    "AUD-DOC-185",
+    "AUD-DOC-209",
+    "AUD-DOC-211",
+    "AUD-DOC-216",
+    "AUD-DOC-217",
+    "AUD-DOC-218",
+    "AUD-TEST-056",
+    "AUD-XFEAT-047"
+   ]
+  },
+  {
+   "reason": "`xt.py loop run --agent-args` (review #418): lệnh agent đã ghép đi qua `guard_block` ngay trong xt.py như lệnh Gate (LOOP-STOP-027) — quyết định chặn nằm ở guard đã có ca trong corpus (cờ tự duyệt), phần mới là đường gọi; đỡ bằng Gate unittest tests.test_xt_loop -k agent_args_go_through_guard",
+   "ids": [
+    "AUD-SEC-375"
+   ]
+  },
+  {
+   "reason": "Phạm vi commit và diff merge của job Gitleaks chạy trên GitHub, cần workflow và lịch sử Git thật. Kiểm bằng tests.test_ci.SecretScanTest và ca PR thử 31 commit trong báo cáo audit 2026-11-04.",
+   "ids": [
+    "AUD-CI-030"
+   ]
+  },
+  {
+   "reason": "Ghi qua hard link tới hook của repo hoặc linked worktree cần hai đường dẫn chung inode. Fixture `files` của autonomy-bench chỉ tạo file thường. Kiểm bằng tests.test_guard_strict.GuardDebt433Test, các ca test_aud_sec_447_hook_links và test_aud_sec_447_linked_worktree_hook. AUD-SEC-450 (link cứng tới hook/config của repo cha khi dự án nằm trong monorepo) cùng lý do: kiểm bằng tests.test_guard_git_metadata.ReviewDebt435Test.",
+   "ids": [
+    "AUD-SEC-447",
+    "AUD-SEC-450"
+   ]
+  },
+  {
+   "reason": "Nội dung tài liệu khung (mục checklist, mẫu GO-NO-GO, CHANGELOG) sai dữ kiện hoặc lệch luật nhà/định dạng — không phải hành vi của guard, PR hay CI mà bench mô phỏng. Kiểm bằng tests.test_content_facts (khoá 3 dữ kiện 🔴) và xt.py checks/check-links cho các sửa 🟠/🟢 review #436.",
+   "ids": [
+    "AUD-DOC-245",
+    "AUD-DOC-246",
+    "AUD-DOC-247",
+    "AUD-DOC-248"
+   ]
+  },
+  {
+   "reason": "Thiết kế ADR-0071 `perf trial` (review #440) — lệnh chưa có mã, các mục sửa chữ ADR/PLAN/nghiên cứu; không phải quyết định cho/chặn của guard, PR hay CI mà bench mô phỏng. Hành vi được khoá bằng ca FLOW-20…23, 27…45 của tests/test_flow.py khi triển khai T-3700…T-3707 (Gate T-3552 STRICT cả các ID đó).",
+   "ids": [
+    "AUD-HAR-230",
+    "AUD-HAR-231",
+    "AUD-HAR-232",
+    "AUD-HAR-233",
+    "AUD-HAR-234",
+    "AUD-HAR-235",
+    "AUD-HAR-236",
+    "AUD-HAR-237",
+    "AUD-HAR-238",
+    "AUD-HAR-239",
+    "AUD-HAR-240",
+    "AUD-HAR-241",
+    "AUD-HAR-242",
+    "AUD-HAR-243",
+    "AUD-HAR-244"
+   ]
+  },
+  {
+   "reason": "Hành vi của `xt.py perf trial` (review #442, D-366): gốc từ đầu nhánh máy chủ, diff không theo `diff.ignoreSubmodules`, HOME theo passwd, quét không nuốt lỗi quyền — không phải quyết định cho/chặn của guard, PR hay CI mà bench mô phỏng (phần guard của review #442 là AUD-SEC-523, có ca r442-*). Khoá bằng tests/test_perf_trial.TrialReview442Test và FLOW-28.",
+   "ids": [
+    "AUD-SEC-524",
+    "AUD-SEC-525",
+    "AUD-SEC-526",
+    "AUD-SEC-527"
+   ]
+  },
+  {
+   "reason": "Hành vi lệnh test tự dò của `scripts/dev-task.sh` (review #444, D-369): unittest về `discover` tuần tự, pytest-xdist tôn trọng cấu hình tắt, `XT_JOBS` có trần, README và BASE-GATE-020 — không phải quyết định cho/chặn của guard, PR hay CI mà bench mô phỏng. Khoá bằng tests/test_dev_task_parallel và lệnh kiểm BASE-CFG-003/`xt.py validate`. AUD-TEST-085 (`python3 -P -m pytest`, khoá bằng tests/test_dev_task_parallel) cùng loại — review #446.",
+   "ids": [
+    "AUD-TEST-070",
+    "AUD-TEST-071",
+    "AUD-TEST-072",
+    "AUD-TEST-073",
+    "AUD-TEST-074",
+    "AUD-TEST-075",
+    "AUD-TEST-085"
+   ]
+  },
+  {
+   "reason": "Hành vi của `xt.py perf trial` (review #443, D-368): `status --check` ràng `HEAD^{tree}` với cây neo, pathspec theo nghĩa đen qua stdin, môi trường lệnh đo mới mỗi lần chạy, khoá `.venv/`/`node_modules/` và thu hồi file trong thư mục PATH của cây đo — không phải quyết định cho/chặn của guard, PR hay CI mà bench mô phỏng. Khoá bằng FLOW-46 (tests/test_flow.py) và tests/test_perf_trial.TrialReview443Test.",
+   "ids": [
+    "AUD-HAR-260",
+    "AUD-HAR-261",
+    "AUD-HAR-262",
+    "AUD-HAR-263"
+   ]
+  },
+  {
+   "reason": "Hành vi của `xt.py perf trial` (review #445, D-370): Gate mẫu fail-closed khi không đọc được công cụ, ngắt sau đóng băng tiêu lần đo lại duy nhất, `status --check` đòi held-out gộp đạt `target`, đầu ra chỉ số chính so gốc, không ghi `decide` trùng sau khi chết, `abort` sau `finish --no-apply` giữ — không phải quyết định cho/chặn của guard, PR hay CI mà bench mô phỏng. Khoá bằng tests/test_perf_trial.TrialReview445Test (FLOW-47…51).",
+   "ids": [
+    "AUD-HAR-270",
+    "AUD-HAR-271",
+    "AUD-HAR-272",
+    "AUD-HAR-273",
+    "AUD-HAR-274",
+    "AUD-HAR-275"
+   ]
+  },
+  {
+   "reason": "Hành vi của `xt.py perf trial` và tài liệu đường lùi (audit delta T-3557, D-371): so cây neo trừ đường sổ sách, Gate qua squash-merge, `start` khi PLAN-opt/D-NNN commit trên nhánh, file mới che mô-đun nhập được ở gốc → `tampered`, đường lùi đo tay thay Gate `bash <(…)`, test luật giữ — không phải quyết định cho/chặn của guard, PR hay CI mà bench mô phỏng. Khoá bằng tests/test_perf_trial.TrialAudit3557Test (FLOW-52…55) và tests/test_perf.PerfGateExampleTest.",
+   "ids": [
+    "AUD-HAR-280",
+    "AUD-HAR-281",
+    "AUD-HAR-282",
+    "AUD-HAR-283",
+    "AUD-HAR-284"
+   ]
+  },
+  {
+   "reason": "Hành vi của `xt.py perf trial` theo review #447 (D-372): miễn sổ sách chỉ file sổ sách thường, symlink/dòng nhắc vùng sổ sách → `tampered`/Gate 1, gói namespace là tên nhập được, lần giữ vòng trước chỉ khi nhánh mặc định không đổi mã — không phải quyết định cho/chặn của guard, PR hay CI mà bench mô phỏng. Khoá bằng tests/test_perf_trial.TrialReview447Test (FLOW-56…58).",
+   "ids": [
+    "AUD-HAR-290",
+    "AUD-HAR-291",
+    "AUD-HAR-292",
+    "AUD-HAR-293"
+   ]
+  },
+  {
+   "reason": "Trần kích thước thư mục của chính repo khung (ADR-0072, D-373): nhóm vượt 2× mốc gần nhất mà chưa có ADR khai mốc mới — đo byte file git theo dõi, không phải quyết định cho/chặn của guard, PR hay CI mà bench mô phỏng. Khoá bằng tests/test_docs_budget.DocsBudgetTest (test_dir_totals_within_double_latest_mark, test_size_marks_are_declared_by_existing_adr).",
+   "ids": [
+    "AUD-ARCH-009"
+   ]
+  },
+  {
+   "reason": "Khoá `stage_approval: agent` (ADR-0069) chỉ có hiệu lực khi xt.yaml đã commit ở `origin/main`/`origin/master` của remote — fixture `files` của autonomy-bench không dựng được repo git có remote ref. Kiểm bằng tests.test_stage_agent_approval (repo git thật có remote: `env -u …` né nhánh agent, `remote set-head`, PR đổi khoá là ngoại lệ cứng). AUD-SEC-625/637 (đọc khoá ở bản mới của remote trong phiên agent): tests.test_stage_agent_approval.",
+   "ids": [
+    "AUD-SEC-499",
+    "AUD-SEC-500",
+    "AUD-HAR-222",
+    "AUD-SEC-625",
+    "AUD-SEC-637"
+   ]
+  },
+  {
+   "reason": "Gói sản phẩm và `install.py --pack` (ADR-0068 lát B–D) — hành vi của installer, mã TypeScript và migration của gói (AUD-DATA-001, D-377) và ca sai cố ý, không phải guard/PR/CI/harness. Kiểm bằng tests.test_install_pack, tests.test_packs và workflow pack-web-api.yml (Postgres thật, mutants.json).",
+   "ids": [
+    "AUD-SEC-501",
+    "AUD-CODE-064",
+    "AUD-HAR-223",
+    "AUD-TEST-063",
+    "AUD-CODE-048",
+    "AUD-HAR-224",
+    "AUD-HAR-225",
+    "AUD-HAR-226",
+    "AUD-DATA-001",
+    "AUD-SEC-530",
+    "AUD-SEC-531",
+    "AUD-DATA-007",
+    "AUD-DATA-006",
+    "AUD-DATA-009",
+    "AUD-CI-032"
+   ]
+  },
+  {
+   "reason": "Registry sản phẩm (`xt.py registry`, `GET /api/registry` của `xt.py app` — ADR-0068 lát E): kiểm schema và thông điệp lỗi của lệnh đọc, không phải guard/PR/CI/harness. Kiểm bằng tests.test_registry.",
+   "ids": [
+    "AUD-CODE-049",
+    "AUD-SEC-503"
+   ]
+  },
+  {
+   "reason": "Điều kiện ký của `xt.py release-sign` và đánh giá `promotion` (ADR-0074) đọc GO-NO-GO trên cây và trong lịch sử git (D-404), sổ `.autopilot/`, khoá `release_signoff` — không thuộc nhóm ca PR/rollup/review/guard; đỡ bằng Gate unittest tests.test_release_signoff (AUD-SEC-542: ReleaseSignRealCheckTest.test_rejected_in_tree_not_overridden, test_refusal_kept_on_main_after_tree_delete, ReleaseSignTest.test_refuses_when_promotion_rejected, test_history_unreadable_fails_closed; AUD-SEC-543: test_promotion_counts_agent_row_only_with_key; AUD-HAR-339: test_unchecked_must_blocks_sign; AUD-SEC-546: ReleaseSignRealCheckTest.test_refusal_on_pr_branch_deleted, ReleaseSignSubdirTest.test_refusal_on_main_deleted_in_tree, GoHistoryTest.test_scope_any_dir_case_version; AUD-SEC-547: ReleaseSignRealCheckTest.test_refusal_cell_not_go, test_refusal_survives_version_bump, test_refusal_undated_row_in_target, test_refusal_deleted_on_main, GoHistoryTest.test_row_rules; AUD-SEC-548: GoHistoryTest.test_isolated_git_env_and_unfetched_remote; AUD-SEC-549: ReleaseSignRealCheckTest.test_merge_ours_does_not_hide_refusal, test_shallow_fetch_refused, test_remote_ref_deleted_locally_still_seen, test_pull_ref_survives_branch_delete, test_external_repo_go_does_not_lift; AUD-SEC-550: GoHistoryTest.test_show_root_pinned, test_supersede_needs_new_signed_human_go_in_section_five, test_tables_without_decision_column_not_read, test_pins_all_refs_and_full_context, ReleaseSignRealCheckTest.test_lower_version_go_does_not_lift, test_free_form_go_and_appendix_table_not_refusal; AUD-SEC-552: ReleaseSignRealCheckTest.test_remote_key_off_refused_with_stale_tracking_ref, test_remote_key_missing_refused, ReleaseSignSubdirTest.test_remote_key_read_at_project_path; AUD-SEC-553: GoMirrorCredentialTest — clone mirror qua HTTP cần xác thực, không phải quyết định guard; AUD-SEC-559: GoMirrorCredentialTest.test_foreign_global_config_not_trusted, test_askpass_not_kept_for_clone — nguồn helper/môi trường của clone, không phải quyết định guard) AUD-SEC-629/630 (ô Tên vô hình, hậu tố `subject:`): tests.test_release_signoff.GoInvisibleSignerTest, tests.test_guard_go_no_go.",
+   "ids": [
+    "AUD-HAR-339",
+    "AUD-SEC-542",
+    "AUD-SEC-543",
+    "AUD-SEC-546",
+    "AUD-SEC-547",
+    "AUD-SEC-548",
+    "AUD-SEC-549",
+    "AUD-SEC-550",
+    "AUD-SEC-552",
+    "AUD-SEC-553",
+    "AUD-SEC-559",
+    "AUD-SEC-629",
+    "AUD-SEC-630"
+   ]
+  },
+  {
+   "reason": "Lời khai phạm vi trong CHANGELOG/harness-files/sổ (\"mọi luật gh\" đọc dạng chuẩn hoá cobra) — tài liệu, không có hành vi để mô phỏng; hành vi tương ứng được ghim bằng tests.test_guard_gh_parity (đối chiếu 778 biến thể cờ-trước-lệnh-con với dạng gốc) và các ca corpus aud575/577/578/579-*.",
+   "ids": [
+    "AUD-DOC-281"
+   ]
+  },
+  {
+   "reason": "Cổng phát hành của xt.py (`release-check` hàng tree, `release-sign` đọc `loop defer`) — không phải quyết định guard/harness/pr để mô phỏng bằng corpus; đỡ bằng repo git tạm trong tests.test_release_contract (PromotionTest.test_status_config_cannot_hide_dirty_tree) và tests.test_release_signoff (test_deferred_read_from_every_worktree, test_unknown_or_broken_state_refuses, ReleaseSignSubdirTest); hàng `verify` đọc sổ máy mọi worktree (AUD-HAR-369): tests.test_release_contract.ReleaseVerifyWorktreeTest. AUD-HAR-371/400 (liệt kê worktree khi git in thư mục git / git cũ): tests.test_release_signoff, tests.test_release_contract.",
+   "ids": [
+    "AUD-HAR-334",
+    "AUD-HAR-340",
+    "AUD-HAR-369",
+    "AUD-HAR-377",
+    "AUD-HAR-371",
+    "AUD-HAR-400",
+    "AUD-HAR-416"
+   ]
+  },
+  {
+   "reason": "Hồi quy chỉ tồn tại trong nhánh PR #495 (chưa từng ở main) — hành vi đúng là «y như main», đã có ca corpus aud605-* (refs AUD-SEC-605) ghim các lệnh đó; ghim đầy đủ bằng tests.test_hooks.GuardQuotedOperatorTest (test_substitution_same_as_main, test_never_weaker_than_legacy_reading).",
+   "ids": [
+    "AUD-SEC-613"
+   ]
+  },
+  {
+   "reason": "Thứ tự `sau:` trong PLAN-factory-e2e (cơ chế bù đóng trước phần nới, ADR-0075 §Quyết định 6; review #502) — nội dung một file PLAN, không phải quyết định cho/chặn của guard, PR, rollup hay CI mà bench mô phỏng. Khoá bằng tests.test_plan_factory_order (có ca tái hiện thứ tự cũ).",
+   "ids": [
+    "AUD-HAR-380"
+   ]
+  },
+  {
+   "reason": "Lỗi nằm ở `dev-task.sh format-file` (formatter PostToolUse chuẩn hoá dòng §5 sau khi guard đã cho qua) — không phải quyết định của guard/PR/CI mà bench mô phỏng. Khoá bằng tests.test_hooks.DevTaskTest.test_format_file_skips_go_no_go. AUD-HAR-394/395 (`run_format` chụp–khôi phục, `trap` khi bị ngắt) và AUD-SEC-649 (hướng dẫn mẫu xt.yaml): tests.test_hooks.DevTaskTest.",
+   "ids": [
+    "AUD-SEC-628",
+    "AUD-HAR-394",
+    "AUD-HAR-395",
+    "AUD-SEC-649",
+    "AUD-HAR-417",
+    "AUD-HAR-422"
+   ]
+  },
+  {
+   "reason": "Nợ review #502 trả ở #505 — lời văn và phụ thuộc `sau:` của ADR-0075, PLAN-factory-e2e, T-3555 ở PLAN-harden-2026-10-27-loops, research 2026-11-11 và PROGRESS: tài liệu/PLAN, không phải quyết định cho/chặn của guard, PR, rollup hay CI mà bench mô phỏng. Đỡ bằng `validate`, `check-links`, `progress-check`, tests.test_plan_files (PLAN máy đọc được) và `plan waves` (không chu trình); thứ tự `sau:` của AUD-HAR-383 không có test riêng.",
+   "ids": [
+    "AUD-DOC-282",
+    "AUD-DOC-283",
+    "AUD-DOC-284",
+    "AUD-DOC-285",
+    "AUD-DOC-286",
+    "AUD-HAR-381",
+    "AUD-HAR-382",
+    "AUD-HAR-383"
+   ]
+  },
+  {
+   "reason": "Lời văn của bảy đặc tả xưởng đầu-cuối `docs/specs/SPEC-factory-*.md` (review #505) — đặc tả cho khoá, lệnh và sổ CHƯA có mã, nên không có hành vi của guard, PR, rollup hay CI để bench mô phỏng. Ba 🔴 (AUD-HAR-386, AUD-SEC-638, AUD-HAR-387) khoá bằng tests.test_spec_factory_facts; bốn 🟠 (AUD-SEC-639, AUD-DOC-289, AUD-HAR-389, AUD-HAR-390) là lời văn đã sửa, kiểm bằng scenario của đặc tả khi task tương ứng có mã.",
+   "ids": [
+    "AUD-HAR-386",
+    "AUD-HAR-387",
+    "AUD-HAR-389",
+    "AUD-HAR-390",
+    "AUD-SEC-638",
+    "AUD-SEC-639",
+    "AUD-DOC-289"
+   ]
+  },
+  {
+   "reason": "Bộ chấm JUnit cho mutation của gói Vitest nằm ngoài sáu nhóm của autonomy-bench. CI chạy tests.test_packs, có ca đúng tên, sai tên và lỗi hạ tầng.",
+   "ids": [
+    "AUD-TEST-107"
+   ]
+  },
+  {
+   "reason": "Hợp đồng của chính bộ chấm autonomy-bench được kiểm độc lập bởi tests.test_autonomy_bench.AutonomyBenchCorpusTest trong CI: kết quả thiếu hoặc sai kiểu phải trả exit 1 và ghi mismatch cho cả hai giá trị mong đợi.",
+   "ids": [
+    "AUD-TEST-108"
+   ]
+  },
+  {
+   "reason": "Hướng dẫn phục hồi của release-check khi dùng worktree, kiểm bằng ReleaseVerifyWorktreeTest với hai checkout Git thật.",
+   "ids": [
+    "AUD-HAR-401"
+   ]
+  },
+  {
+   "reason": "Lỗi kiểu đường dẫn của trình cài đặt, kiểm bằng HooksPathSymlinkTest với Git hooksPath trỏ vào file hoặc đi qua file.",
+   "ids": [
+    "AUD-HAR-406"
+   ]
+  },
+  {
+   "reason": "Quy tắc index PostgreSQL trong gói web-api-ts, kiểm bằng tests.test_packs.MigrationIndexTest trên fixture migration giao dịch.",
+   "ids": [
+    "AUD-DATA-012",
+    "AUD-DATA-013"
+   ]
+  },
+  {
+   "reason": "Kiểm tra upstream của lockfile bằng registry npm trên workflow dự án đích; nghiệm thu bằng cài gói vào repo sạch và chạy pnpm audit.",
+   "ids": [
+    "AUD-DEP-022"
+   ]
+  },
+  {
+   "reason": "Phạm vi hook pre-push do Git gọi, kiểm bằng GitHooksTest với hai repo dùng chung core.hooksPath; corpus mô phỏng guard Bash, không gọi hook Git.",
+   "ids": [
+    "AUD-HAR-393"
+   ]
+  },
+  {
+   "reason": "Hook shell, cổng commit, cài đặt — đường chạy tiến trình (`dev-task.sh`, `pre-*-guard.sh`, `install.py`, `loop record`); test_hooks.py, test_install.py chạy hook thật; khóa state thiếu fcntl/flock và guard lỗi nạp/fallback (ADR-0054) là đường CLI/Gate có file thật: UpdateStateTest, GuardChokePointTest kiểm state bất biến và canary không chạy AUD-SEC-753 (cờ `no_verify` của commit viết tắt): tests.test_hooks.GuardMiscOrangeTest.",
+   "ids": [
+    "AUD-SEC-753"
+   ]
+  },
+  {
+   "reason": "Cổng phát hành của xt.py (`release-check` hàng tree, `release-sign` đọc `loop defer`) — không phải quyết định guard/harness/pr để mô phỏng bằng corpus; đỡ bằng repo git tạm trong tests.test_release_contract (PromotionTest.test_status_config_cannot_hide_dirty_tree) và tests.test_release_signoff (test_deferred_read_from_every_worktree, test_unknown_or_broken_state_refuses, ReleaseSignSubdirTest); hàng `verify` đọc sổ máy mọi worktree (AUD-HAR-369): tests.test_release_contract.ReleaseVerifyWorktreeTest.",
+   "ids": []
+  },
+  {
+   "reason": "Trường `milestone_audit` của `loop status` theo pha (harden → `signoff`, build → `g7`; D-500) — lời nhắc tiến trình của vòng, không phải quyết định cho/chặn của PR, rollup, review hay guard; đỡ bằng tests.test_audit_dot4_har.MilestoneAuditPhaseTest và tests.test_xt_core -k test_milestone_done",
+   "ids": [
+    "AUD-HAR-412"
+   ]
+  },
+  {
+   "reason": "Cô lập mạng của chính bộ test khung (test guard không gọi `gh` thật qua merge-check) — hạ tầng test, không phải quyết định của máy; đỡ bằng tests.test_audit_dot4_har.GreenGhNoNetworkTest với shim gh lỗi",
+   "ids": [
+    "AUD-TEST-109",
+    "AUD-TEST-112",
+    "AUD-TEST-117"
+   ]
+  },
+  {
+   "reason": "Thời gian quyết định của guard (độ phức tạp `_SedCtx._cond_segs`, hạn giờ chung `DECISION_SECONDS`, D-505) — thuộc tính hiệu năng, không phải cho/chặn của một lệnh để mô phỏng bằng corpus; đỡ bằng tests.test_guard_signoff6 (test thời gian 100 KB < 20 s và BUDGET, sed không bậc hai)",
+   "ids": [
+    "AUD-SEC-884",
+    "AUD-SEC-885"
+   ]
+  },
+  {
+   "reason": "Cần cây thư mục có worktree liên kết thật (`.git` là tệp gitdir + `commondir`) — corpus bench chạy ở một gốc thường nên không mô phỏng được; đỡ bằng tests.test_guard_signoff9 (test_linked_worktree_common_git, dựng repo chính và worktree tạm)",
+   "ids": [
+    "AUD-SEC-911"
+   ]
+  },
+  {
+   "reason": "Ghi đè `.git/**` cần cây thư mục thật (worktree liên kết với gitdir/commondir, repo con `sub/.git`) — corpus bench chạy ở gốc thường nên không mô phỏng được và fuzz bọc `cd /tmp` đổi nghĩa ca `.git` tương đối; đỡ bằng tests.test_guard_signoff10 và họ `T10|*` trong d503_invariant.jsonl",
+   "ids": [
+    "AUD-SEC-924"
+   ]
+  },
+  {
+   "reason": "Cần môi trường thật mà corpus bench (gốc thường, không mạng, không git config riêng) không dựng được: symlink thư mục trỏ ra ngoài dự án (AUD-SEC-939), cấu hình git có sẵn như `push.default=upstream` hoặc `remote.origin.mirror` (AUD-SEC-946); đỡ bằng tests.test_guard_signoff11 và tests.test_guard_signoff12 (dựng cây/repo tạm) và họ `T11|*`, `T12|*` trong d503_invariant.jsonl",
+   "ids": [
+    "AUD-SEC-939",
+    "AUD-SEC-946"
+   ]
+  },
+  {
+   "reason": "Thời gian quyết định của guard khi quét lệnh máy xa dài (F8: ssh/kubectl/docker exec, hạn giờ chung D-505) — thuộc tính hiệu năng, không phải cho/chặn của một lệnh để mô phỏng bằng corpus; đỡ bằng tests.test_guard_signoff14 (cpu_budget, không ngưỡng cứng) và tests.test_guard_exec_class",
+   "ids": [
+    "AUD-SEC-969"
+   ]
+  },
+  {
+   "reason": "Cấu hình/tài liệu/workflow của khung, không phải quyết định guard/harness/pr mô phỏng bằng corpus: ruleset `required_review_thread_resolution` theo `merge_review` (đỡ bằng tests.test_ci), bước `pnpm audit:exceptions` của workflow gói (tests.test_packs, tests.test_pack_audit_exceptions), `PROGRESS.md` lạc hậu (xt.py progress-check; sửa ở PR cắt bản 3.34.0); `compose` đọc quy mô cũ và câu LOOP-HARNESS-020 (xt.py compose, tests.test_xt_cli, tests.test_doctor — sửa ở #672); thứ tự bước của skill `/complete` (tests.test_audit_dot4_har.CompleteNextStepTest — sửa ở #677); `test-select` chọn theo lớp không ra 0 lớp (tests.test_commit_gate — sửa ở #678)",
+   "ids": [
+    "AUD-CI-034",
+    "AUD-DEP-033",
+    "AUD-HAR-435",
+    "AUD-HAR-437",
+    "AUD-HAR-438",
+    "AUD-HAR-440",
+    "AUD-TEST-130"
+   ]
+  }
+ ]
+}

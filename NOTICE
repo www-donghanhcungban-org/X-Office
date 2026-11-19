@@ -1,0 +1,28 @@
+X-office
+Copyright (c) 2026 www-donghanhcungban-org
+
+Toàn bộ repo (mã, tài liệu, checklist, mẫu) phát hành theo giấy phép MIT — xem LICENSE —
+trừ các thành phần bên thứ ba liệt kê dưới đây, giữ nguyên giấy phép gốc của chúng.
+
+Thành phần bên thứ ba
+---------------------
+
+axe-core 4.14.0 — tests_e2e/vendor/axe/axe.min.js
+  Copyright (c) 2015 - 2026 Deque Systems, Inc.
+  Giấy phép: MPL-2.0 (tests_e2e/vendor/axe/LICENSE); thành phần bên thứ ba nhúng trong tệp:
+  tests_e2e/vendor/axe/LICENSE-3RD-PARTY.txt. Nguồn, phiên bản, checksum: tests_e2e/vendor/axe/SOURCE.
+  Tệp chép nguyên bản, không sửa; chỉ dùng cho test E2E của repo, không chép sang dự án đích.
+
+Nhãn hiệu
+---------
+
+Tên sản phẩm và tổ chức nhắc trong repo (ví dụ Claude, Claude Code, Anthropic, OpenAI, Codex, Gemini,
+GitHub, OWASP, ISO, W3C; Techcombank, VietQR, NAPAS 247 trên ảnh mã ủng hộ docs/assets/) là nhãn hiệu của chủ sở hữu tương ứng, chỉ dùng để gọi đúng tên. X-office
+không liên kết với, không được tài trợ hay xác nhận bởi các chủ sở hữu đó.
+
+Chuẩn, luật và tài liệu tham khảo
+---------------------------------
+
+Checklist dẫn chiếu chuẩn và văn bản pháp luật bằng mã mục, tóm tắt và đường link; không chép nguyên
+văn chuẩn có bản quyền. Đọc bản gốc từ nguồn chính thức. Nội dung pháp lý trong repo không phải tư vấn
+pháp lý.
