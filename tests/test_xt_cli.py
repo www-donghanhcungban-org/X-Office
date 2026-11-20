@@ -1079,7 +1079,7 @@ class RepoBlueprintKiemTest(TmpRepoCase):
 
     def test_base_repo_005_subject_like_flag_is_red(self):
         """AUD-CI-029: subject đúng bằng `--help`/`-h` không được thành cờ của `pr title-check` (argparse in help, exit 0 —
-        xanh giả); Kiểm gọi `pr title-check -- "$s"`."""
+        xanh giả); subject lịch sử luôn là dữ liệu, kể cả khi bắt đầu bằng dấu gạch."""
         self.link_scripts()
         self.commit_as("t", "chore: gốc")
         self.git("tag", "v3.20.0")
@@ -1110,8 +1110,71 @@ class RepoBlueprintKiemTest(TmpRepoCase):
             ln for ln in (ROOT / "BLUEPRINT.md").read_text(encoding="utf-8").splitlines() if "`BASE-REPO-005`" in ln
         )
         kiem = xt._check_cmd(line)
-        self.assertIn("%an", kiem)
+        self.assertEqual(
+            kiem,
+            "b=v3.20.0; git rev-parse -q --verify refs/tags/x-office-start >/dev/null && b=x-office-start; "
+            'python3 scripts/xt.py pr title-check --range "$b..origin/main"',
+        )
         self.assertIsNone(re.search(r"\b[0-9a-f]{12,40}\b", kiem))
+
+    def test_title_history_one_git_log_preserves_authors_and_subjects(self):
+        self.commit_as("t", "base excluded")
+        self.git("tag", "v1.0")
+        self.commit_as("t", "fix: " + "ệ" * 95 + " (#123)")
+        self.commit_as("bot[bot]", "unconventional")
+        self.commit_as("t", 'Revert "an earlier change"')
+        self.commit_as("[bot] person", "--help")
+        first_bad = self.git("rev-parse", "HEAD")
+        self.commit_as("t", "fix: " + "x" * 95 + " (#1oops)")
+        second_bad = self.git("rev-parse", "HEAD")
+        with unittest.mock.patch.object(xt, "_git", wraps=xt._git) as git:
+            rc, out, err = run_main("pr", "title-check", "--range", "v1.0..origin/main")
+        self.assertEqual(rc, 1)
+        self.assertIn("5 commit, 1 bot, 2 sai", out)
+        self.assertIn(first_bad, err)
+        self.assertIn(second_bad, err)
+        self.assertIn("--help", err)
+        self.assertIn("ký tự > 100", err)
+        self.assertEqual(git.call_count, 1)
+        self.assertEqual(git.call_args.args[1], "log")
+        self.assertEqual(
+            run_main("pr", "title-check", "--range", "HEAD..HEAD"), (0, "pr title-check: 0 commit, 0 bot, 0 sai\n", "")
+        )
+
+    def test_title_history_ref_errors_and_disabled_policy(self):
+        self.commit_as("t", "base")
+        self.commit_as("t", "invalid")
+        (self.repo / "xt.yaml").write_text("pr_title_check: off\n", encoding="utf-8")
+        self.assertIn("pr_title_check: off", run_main("pr", "title-check", "--range", "HEAD~1..HEAD")[1])
+        for revision_range in (
+            "",
+            "HEAD",
+            "HEAD...HEAD",
+            "a..b..c",
+            "..HEAD",
+            "HEAD..",
+            "--all..HEAD",
+            "HEAD..^HEAD",
+            "HEAD..missing-ref",
+            "HEAD^{tree}..HEAD",
+        ):
+            with self.subTest(revision_range=revision_range):
+                rc, out, err = run_main("pr", "title-check", f"--range={revision_range}")
+                self.assertEqual((rc, out), (2, ""))
+                self.assertIn("pr title-check --range", err)
+        with self.assertRaises(SystemExit) as cm:
+            run_main("pr", "title-check", "--range", "HEAD..HEAD", "fix: explicit")
+        self.assertEqual(cm.exception.code, 2)
+
+    def test_title_history_bad_git_output_fails_closed(self):
+        for output in ("missing terminator", "sha\0name\0"):
+            with (
+                self.subTest(output=output),
+                unittest.mock.patch.object(xt, "_git", return_value=subprocess.CompletedProcess([], 0, output, "")),
+            ):
+                rc, _, err = run_main("pr", "title-check", "--range", "a..b")
+            self.assertEqual(rc, 2)
+            self.assertIn("thiếu trường", err)
 
     def test_base_sec_006_dockerfile_red_under_pipefail(self):
         """AUD-CI-026: `! git ls-files | grep -q…` xanh giả khi grep thoát sớm và `git ls-files` nhận SIGPIPE (pipefail).

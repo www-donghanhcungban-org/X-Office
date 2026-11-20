@@ -32,9 +32,9 @@ DIR_CAPS = {  # nhóm → (pathspec git, trần byte); đo: `git ls-files -z -- 
 # không chờ audit). Mốc = (ngày, byte theo pathspec của nhóm ở commit ghi trong ADR, ADR ghi mốc); không xoá mốc cũ. MỘT
 # dòng của ADR ghi đường nhóm; ngày và byte của mốc cùng một ô bảng (dòng thường là một ô; review #448/#449). Mốc
 # 2026-10-26 do ADR-0050 khai; ADR-0050 tách nhóm và số qua hai dòng nên trỏ bảng số đo ADR-0072 (ghi nguồn). Chỉ nhóm
-# đã vượt 2× mới có mốc mới (scripts giữ mốc 2026-10-26).
+# đã vượt 2× mới có mốc mới (xét lại nhóm scripts ở ADR-0083).
 SIZE_MARKS = {
-    "scripts (xt.py, install.py, xt_app)": (("2026-10-26", 711824, "ADR-0072"),),
+    "scripts (xt.py, install.py, xt_app)": (("2026-10-26", 711824, "ADR-0072"), ("2026-11-20", 1414300, "ADR-0083")),
     ".claude/hooks": (("2026-10-26", 369274, "ADR-0072"), ("2026-11-05", 843817, "ADR-0072")),
     "framework/11-autonomous-loop": (("2026-10-26", 232297, "ADR-0072"),),
     "docs/ops": (("2026-11-02", 771538, "ADR-0072"),),  # số đo D-314 (T-3651), ADR-0072 nhận làm mốc

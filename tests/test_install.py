@@ -35,6 +35,26 @@ class InstallTest(unittest.TestCase):
     def run_install(self, *extra) -> int:
         return install.main([str(self.target), "--label", "test", *extra])
 
+    def test_managed_optional_helpers_follow_the_selected_framework_version(self):
+        root = self.target / ".xtemplates"
+        root.mkdir()
+        install.install_framework(root, "with-factory")
+        helpers = ("xt_acceptance.py", "xt_flow.py", "xt_ops_setup.py", "xt_release_ops.py")
+        self.assertTrue(all((root / "scripts" / name).is_file() for name in helpers))
+        project_file = self.target / "product.py"
+        project_file.write_text("product = True\n")
+        with tempfile.TemporaryDirectory() as temp:
+            minimal = Path(temp)
+            (minimal / "framework").mkdir()
+            (minimal / "scripts").mkdir()
+            for name in ("xt.py", "dev-task.sh", "check-links.py"):
+                shutil.copy2(ROOT / "scripts" / name, minimal / "scripts" / name)
+            with mock.patch.object(install, "SRC", minimal):
+                install.install_framework(root, "minimal")
+                install.install_framework(root, "minimal")
+        self.assertFalse(any((root / "scripts" / name).exists() for name in helpers))
+        self.assertEqual(project_file.read_text(), "product = True\n")
+
     def test_install_requires_cpython_315_minor_before_writing(self):
         for implementation, version in (("cpython", (3, 14, 10)), ("cpython", (3, 16, 0)), ("pypy", (3, 15, 2))):
             with (

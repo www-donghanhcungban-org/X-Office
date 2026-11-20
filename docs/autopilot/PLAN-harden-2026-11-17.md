@@ -158,5 +158,6 @@
 
 - [x] `T-3966` Bộ sinh harness Codex trong `install.py` (`--harness codex`, `--sync-codex`), tệp sinh ở repo khung, test so byte — Gate: `python3 -m unittest tests.test_codex_harness` (files: scripts/install.py, tests/test_codex_harness.py, .agents/, .codex/, framework/templates/harness/README.md)
 - [x] `T-3967` 🟠 AUD-SEC-987: guard xếp `.agents/skills/*`, `.codex/agents/*`, `.codex/hooks.json` vào nhóm năng lực cần duyệt ở dự án đích — Gate: `python3 -m unittest tests.test_hooks.CapabilityCodexPathsTest` (files: .claude/hooks/guard.py, tests/)
-- [ ] `T-3968` 🟠 AUD-SEC-988: khôi phục tệp/thư mục hàng rào từ rev/stash (`git checkout <rev> --`, `git restore --source`) → chặn — Gate: `python3 -m unittest tests.test_hooks.FenceRestoreFromRevTest` (files: .claude/hooks/guard.py, tests/)
-- [ ] `T-3969` 🟠 AUD-SEC-989: rào tệp nối guard của Cursor/Copilot/Grok/OpenCode như `.codex/hooks.json` — Gate: `python3 -m unittest tests.test_hooks.FenceAdapterFilesTest` (sau: T-3968; files: .claude/hooks/guard.py, scripts/xt.py, tests/)
+- [x] `T-3968` 🟠 AUD-SEC-988: khôi phục tệp/thư mục hàng rào từ rev/stash (`git checkout <rev> --`, `git restore --source`) → chặn — Gate: `python3 -m unittest tests.test_hooks.FenceRestoreFromRevTest` (files: .claude/hooks/guard.py, tests/)
+- [x] `T-3969` 🟠 AUD-SEC-989: rào tệp nối guard của Cursor/Copilot/Grok/OpenCode như `.codex/hooks.json` — Gate: `python3 -m unittest tests.test_hooks.FenceAdapterFilesTest` (sau: T-3968; files: .claude/hooks/guard.py, scripts/xt.py, tests/)
+- [ ] `T-3970` 🟠 AUD-SEC-990: giải nén (`tar -x`, `unzip`) có thành viên phủ tệp hàng rào → chặn — Gate: `python3 -m unittest tests.test_hooks.FenceExtractMembersTest` (files: .claude/hooks/guard.py, tests/)

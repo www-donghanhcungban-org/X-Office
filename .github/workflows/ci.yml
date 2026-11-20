@@ -287,8 +287,8 @@ jobs:
           cache-dependency-path: requirements-e2e.txt
       - name: Playwright ghim kèm hash (requirements-e2e.txt)
         run: pip install --quiet --require-hashes -r requirements-e2e.txt
-      - name: Chrome Headless Shell + thư viện hệ thống
-        run: python -m playwright install --with-deps --only-shell chromium
+      - name: Khởi chạy Chromium đã ghim
+        run: bash framework/templates/packs/web-api-ts/starter/tests_e2e/prepare-chromium.sh python
       - name: E2E app — 7 màn × 2 viewport, bàn phím, axe, luồng ghi BLUEPRINT.md
         run: python -m unittest discover -s tests_e2e -t .
 

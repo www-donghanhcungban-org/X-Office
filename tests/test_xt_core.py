@@ -980,6 +980,24 @@ class LoopVerifyTest(TmpMixin, unittest.TestCase):
             rc = xt.loop_verify(self.base, run_all=True)
         return rc, buf.getvalue()
 
+    def test_verify_groups_once_and_uses_first_stale_reason(self):
+        commands = ["echo ok", "false", "echo  ok", " echo 'bad", "echo 'bad ", "echo ok", "echo still"]
+        tasks = [{"id": str(i), "gate": cmd} for i, cmd in enumerate(commands)]
+        reasons = ["", "failed", "first", "invalid", "", "later", ""]
+        with (
+            unittest.mock.patch.object(xt, "canonical_command", wraps=xt.canonical_command) as normalize,
+            unittest.mock.patch.object(xt, "evidence_stale", side_effect=reasons),
+            unittest.mock.patch.object(xt, "run_gate_shell", side_effect=[(0, "ok"), (1, ""), (2, "")]) as run,
+            redirect_stdout(io.StringIO()),
+        ):
+            results = xt._verify_gates(self.base, tasks, 10, False)
+        self.assertEqual([entry.args[0] for entry in run.call_args_list], ["echo ok", "false", " echo 'bad"])
+        self.assertEqual(
+            [(r["task"], r["exit_code"], r.get("rerun"), r.get("kept")) for r in results],
+            [("0", 0, "first", None), ("1", 1, "failed", None), ("3", 2, "invalid", None), ("6", 0, None, True)],
+        )
+        self.assertLessEqual(normalize.call_count, len(tasks))
+
     def test_zero_tests_red_in_verify_and_blueprint_checks(self):
         """`loop verify` và lệnh `— Kiểm:` của blueprint đi cùng `run_gate_shell`: `Ran 0 tests` + exit 0 là đỏ (T-1501)."""
         write(self.plan, "- [x] `T-001` a — Gate: `echo 'Ran 0 tests'`\n")
@@ -1875,7 +1893,7 @@ class LoopRecordBranchesTest(TmpMixin, RealAutopilotUntouchedMixin, unittest.Tes
         write(self.base / "xt.yaml", "delivery_phase: build\n")  # ADR-0033: pha build gom audit theo mốc về trước G7
         v = xt.loop_verdict(self.base)
         self.assertEqual((v["milestone_done"], v["milestone_audit"]), ("Lát 1 — skeleton", "g7"))
-        self.assertIn("pha build: audit delta ở cuối đợt (D-177)", v["reason"])
+        self.assertIn("cuối đợt dùng loop next-step để chọn trình MVP hoặc audit delta", v["reason"])
         self.assertNotIn("audit delta trước khi sang mốc kế", v["reason"])
         for phase in ("Build", "prod", "harden", ""):  # giá trị lạ/vắng = harden (ADR-0031) → dồn về cổng ký
             write(self.base / "xt.yaml", f"delivery_phase: {phase}\n")

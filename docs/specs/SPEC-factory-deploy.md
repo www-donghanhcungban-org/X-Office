@@ -16,10 +16,13 @@ CLI yêu cầu đúng bốn lệnh `node scripts/dev-preview.mjs` và URL loopba
 CLI có thể tự quay lui khi smoke hoặc digest sai. Để chủ động quay lui, dùng `deploy rollback --env dev`.
 `deploy status --env dev --json` đọc và kiểm sổ schema 1 theo §5.
 
-Hợp đồng dưới đây mô tả cả những phần đang mở trong PLAN. Chạy lệnh triển khai tuỳ biến và guard chống ghi tay
-`DEPLOYS.json` (S-112) còn chờ. Hàng `deploy` trong `release-check` và việc đồng bộ registry thuộc T-3843.
-Quyền, thiết lập và triển khai production thuộc T-3859/T-3860. Schema 1 dùng chung để lưu và đọc bằng chứng,
-còn các tiêu chí nghiệm thu toàn bộ hợp đồng nằm ở §3. [Kế hoạch triển khai](../autopilot/PLAN-factory-e2e.md)
+`release-check` kiểm hàng `deploy` khi `deploy_envs` được khai. Receipt dev phải khớp content và digest của ứng viên.
+`registry pull --from DIR` đọc các sổ trong clone sản phẩm. `admin-plan` tổng hợp việc thiết lập,
+`rollout-drill` diễn tập điều kiện phát hành và `ops-check` đối chiếu số liệu field với môi trường đã ghi nhận.
+
+Chạy lệnh triển khai tuỳ biến, guard chống ghi tay `DEPLOYS.json` (S-112) và lệnh triển khai/quay lui production
+của T-3860 còn mở. Việc đưa ứng viên lên đích production cần quyền và runbook thật của sản phẩm.
+[Kế hoạch triển khai](../autopilot/PLAN-factory-e2e.md)
 
 ## 1. User story
 Là chủ dự án chỉ nêu ý tưởng, tôi muốn máy tự đưa đúng bản đã kiểm lên một môi trường chạy được, kiểm nó sống, và ghi

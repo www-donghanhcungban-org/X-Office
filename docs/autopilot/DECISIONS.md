@@ -1,35 +1,7 @@
 # Nhật ký quyết định tự duyệt
 
 > Ghi bởi `xt.py loop decide`. Phiên chính tự duyệt điểm quyết định theo tiêu chí chất lượng cuối (`LOOP-STOP-018`, ADR-0008 của khung). Người xem lại bất cứ lúc nào; đổi ý → quyết định mới ghi "thay D-NNN", không sửa mục cũ.
-> Bản tháng trước: [`DECISIONS-2026-10.md`](DECISIONS-2026-10.md) (D-001…D-287), [`DECISIONS-2026-11.md`](DECISIONS-2026-11.md) (D-292…D-413) — máy đọc cả bản tháng (T-3651).
-
-### D-414 · 2026-11-10T15:03:52+00:00 · Workflow thiết kế AUD-SEC-591/592/593 phát hiện lỗi gốc: từ chỉ gồm toán tử shell trong nháy (';' hay dấu ống trong nháy đơn) làm tokenize/split_commands cắt lệnh ở MỌI luật (git push có --force sau ';' trong nháy được cho qua — đã tái hiện). Thứ tự làm và 4 điểm spec để phiên chính quyết?
-
-- Phương án: (1) Sửa gốc tokenizer trước ở PR riêng (🔴), rồi PR cài spec 591/592/593 không cần vá tạm R0; nhận cả 4 khuyến nghị của spec: bỏ miễn trừ thân không nháy, pr close chế độ tail, bảng 12 hàng lệnh đăng chữ · (2) Cài spec kèm vá tạm R0 trong lớp gh trước, mở dòng 🔴 cho gốc làm sau
-- Chọn: Sửa gốc tokenizer trước ở PR riêng (🔴), rồi PR cài spec 591/592/593 không cần vá tạm R0; nhận cả 4 khuyến nghị của spec: bỏ miễn trừ thân không nháy, pr close chế độ tail, bảng 12 hàng lệnh đăng chữ
-- Lý do (tiêu chí chất lượng cuối): (1) đúng và an toàn: lỗi gốc lách cả luật force-push và no-verify, nặng hơn ba nợ 🟠 — sửa gốc đóng mọi luật, vá tạm chỉ đóng gh; (3) đơn giản hơn: không thêm R0 rồi gỡ; các khuyến nghị spec đều là cách hiểu chặt hơn và đã đo 0 chặn oan trên lệnh thật
-- Đường lùi: Tách lại: R0 trong lớp gh
-
-### D-415 · 2026-11-11T03:22:00+00:00 · Review #495 BLOCKING: 7 hồi quy 🔴 đều đến từ phần mở rộng (GlueWord, _SubstTrack/PROCSUB_WORD, đường lùi flat của tokenize), còn lõi LitWord được xác nhận đúng và không chặn oan. Sửa thế nào?
-
-- Phương án: (1) Thu hẹp #495 về lõi: giữ LitWord + bỏ chuyển hướng ở chữ đọc lại (eval, echo nối ống sang sh) + watch; gỡ GlueWord, _SubstTrack/PROCSUB_WORD và đường lùi flat, trả hành vi của main cho thay tiến trình/thay lệnh; các dạng thay tiến trình/thay lệnh che phần sau (main cũng hở) ghi 🔴 mở riêng, làm ở PR sau theo hướng chặn khi không đọc chắc · (2) Vá từng hồi quy trong #495, giữ nguyên thiết kế mở rộng
-- Chọn: Thu hẹp #495 về lõi: giữ LitWord + bỏ chuyển hướng ở chữ đọc lại (eval, echo nối ống sang sh) + watch; gỡ GlueWord, _SubstTrack/PROCSUB_WORD và đường lùi flat, trả hành vi của main cho thay tiến trình/thay lệnh; các dạng thay tiến trình/thay lệnh che phần sau (main cũng hở) ghi 🔴 mở riêng, làm ở PR sau theo hướng chặn khi không đọc chắc
-- Lý do (tiêu chí chất lượng cuối): (1) đúng và an toàn: phần mở rộng đã hai lượt liên tiếp sinh hồi quy — mỗi lần vá thêm một cách đọc là thêm chỗ lệch với bash; gỡ về main chắc chắn không yếu hơn main ở lớp đó; lõi LitWord đóng đúng lỗ đã tái hiện; (2) đường lùi: PR riêng cho lớp thay tiến trình; (3) nhỏ, review được (P8) — diff hiện 647 dòng
-- Đường lùi: Khôi phục phần mở rộng ở PR riêng
-
-### D-416 · 2026-11-11T08:34:16+00:00 · Duyệt PLAN-harden-2026-11-11 (audit delta 454d146..7ca87a6: 3 🔴 mới, 5 🟠 mới, 4 🔴 guard có từ trước, tối ưu có số)
-
-- Phương án: (1) Sửa mọi 🔴 (mới + có từ trước) và 🟠 mới theo lát ≤150 dòng, tối ưu rủi ro thấp có số; 🟠 guard có từ trước để PLAN kế · (2) Chỉ sửa 🔴 mới rồi cắt bản; phần còn lại ghi nợ · (3) Gom mọi 🔴/🟠 mở (kể cả 16 🟠 cũ) và cache bytecode guard vào một đợt
-- Chọn: Sửa mọi 🔴 (mới + có từ trước) và 🟠 mới theo lát ≤150 dòng, tối ưu rủi ro thấp có số; 🟠 guard có từ trước để PLAN kế
-- Lý do (tiêu chí chất lượng cuối): (1) đúng và an toàn: 7 🔴 mở đều là đường lách hàng rào hoặc ghi ngoài dự án — sửa hết trước khi cắt 3.34.0; (2) giữ đường lùi: mỗi lát một PR nhỏ, test đỏ trước; (3) bền: 609/606 theo bài học D-415 (không đọc chắc → BUDGET); cache bytecode ngược AUD-SEC-074 nên cần ADR riêng; (5) phương án 3 quá rộng cho một đợt
-- Đường lùi: Revert từng PR lát; PLAN kế nhận phần còn lại
-
-### D-417 · 2026-11-11T14:21:06+00:00 · AUD-SEC-615: guard GO_SIGN mô hình tool Edit thế nào khi ba lượt review liên tiếp đều tìm ra chỗ mô hình lệch tool thật (CR trần, new_string rỗng nuốt xuống dòng, khớp dự phòng nháy cong và escape unicode, old phải duy nhất)?
-
-- Phương án: (1) Thêm tiếp từng mô hình Edit theo mã tool hiện hành · (2) Chặt: với file GO-NO-GO, Edit/MultiEdit chỉ cho qua khi không mang nội dung dạng dòng ký hay neo; mọi thay đổi chạm §5, tiêu đề, subject đi bằng Write cả file — Write là nội dung y nguyên nên guard đọc đúng như release-check; CR không kèm LF và BOM lệch đĩa thì chặn · (3) Giữ bản vá lượt 3, ghi nợ các ca còn lọt
-- Chọn: Chặt: với file GO-NO-GO, Edit/MultiEdit chỉ cho qua khi không mang nội dung dạng dòng ký hay neo; mọi thay đổi chạm §5, tiêu đề, subject đi bằng Write cả file — Write là nội dung y nguyên nên guard đọc đúng như release-check; CR không kèm LF và BOM lệch đĩa thì chặn
-- Lý do (tiêu chí chất lượng cuối): Tiêu chí 1 (đúng và an toàn, cách hiểu chặt hơn) và 3 (đơn giản, test được): mô hình theo mã tool bị minify sẽ lệch mỗi lần tool đổi bản — đúng bài học D-415 (ca không đọc chắc thì chặn, không thêm cách đọc mới). Write cả file không cần mô hình. Giá phải trả: agent sửa GO-NO-GO bằng Write thay Edit (tiêu chí 4, thấp hơn).
-- Đường lùi: Bỏ luật chặn Edit trên GO-NO-GO và quay lại mô hình hai cách áp của lượt 3 (patch lượt 3 lưu ở scratch slices/sec615.patch trước khi sửa)
+> Bản tháng trước: [`DECISIONS-2026-10.md`](DECISIONS-2026-10.md) (D-001…D-287), [`DECISIONS-2026-11.md`](DECISIONS-2026-11.md) (D-292…D-417) — máy đọc cả bản tháng (T-3651).
 
 ### D-418 · 2026-11-11T14:21:20+00:00 · D-417 nói Edit trên GO-NO-GO cho qua khi không mang nội dung dạng dòng ký — nhưng ca A1 của review lượt 3 (Edit xoá một ký tự làm hai dòng nối thành dòng ký) không mang nội dung như vậy. Phạm vi luật chặn Edit là gì?
 
@@ -594,3 +566,17 @@
 - Chọn: Đổi ADR riêng của X-Office sang dải số dành riêng cho bản phái sinh (ADR-9001+), cập nhật mọi chỗ nhắc ở X-Office; ADR của X-Templates giữ nguyên số
 - Lý do (tiêu chí chất lượng cuối): Đúng và an toàn: ID không được dùng lại (AGENTS §3) — hai ADR-0082 làm mọi tham chiếu trong code/test/CHANGELOG mơ hồ; đổi số upstream làm X-Office lệch nguồn ở mọi lần đồng bộ sau. Dải 9001+ không bao giờ va với số tăng dần của X-Templates nên lỗi không tái diễn; ADR X-Office cũ chỉ đổi số định danh, giữ nguyên nội dung quyết định, có ghi chú đổi số. Cùng lý do, quyết định D-NNN ghi ở X-Office lấy số sau khi đã đồng bộ (lần đầu ghi trước khi merge đã va D-519 của upstream nên bỏ).
 - Đường lùi: Đổi tên tệp docs/adr/9001-office-view-renderers.md về 0082-… và thay ADR-9001 → ADR-0082 ở các chỗ nhắc (một commit hoàn lại)
+
+### D-522 · 2026-11-20T01:05:30+00:00 · Trình MVP lúc nào?
+
+- Phương án: (1) Sau smoke · (2) Sau audit
+- Chọn: Sau smoke
+- Lý do (tiêu chí chất lượng cuối): Duyệt bản dev; trả nợ ở pha 2 (ADR-0084).
+- Đường lùi: Revert ADR-0084.
+
+### D-523 · 2026-11-20T02:47:33+00:00 · Rút ngắn phản hồi từ sửa mã đến CI?
+
+- Phương án: (1) Dựng lại sau mỗi lần sửa, chạy test theo tên · (2) Dùng watch lúc viết, giữ nghiệm thu bản đóng gói, xếp lớp test nặng trước và gom Gate một lượt
+- Chọn: Dùng watch lúc viết, giữ nghiệm thu bản đóng gói, xếp lớp test nặng trước và gom Gate một lượt
+- Lý do (tiêu chí chất lượng cuối): Giảm việc lặp, giữ tập test và thứ tự Gate theo PLAN.
+- Đường lùi: Hoàn tác thay đổi của lượt này.

@@ -22,6 +22,26 @@ def require(condition: bool, reason: str) -> None:
         raise ValueError(reason)
 
 
+def check_deploy_gate(digest: str, expected: str) -> None:
+    run = subprocess.run(
+        [sys.executable, ".xtemplates/scripts/xt.py", "release-check", "--json"],
+        capture_output=True,
+        text=True,
+        timeout=300,
+    )
+    report = json.loads(run.stdout)
+    require(run.returncode == (0 if report["go"] else 1), "Exit code release-check không khớp báo cáo")
+    require(report["subject"]["digest"] == digest, "Release-check không kiểm đúng artifact")
+    rows = [row for row in report["rows"] if row["id"] == "deploy"]
+    require(len(rows) == 1, "Cần đúng một hàng deploy")
+    row = rows[0]
+    require(row["level"] == "BLOCKER" and row["result"] == expected, f"Hàng deploy sai: {row}")
+    require(("deploy" in report["fails"]) == (expected == "FAIL"), "Danh sách blocker sai ở hàng deploy")
+    if expected == "FAIL":
+        require("bản dev chưa chạy ứng viên này" in row["evidence"], f"Sai lý do từ chối ứng viên: {row}")
+    print(f"release-check: deploy {expected} ({digest})")
+
+
 def stale() -> None:
     css = Path("src/notes-ui/app.css")
     original = css.read_bytes()
@@ -94,6 +114,7 @@ def rollback() -> None:
         restored_token = api("/v1/login", 200, owner)["token"]
         restored = api(f"/v1/notes/{note_id}", 200, token=restored_token)
         require(restored["id"] == note["id"] and restored["body"] == body, "Mất ghi chú của A sau rollback")
+        check_deploy_gate(candidate, "FAIL")
     finally:
         source.write_bytes(original)
         subprocess.run(["node", "scripts/build.ts"], check=True, timeout=120)
@@ -102,10 +123,13 @@ def rollback() -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("case", choices=["stale", "rollback"])
+    parser.add_argument("case", choices=["stale", "confirmed", "rollback"])
     args = parser.parse_args()
     require(Path.cwd() == (Path(os.environ["RUNNER_TEMP"]) / "app").resolve(), "Cần dự án tạm của job pack-web-api")
     if args.case == "stale":
         stale()
+    elif args.case == "confirmed":
+        current = json.loads(LEDGER.read_text())["envs"]["dev"]["current"]
+        check_deploy_gate(current["subject"]["digest"], "PASS")
     else:
         rollback()

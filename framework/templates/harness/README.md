@@ -1,7 +1,7 @@
 ---
 title: Adapter hook cho công cụ agent khác
 kind: index
-updated: 2026-11-19
+updated: 2026-11-20
 ---
 
 # Adapter hook cho công cụ agent khác Claude Code (ADR-0064 lát B)
@@ -31,6 +31,10 @@ thật (2026-11-05: Codex CLI 0.147.0 có trên máy dev nhưng chạy nó tốn
 | [`copilot-xt.json`](copilot-xt.json) | `.github/hooks/xt.json` | `preToolUse` (lỗi = chặn, hết giờ = cho qua); Copilot cũng đọc `.claude/settings.json` — chạy hai lần, quyết định vẫn đúng |
 | [`grok-xt.json`](grok-xt.json) | `.grok/hooks/xt.json` | `PreToolUse` (chỉ deny tường minh chặn); matcher gồm tên thật `run_terminal_command`/`search_replace` (research §9) ngoài bí danh tên Claude — `write_file` vẫn chưa xác minh (2026-11-03); hook `.claude` cũng được nạp khi đã tin cậy |
 | [`opencode-xt.ts`](opencode-xt.ts) | `.opencode/plugins/xt.ts` | plugin `tool.execute.before`, `throw` khi deny; hook có thể không chạy ở `opencode run` (chưa xác minh bản 1.19.5) |
+
+Tệp ở cột "Chép tới" (khi đã cài — tệp có thật; `.codex/hooks.json` luôn) là hàng rào như `.claude/settings.json`
+(AUD-SEC-987/989): Bash ghi/xoá/dời hay git lấy từ rev khác chỉ mục/HEAD → guard chặn (HOOK_BYPASS); sửa bằng
+Edit/Write hoặc chạy lại `install.py --harness`.
 
 ## Codex: skill và agent sinh từ `.claude/` (ADR-0082)
 

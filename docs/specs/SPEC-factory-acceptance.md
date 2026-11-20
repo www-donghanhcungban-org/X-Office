@@ -8,6 +8,11 @@
 | Kiến trúc | [ADR-0075](../adr/0075-end-to-end-factory.md) — file này chốt giao ước, không chép lại lý do |
 | Kế hoạch | [`PLAN-factory-e2e.md`](../autopilot/PLAN-factory-e2e.md) T-3848, T-3849 |
 
+**Phạm vi đã có ([D-521 của X-Templates](https://github.com/www-donghanhcungban-org/X-Templates/blob/3a1cd5471cb1f634656c62369559c4a489a58dcc/docs/autopilot/DECISIONS.md)).** Dự án có thể ghi SPEC và bài thử vào `docs/autopilot/ACCEPTANCE.paths`, chốt
+commit trước khi viết tính năng và chạy `xt_acceptance.py check --base <sha-đầy-đủ>`. Công cụ đọc danh sách
+ở chính commit đó và so file với HEAD, index và cây làm việc. Pilot dùng bài thử đã chốt để chứng minh
+đỏ rồi xanh. Giao ước F-121 về danh tính tác giả, sửa đổi có reviewer và số ca theo từng khoá vẫn ở Draft.
+
 ## 1. User story
 Là chủ dự án chỉ nêu ý tưởng, tôi muốn phần "đúng ý định" được kiểm bởi một bộ nghiệm thu mà người viết mã không tự sửa
 được, để việc bỏ chốt người (ADR-0075) không biến "qua cổng" thành "tự chấm bài mình". Với việc có giao diện, tôi muốn máy

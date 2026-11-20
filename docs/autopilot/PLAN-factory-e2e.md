@@ -38,6 +38,12 @@
 - Việc cũ gộp vào đây: T-3555 phần worker ngoài phiên, field trigger, bot nâng bản (T-3850, T-3861, T-3865; phần event
   policy `pull_request_target` ở lại PLAN cũ); S2/S6/S8/S10 của research 2026-11-08 (T-3864, T-3854, T-3859, T-3856).
 
+## Bằng chứng ngày 2026-11-20
+
+[ADR-0083 của X-Templates](../adr/0083-factory-lifecycle-flow.md) nối ba giai đoạn. CI `pack-web-api` thử rollback và
+[pilot sửa chữa](../../research/2026-11-20-factory-repair-pilot.md). Artifact `pack-preview-evidence` chứa báo cáo
+và dữ liệu gốc cho cổng T-3847. `xt_flow.py` ghi rõ phần số liệu T-3854 còn thiếu.
+
 ## Ngân sách (4 con số)
 - Số vòng tối đa: bỏ trống · Chi phí: 0 đồng ngoài phiên tới hết Lát 5 · Timeout Gate: 1200 giây · Hạn: xét lại 2027-01-21
 
@@ -55,8 +61,8 @@
 
 ### Lát 1 — Bản dev có receipt
 - [ ] `T-3842` xt.py: lệnh triển khai đọc khoá `xt.yaml`, ghi receipt (môi trường · digest · thời điểm · smoke), smoke đỏ thì quay lui; fixture âm sai digest, smoke đỏ, receipt cũ (sau: T-3841; topo: review) — Gate: `python3 -m unittest tests.test_deploy_receipt tests.test_deploy_run`
-- [ ] `T-3843` `release-check` đối chiếu digest ở receipt với `subject.digest`; `registry` đọc receipt vào `environments`/`release` (sau: T-3842; topo: review) — Gate: `python3 -m unittest tests.test_deploy_release_row`
-- [ ] `T-3844` Gói `web-api-ts`: ảnh + compose dev (app + Postgres), khoá triển khai dev ở `pack.json`; workflow gói: repo sạch → bản dev → receipt → quay lui, ca sai cố ý đỏ (sau: T-3842) — Gate: `python3 -m unittest tests.test_pack_dev_deploy`
+- [x] `T-3843` `release-check` đối chiếu digest ở receipt với `subject.digest`; `registry` đọc receipt vào `environments`/`release` (sau: T-3842; topo: review) — Gate: `python3 -m unittest tests.test_deploy_release_row`
+- [x] `T-3844` Gói `web-api-ts`: ảnh + compose dev (app + Postgres), khoá triển khai dev ở `pack.json`; workflow gói: repo sạch → bản dev → receipt → quay lui, ca sai cố ý đỏ (sau: T-3842) — Gate: `python3 -m unittest tests.test_deploy_run tests.test_pack_ui` · CI `pack-acceptance (clean)`
 
 ### Lát 2 — Ý tưởng tới repo đang chạy
 - [x] `T-3845` `install.py`: một lệnh từ thư mục trống ra dự án mới (git, khung + gói, `PROJECT.md` giữ ý tưởng và bốn dòng Khung để skill điền, blueprint, `doctor` sạch) (topo: review) — Gate: `python3 -m unittest tests.test_install_new`
@@ -65,7 +71,7 @@
 
 ### Lát 3 — Chất lượng bù: nghiệm thu độc lập, UI
 - [ ] `T-3848` Bộ nghiệm thu do agent khác người viết sinh từ SPEC trước khi viết mã, khoá bằng digest; việc đổi file đã khoá làm Gate đỏ trừ khi có D-NNN và reviewer độc lập; dựng trên `QA-STRAT-023` và khoá `acceptance`/`acceptance_report` sẵn có (topo: review) — Gate: `python3 -m unittest tests.test_acceptance_lock`
-- [ ] `T-3849` Gói thêm UI tối thiểu và E2E trình duyệt. Repo sản phẩm chạy `bash tests_e2e/preview.sh` để dựng bản dev và kiểm đăng nhập, tạo, đọc lại ghi chú trong phiên mới. Workflow `dev-preview` chạy cùng lệnh trên PR hoặc khi gọi thủ công (sau: T-3844) — Gate: `python3 -m unittest tests.test_pack_ui`
+- [x] `T-3849` Gói thêm UI tối thiểu và E2E trình duyệt. Repo sản phẩm chạy `bash tests_e2e/preview.sh` để dựng bản dev và kiểm đăng nhập, tạo, đọc lại ghi chú trong phiên mới. Workflow `dev-preview` chạy cùng lệnh trên PR hoặc khi gọi thủ công (sau: T-3844) — Gate: `python3 -m unittest tests.test_pack_ui`
 
 ### Lát 4 — Song song theo file
 - [ ] `T-3850` ADR song song theo file và worker ngoài phiên — thay một phần D-142; đối chiếu `LOOP-STOP-014`, ADR-0009 §4, `LOOP-ORCH-006/007/020/024` ở mục Thay/Giữ; thử trên git/GitHub thật năm điểm [chặn] của đặc tả parallel §10 rồi chuyển F-131/F-133 sang Approved (sau: T-3866) — Gate: `git grep --untracked -qiE '^# ADR-[0-9]+: .*worker ngoài phiên' -- docs/adr`
@@ -81,7 +87,7 @@
 - [ ] `T-3857` Thư viện: mục MUST buộc người ở M/L (research 2026-11-08 §8 "Soát thiếu") xếp lớp A/B/C, đối chiếu theo khoá, giữ ID, CHANGELOG ghi ID (sau: T-3855, T-3856; topo: review) — Gate: `python3 -m unittest tests.test_human_must_keys`
 
 ### Lát 6 — Thiết lập một lần, production
-- [ ] `T-3859` `xt.py admin-plan` chỉ đọc: khi receipt dev xanh in một checklist (App/token, ruleset lệch, đích và khoá production, trần chi phí, khoá cần bật, mục MUST lớp B); không tự áp (sau: T-3843, T-3857; topo: review) — Gate: `python3 -m unittest tests.test_admin_plan`
+- [x] `T-3859` `xt.py admin-plan` chỉ đọc: khi receipt dev xanh in một checklist (App/token, ruleset lệch, đích và khoá production, trần chi phí, khoá cần bật, mục MUST lớp B); không tự áp (sau: T-3843, T-3857; topo: review) — Gate: `python3 -m unittest tests.test_admin_plan`
 - [ ] `T-3860` Triển khai production: chỉ khi có `grant`, `promotion: approved`, HEAD nằm trong nhánh chính của remote, digest trùng digest đã qua dev; smoke đỏ thì tự quay lui; `rollback` cùng điều kiện quyền và cũng đòi HEAD ở nhánh chính (sau: T-3859; topo: review) — Gate: `python3 -m unittest tests.test_deploy_prod`
 
 ### Lát 7 — Vòng học, kênh vào, nghiệm thu dây chuyền

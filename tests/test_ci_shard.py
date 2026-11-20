@@ -62,7 +62,7 @@ class ShardPlanTest(unittest.TestCase):
 
     def test_unknown_id_takes_median_and_order_is_deterministic(self):
         w = {"x": 10.0, "y": 1.0, "z": 3.0, "old": 2.0}  # trung vị = 2.5
-        self.assertEqual(xt.shard_plan(["x", "y", "z", "new"], w, 2), [["x"], ["new", "y", "z"]])
+        self.assertEqual(xt.shard_plan(["x", "y", "z", "new"], w, 2), [["x"], ["z", "new", "y"]])
         self.assertEqual(xt.shard_plan(["new", "z", "y", "x"], w, 2), xt.shard_plan(["x", "y", "z", "new"], w, 2))
         # hoà trọng số → theo id; hoà tổng → shard chỉ số nhỏ nhất
         self.assertEqual(xt.shard_plan(["b", "a"], {"a": 1.0, "b": 1.0}, 2), [["a"], ["b"]])
@@ -165,7 +165,7 @@ class ShardCliTest(unittest.TestCase):
             self.assertIn(f"[test-shard] {i}/2:", err)
             self.assertIn("1 id không có trong", err)
             got.append(out.split())
-        self.assertEqual(got, [["a"], ["b", "c", "new"]])  # new lấy trung vị 3.0
+        self.assertEqual(got, [["a"], ["new", "b", "c"]])  # new lấy trung vị 3.0, chạy trước b/c (1.0)
 
     def test_plan_empty_shard_prints_nothing(self):
         rc, out, _ = self.run_xt("a\n", "test-shard-plan", "2", "2", "--weights", str(self.f))

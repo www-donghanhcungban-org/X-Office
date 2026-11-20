@@ -197,7 +197,67 @@ class DoctorHealthyTest(DoctorCase):
 
 
 class DoctorAppTest(DoctorCase):
-    """T-1981 (ADR-0038): install.py chép `scripts/xt_app`, `scripts/app` cạnh xt.py; thiếu → doctor ⚠ `app`, không ✗."""
+    """Install.py chép module tùy chọn cạnh xt.py; parser và doctor phản ánh đúng năng lực đã cài."""
+
+    def test_installed_cli_advertises_ops_but_loads_them_only_for_dispatch(self):
+        scripts = self.base / ".xtemplates" / "scripts"
+        cli = [sys.executable, "-I", str(scripts / "xt.py")]
+        commands = ["admin-plan", "rollout-drill", "ops-check"]
+        help_text = subprocess.check_output([*cli, "--help"], cwd=self.base, text=True)
+        for command in commands:
+            self.assertIn(command, help_text)
+        probe = """
+import sys
+sys.path.insert(0, sys.argv[1])
+import xt
+p = xt.build_parser()
+assert p.parse_args(["admin-plan", "--json"]).cmd == "admin-plan"
+assert p.parse_args(["rollout-drill", "--env", "prod"]).cmd == "rollout-drill"
+assert p.parse_args(["ops-check", "--env", "prod", "--field", "x", "--max-p95-ms", "9", "--max-error-pct", "1"]).cmd == "ops-check"
+assert xt.main(["stats"]) == 0
+assert "xt_release_ops" not in sys.modules and "xt_ops_setup" not in sys.modules
+"""
+        subprocess.run(
+            [sys.executable, "-I", "-B", "-c", probe, str(scripts)], cwd=self.base, capture_output=True, check=True
+        )
+        self.assertFalse(list(scripts.rglob("__pycache__")))
+        result = subprocess.run(
+            [
+                *cli,
+                "ops-check",
+                "--env",
+                "prod",
+                "--field",
+                "missing.json",
+                "--max-p95-ms",
+                "9",
+                "--max-error-pct",
+                "1",
+            ],
+            cwd=self.base,
+            capture_output=True,
+            text=True,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn("Traceback", result.stderr)
+
+    def test_cli_incomplete_install_omits_ops_and_isolated_dispatch_finds_sibling_modules(self):
+        scripts = self.base / ".xtemplates" / "scripts"
+        with unittest.mock.patch.object(xt, "SCRIPT_DIR", scripts):
+            for name in ("xt_ops_setup.py", "xt_release_ops.py", "xt_flow.py"):
+                helper = scripts / name
+                backup = helper.with_suffix(".bak")
+                helper.rename(backup)
+                try:
+                    with self.subTest(name=name):
+                        self.assertNotIn("rollout-drill", xt.build_parser().format_help())
+                finally:
+                    backup.rename(helper)
+        args = xt.build_parser().parse_args(["admin-plan", "--json"])
+        with unittest.mock.patch("xt_ops_setup.command", return_value=7) as command:
+            with unittest.mock.patch.object(sys, "path", [p for p in sys.path if p != str(xt.SCRIPT_DIR)]):
+                self.assertEqual(args.fn(args), 7)
+            command.assert_called_once_with(xt, args)
 
     def test_install_copies_app_and_doctor_warns_when_missing(self):
         scripts = self.base / ".xtemplates" / "scripts"

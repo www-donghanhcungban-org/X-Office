@@ -1,8 +1,9 @@
 """E2E trình duyệt cho app cục bộ `xt.py app` (T-1992, D-133, PRF-WEB-006): 8 màn × 2 viewport, console sạch, không
 cuộn ngang ở 390 px, đi được bằng bàn phím, axe 0 vi phạm `critical`/`serious`, một luồng ghi BLUEPRINT.md.
 
-Chạy: `pip install --require-hashes -r requirements-e2e.txt` rồi `python -m playwright install --only-shell chromium`
-(CI: `--with-deps`), `python3 -m unittest discover -s tests_e2e`. `XT_E2E_CHROMIUM=<đường chrome/headless_shell>` dùng
+Chạy cục bộ bằng `pip install --require-hashes -r requirements-e2e.txt`, `python -m playwright install --only-shell chromium`
+rồi `python3 -m unittest discover -s tests_e2e`. CI thử mở Chromium và chỉ cài thư viện hệ thống khi thiếu.
+`XT_E2E_CHROMIUM=<đường chrome/headless_shell>` dùng
 trình duyệt có sẵn thay bản Playwright tải. Máy chủ là `xt_app.server.make_server` thật (cổng 0, thread) trên dự án tạm;
 `xt._gh_api` bị thay bằng hàm ném `PrInputError` — không gọi `gh`/mạng.
 """

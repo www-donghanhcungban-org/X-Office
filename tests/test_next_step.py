@@ -374,6 +374,38 @@ class NextStepPureTest(unittest.TestCase):
         stale = {"package": old, "release": go, "release_changed": ["app.py"], "package_changed": ["app.py"]}
         self.assertIn("gói nghiệm thu hết hạn", self.step(objective=HARDEN, signoff=stale)["reason"])
 
+    def test_preview_before_full_audit_keeps_task_pr_and_known_findings_blocking(self):
+        mvp = {"cycle": "C-001", "stage": 1, "status": "active", "sha": None, "preview_first": True}
+        checks = {"exists": False, "scanned": []}
+        self.assertEqual(self.step(stage=mvp, audit=checks, open_must=70)["action"], "stage-submit")
+        partial = {"errors": ["nhóm 2: chưa quét (--strict)"], "scanned": []}
+        self.assertEqual(self.step(stage=mvp, audit=partial)["action"], "stage-submit")
+        debt = {"debt": {"app.py": HEAD}}
+        self.assertEqual(self.step(stage=mvp, audit=debt, open_must=70)["action"], "stage-submit")
+        self.assertEqual(
+            self.step(stage=mvp, audit={"open": 1}, state={"batches": [batch(1, "a"), batch(1, "b")]})["action"],
+            "budget",
+        )
+        for overrides, expected in [
+            ({"final_check": "chưa kiểm"}, "verify"),
+            ({"prs": None}, "pr"),
+            ({"prs": [{"pr": "1", "head": HEAD, "action": "wait", "why": ""}]}, "pr"),
+            ({"audit": {"open": 1}}, "replan"),
+            ({"audit": {"errors": ["sổ hỏng"]}}, "audit"),
+            ({"objective": HARDEN}, "blocked"),
+            ({"stage": {**mvp, "preview_first": False}, "audit": checks}, "audit"),
+        ]:
+            with self.subTest(expected=expected):
+                self.assertEqual(self.step(**({"stage": mvp} | overrides))["action"], expected)
+
+    def test_harden_drains_known_work_then_audits_the_accumulated_diff(self):
+        items = [work("audit:AUD-A-001", "T-010")]
+        debt = {"debt": {"app.py": HEAD}}
+        self.assertEqual(self.step(objective=HARDEN, harden=items, audit=debt)["action"], "replan")
+        self.assertEqual(self.step(objective=HARDEN, audit=debt)["action"], "audit")
+        for audit in ({"exists": False}, {"errors": ["sổ hỏng"]}):
+            self.assertEqual(self.step(objective=HARDEN, audit=audit, harden=items)["action"], "audit")
+
     def test_stage_gates_ready_for_complete(self) -> None:
         """ADR-0058 lát D: build hết việc ở giai đoạn MVP → `stage-submit` / `wait-approval` thay `ready-for-complete`;
         giai đoạn 2/3 hay không dùng sổ → như cũ; sổ hỏng → `blocked`; harden ở giai đoạn 1 → `blocked` (D-246)."""
@@ -784,7 +816,15 @@ class HardenWorkTest(StateCase):
             encoding="utf-8",
         )
         want = {"cycle": "C-001", "stage": 1, "status": "active", "sha": None, "changed": [], "agent_approval": False}
-        self.assertEqual(xt.stage_facts(self.base), want)
+        self.assertEqual(xt.stage_facts(self.base), {**want, "preview_first": False})
+        (self.base / "xt.yaml").write_text("delivery_phase: build\npreview_smoke: python3 demo.py\n")
+        for scale in ("S", "M", "L"):
+            (self.base / "BLUEPRINT.md").write_text(f"---\nscale: {scale}\n---\n")
+            self.assertEqual(xt.stage_facts(self.base)["preview_first"], scale == "S")
+        (self.base / "BLUEPRINT.md").write_text("---\nscale: S\n---\n")
+        for config in (b"delivery_phase: build\npreview_smoke: true", b"delivery_phase: harden", b"\xff"):
+            (self.base / "xt.yaml").write_bytes(config)
+            self.assertFalse(xt.stage_facts(self.base)["preview_first"])
         led.write_text("{", encoding="utf-8")
         self.assertIn("không đọc được", xt.stage_facts(self.base)["error"])
 

@@ -43,7 +43,9 @@ export async function freshDatabase(): Promise<{ name: string; db: Db }> {
 
 export async function dropDatabase(db: Db, name: string): Promise<void> {
   await db.destroy();
-  await admin(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
+  // pg-pool có thể hoàn tất end() trước khi PostgreSQL nhận Terminate của mọi kết nối rảnh.
+  // DROP thường đợi các phiên đó đóng và báo 55006 nếu còn người dùng cơ sở dữ liệu.
+  await admin(`DROP DATABASE IF EXISTS ${name}`);
 }
 
 export interface Tenant {

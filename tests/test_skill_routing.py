@@ -23,7 +23,11 @@ STOP = set(
     " trước rồi mới nếu như cả mọi đã sẽ đang bị nhưng vì do tới về hay hơn nhất chỉ còn".split()
 )
 PROMPTS = {
-    "factory": ["tạo webapp mới từ một câu ý tưởng", "muốn có MVP chạy thử với dữ liệu mẫu trên trình duyệt"],
+    "factory": [
+        "tạo webapp mới từ một câu ý tưởng",
+        "muốn có MVP chạy thử với dữ liệu mẫu trên trình duyệt",
+        "tiếp tục toàn vòng đời sản phẩm từ repo đang chạy qua ba giai đoạn",
+    ],
     "adr": ["ghi lại quyết định kiến trúc chọn PostgreSQL", "tạo ADR cho việc đổi framework"],
     "audit": ["audit toàn diện dự án về bảo mật và chất lượng mã", "rà soát CI/CD, phụ thuộc, tài liệu của cả repo"],
     "autopilot": ["chạy tự động làm hết các task trong kế hoạch", "tự làm vòng lặp build đến khi hết việc"],

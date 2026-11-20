@@ -26,6 +26,22 @@ Bản < 3.20.0: [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md) (T-3651; `changel
   chuyển động khi `prefers-reduced-motion`; tab ẩn thì không hỏi lại dữ liệu; có bảng văn bản tương đương. Dự án đích:
   màn Văn phòng 2D nhận khi chạy lại `install.py`; bộ vẽ 3D (≈ 2,1 MB) chỉ khi thêm cờ mới `install.py --with-office-3d`
   (cài một lần thì nâng khung vẫn giữ).
+
+- Gói `web-api-ts` có `pnpm dev` để thử thay đổi ngay trên loopback và `pnpm test:watch` để chạy lại test khi lưu. Quy trình `/factory` dùng hai lệnh trong lúc viết mã; bước trình MVP tiếp tục kiểm bản đóng gói.
+- `loop verify` gom Gate tương đương trong một lần duyệt PLAN. Trong mỗi shard CI, lớp test có trọng số lớn được giao trước. [ADR-0085](docs/adr/0085-fast-development-feedback.md).
+
+- MVP quy mô S ở pha build có smoke được trình sau khi PLAN đã kiểm lại và PR đã xử lý. Audit tổng thể và các MUST còn lại thuộc pha hoàn thiện. Khi sổ audit hợp lệ đã có kết quả quét, pha hoàn thiện sửa các việc đã biết trước khi rà phần mã thay đổi. Job E2E bỏ bước cài Python khi dùng cấu hình E2E rỗng của mẫu. Lệnh tạo dự án nhận `--harness` ngay lần đầu. [ADR-0084](docs/adr/0084-preview-before-full-audit.md).
+
+- `xt.py pr title-check --range BASE..HEAD` kiểm lịch sử trong một lần đọc Git. Cổng `BASE-REPO-005` dùng lệnh này để giảm thời gian chờ CI.
+- Quy trình ba giai đoạn của `/factory` nối tiếp từ sổ hiện tại. `xt_flow.py` cho biết ai làm gì tiếp theo,
+  thời gian chờ duyệt và các số đo có dữ liệu. Có thể chốt SPEC và bộ nghiệm thu tại một commit đã review
+  bằng `xt_acceptance.py`. Pilot phiếu sửa chữa kiểm trên PostgreSQL và Chromium ở một sản phẩm sinh mới.
+  [ADR-0083](docs/adr/0083-factory-lifecycle-flow.md) giải thích mốc duyệt, cách đọc số và phạm vi diễn tập.
+- Với dự án có cấu hình triển khai dev, `release-check` kiểm receipt của đúng nội dung và artifact.
+  `registry pull --from` tổng hợp receipt từ các checkout đã đăng ký. `admin-plan` liệt kê việc cấu hình,
+  `rollout-drill` diễn tập bàn giao và `ops-check` đối chiếu cửa sổ SLO với lần triển khai hiện hành.
+  Dự án đích nhận công cụ qua installer. Bước chuẩn bị Chromium của gói `web-api-ts` dùng lại trình duyệt
+  đã ghim và chỉ cài thư viện hệ thống khi phép thử khởi chạy cho thấy còn thiếu.
 - Dự án mới dùng `web-api-ts` có giao diện ghi chú tiếng Việt, PostgreSQL và bản dev trên loopback.
   Từ gốc dự án, `pnpm build` và `xt.py deploy run --env dev` dựng ứng dụng, thử luồng nghiệp vụ và ghi receipt
   sau khi kiểm digest qua HTTP. `deploy rollback --env dev` dùng lại ảnh trước đã lưu. Dữ liệu và tài khoản thử
@@ -92,6 +108,21 @@ Bản < 3.20.0: [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md) (T-3651; `changel
   dù không rơi ra ngoài mép vườn.
 - `xt.py`: đọc tệp JSON của vòng (`.autopilot/state.json`…) lồng quá sâu (RecursionError khi giải mã) nay coi như hỏng —
   trả `None` như JSON sai — thay vì ném lỗi; màn Tổng quan và Văn phòng của `xt.py app` không còn trả 500 (review #6).
+
+- Guard chặn khôi phục tệp hàng rào từ commit cũ (AUD-SEC-988, T-3968): lệnh git đưa nội dung từ nguồn khác chỉ
+  mục/HEAD vào cây làm việc hoặc chỉ mục ở đường phủ hàng rào (tệp, thư mục cha, `.`, glob, magic pathspec) — `git
+  checkout <rev> -- f` (cả `-p`, `--end-of-options`), `git restore -s <rev>`, `git reset <rev> -- f`, `read-tree`,
+  `--icase-pathspecs`, `--work-tree` — nay bị chặn (`HOOK_BYPASS`; pathspec không đọc chắc → `BUDGET`). Khôi phục từ chỉ
+  mục/HEAD (`git restore f`, `git checkout -- f`) và lệnh dời HEAD cả cây (`checkout <nhánh>`, `switch`, `pull`, `merge`)
+  giữ nguyên; giới hạn còn lại ghi ở `harness-files.md`. Trước đây `git checkout HEAD~3 -- .claude/hooks/guard.py` hạ
+  cấp được guard ở cả chính sách strict.
+- Guard rào tệp nối guard của host khác (AUD-SEC-989, T-3969): `.cursor/hooks.json`, `.github/hooks/xt.json`,
+  `.grok/hooks/xt.json`, `.opencode/plugins/xt.ts`, `.gemini/settings.json` — Bash ghi/xoá bị chặn như
+  `.codex/hooks.json` **khi tệp nối có thật** (dự án đã cài adapter đó); `.github` chỉ rào `.github/hooks`.
+  `merge-check` xếp bốn tệp vào đường dẫn cổng. Lớp test `FenceBaselineMonotoneTest` ghim 1 116 quyết định nền để bản
+  sửa guard không lỏng hơn nền. **Dự án đích:** chạy lại `install.py` để nhận guard; script có
+  `git checkout <rev> -- <glob rộng>` trùng tệp hàng rào phải liệt kê đường cụ thể.
+
 - Guard bảo vệ harness Codex (AUD-SEC-987, T-3967, ADR-0082): ở dự án đích `.agents/skills/*` và `.codex/agents/*` nay là
   "năng lực" cần duyệt như `.claude/skills/*`, `.claude/agents/*` (`LOOP-STOP-023`, câu của mục có thêm ba đường; ID và
   mức giữ nguyên); `.codex/hooks.json` (tệp nối guard cho Codex) được rào như `.claude/settings.json` ở cả repo khung lẫn

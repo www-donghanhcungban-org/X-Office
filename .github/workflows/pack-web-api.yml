@@ -14,6 +14,11 @@ on:
       - scripts/install.py
       - scripts/xt*.py
       - tests_e2e/pack_rollback.py
+      - tests_e2e/factory_lifecycle.py
+      - tests_e2e/report_factory_pilot.py
+      - tests_e2e/verify_factory_pilot.py
+      - tests/test_factory_pilot_evidence.py
+      - tests_e2e/repairs/**
       - tests/pack_mutants.py
       - tests/pack_baseline.py
       - .github/workflows/pack-web-api.yml
@@ -25,6 +30,11 @@ on:
       - scripts/install.py
       - scripts/xt*.py
       - tests_e2e/pack_rollback.py
+      - tests_e2e/factory_lifecycle.py
+      - tests_e2e/report_factory_pilot.py
+      - tests_e2e/verify_factory_pilot.py
+      - tests/test_factory_pilot_evidence.py
+      - tests_e2e/repairs/**
       - tests/pack_mutants.py
       - tests/pack_baseline.py
       - .github/workflows/pack-web-api.yml
@@ -82,6 +92,7 @@ jobs:
       DATABASE_URL: postgres://postgres@localhost:5432/postgres
       PACK: framework/templates/packs/web-api-ts
       CASE: ${{ matrix.case }}
+      PILOT_IDEA: Ghi chú nội bộ cho một nhóm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -96,21 +107,25 @@ jobs:
         with:
           node-version: 24
       - name: Repo sạch từ gói (install.py --pack)
+        id: scaffold
         run: |
           if [ "$CASE" = clean ]; then
-            python3 scripts/install.py "$RUNNER_TEMP/app" --new --pack web-api-ts --idea "Ghi chú nội bộ cho một nhóm"
+            date -u +'%Y-%m-%dT%H:%M:%SZ' > "$RUNNER_TEMP/pilot-1-started"
+            python3 scripts/install.py "$RUNNER_TEMP/app" --new --pack web-api-ts --idea "$PILOT_IDEA"
           else
             git init -q "$RUNNER_TEMP/app"
             python3 scripts/install.py "$RUNNER_TEMP/app" --pack web-api-ts --label ci
           fi
           test -f "$RUNNER_TEMP/app/package.json"
       - name: Cài phụ thuộc theo lock
+        id: dependencies
         working-directory: ${{ runner.temp }}/app
         run: pnpm install --frozen-lockfile
       - name: Áp ca sai cố ý
         if: matrix.case != 'clean'
         run: python3 tests/pack_mutants.py apply "$PACK" "$CASE" "$RUNNER_TEMP/app"
       - name: Cổng tĩnh (lint · typecheck)
+        id: static_checks
         if: matrix.case == 'clean'
         working-directory: ${{ runner.temp }}/app
         run: |
@@ -123,9 +138,15 @@ jobs:
           PG_TOOLS_CONTAINER: ${{ job.services.postgres.id }}
         run: |
           set +e
-          pnpm exec vitest run --reporter=default --reporter=junit --outputFile.junit=junit.xml
+          reporters=(--reporter=default --reporter=junit --outputFile.junit=junit.xml)
+          if [[ "$CASE" == clean ]]; then
+            env -u DATABASE_URL -u PG_TOOLS_CONTAINER pnpm test "${reporters[@]}"
+          else
+            pnpm exec vitest run "${reporters[@]}"
+          fi
           echo "VITEST_EXIT=$?" >> "$GITHUB_ENV"
       - name: Kết luận ca
+        id: unit_gate
         run: |
           if [ "$CASE" = clean ]; then
             test "$VITEST_EXIT" = 0
@@ -134,6 +155,7 @@ jobs:
             python3 tests/pack_mutants.py check "$PACK" "$CASE" "$RUNNER_TEMP/app/junit.xml"
           fi
       - name: Build artifact tái lập được + release-check chưa promote khi chưa ký
+        id: build_candidate
         if: matrix.case == 'clean'
         working-directory: ${{ runner.temp }}/app
         run: |
@@ -145,29 +167,58 @@ jobs:
           python3 .xtemplates/scripts/xt.py release-check --json > "$RUNNER_TEMP/release.json" || true
           python3 "$GITHUB_WORKSPACE/tests/pack_mutants.py" promotion "$RUNNER_TEMP/release.json"
       - name: Cài Chromium cho luồng duyệt MVP
+        id: browser_setup
         if: matrix.case == 'clean'
         working-directory: ${{ runner.temp }}/app
         run: |
           python -m pip install --quiet --require-hashes -r tests_e2e/requirements.txt
-          python -m playwright install --with-deps --only-shell chromium
+          bash tests_e2e/prepare-chromium.sh python
       - name: Dựng bản dev và xác nhận ghi chú qua trình duyệt
+        id: browser_preview
         if: matrix.case == 'clean'
         working-directory: ${{ runner.temp }}/app
         run: |
           python "$GITHUB_WORKSPACE/tests_e2e/pack_rollback.py" stale
           python3 .xtemplates/scripts/xt.py deploy run --env dev
+          python "$GITHUB_WORKSPACE/tests_e2e/pack_rollback.py" confirmed
+          python3 .xtemplates/scripts/xt.py rollout-drill --env prod --json > "$RUNNER_TEMP/rollout-drill.json"
+          jq -e '.dev_verified and (.deployed_to_target == false) and (.handoff == "pending")' "$RUNNER_TEMP/rollout-drill.json"
           python tests_e2e/pack_preview.py --output "$RUNNER_TEMP/preview-browser.json"
           python "$GITHUB_WORKSPACE/tests_e2e/pack_rollback.py" stale
       - name: Xác nhận rollback tự động và đọc lại ghi chú trên bản đã khôi phục
+        id: restore_gate
         if: matrix.case == 'clean'
         working-directory: ${{ runner.temp }}/app
         run: python "$GITHUB_WORKSPACE/tests_e2e/pack_rollback.py" rollback
+      - name: Đối chiếu báo cáo pilot ghi chú và kết quả các cổng thực chạy
+        if: ${{ !cancelled() && matrix.case == 'clean' }}
+        env:
+          XT_PILOT_STEPS: ${{ toJSON(steps) }}
+        run: |
+          python3 tests_e2e/report_factory_pilot.py --app "$RUNNER_TEMP/app" \
+            --browser "$RUNNER_TEMP/preview-browser.json" --started-file "$RUNNER_TEMP/pilot-1-started" \
+            --idea "$PILOT_IDEA" --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --output-dir "$RUNNER_TEMP/factory-pilot-1"
       - name: Lưu receipt và kết quả kiểm trình duyệt
-        if: matrix.case == 'clean'
+        if: ${{ !cancelled() && matrix.case == 'clean' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: pack-preview-evidence
           if-no-files-found: error
           path: |
             ${{ runner.temp }}/preview-browser.json
+            ${{ runner.temp }}/rollout-drill.json
             ${{ runner.temp }}/app/docs/ops/DEPLOYS.json
+            ${{ runner.temp }}/factory-pilot-1/
+      - name: Ba vòng sửa chữa với PostgreSQL và Chromium
+        if: matrix.case == 'clean'
+        env:
+          PG_TOOLS_CONTAINER: ${{ job.services.postgres.id }}
+        run: python tests_e2e/factory_lifecycle.py --output "$RUNNER_TEMP/factory-repair-pilot.json"
+      - name: Lưu số đo và ranh giới phê duyệt của pilot sửa chữa
+        if: matrix.case == 'clean'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: factory-repair-pilot
+          if-no-files-found: error
+          path: ${{ runner.temp }}/factory-repair-pilot.json
