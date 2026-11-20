@@ -385,7 +385,19 @@ class OfficeTest(AppCase):
         )
         page.evaluate(frames)
         rooms3d = page.evaluate(inside, ".office-labels .office-tag[data-kind=room]")
-        self.assertEqual(len(rooms3d), 8)
+        # Toàn cảnh: không phòng nào ra khỏi hình (ẩn vì `off-room` = camera cắt mất phòng). Nhãn nhường nhãn agent
+        # (`overlap`) tuỳ cỡ chữ của máy — không phải lỗi khung camera nên không đếm.
+        why = page.eval_on_selector_all(
+            ".office-labels .office-tag[data-kind=room]", "es => es.map(e => [e.textContent, e.dataset.why || ''])"
+        )
+        self.assertEqual(len(why), 8)
+        self.assertEqual([n for n, w in why if w == "off-room"], [])
+        clamped = page.eval_on_selector_all(  # camera ôm trọn toà nhà: không nhãn phòng nào phải kéo từ ngoài khung vào
+            ".office-labels .office-tag[data-kind=room]:not([hidden])",
+            "es => es.filter(e => e.dataset.clamped).map(e => e.textContent)",
+        )
+        self.assertEqual(clamped, [])
+        self.assertGreaterEqual(len(rooms3d), 6, why)
         self.assertTrue(all(ok for _, ok in rooms3d), rooms3d)
         page.click(".office-rooms button[data-room='meeting']")
         page.evaluate(frames)
@@ -562,14 +574,16 @@ class OfficeTest(AppCase):
         page.select_option("#office-renderer", "3d")
         page.locator("canvas.office-3d").wait_for()
         page.wait_for_function(
-            "() => document.querySelectorAll('.office-labels .office-tag[data-kind=room]:not([hidden])').length === 8"
+            "() => { const r = [...document.querySelectorAll('.office-labels .office-tag[data-kind=room]')];"
+            " return r.length === 8 && r.every(e => e.dataset.why !== 'off-room') && r.filter(e => !e.hidden).length >= 6; }"
         )
         self.assertIn("xoay", page.text_content("#office-keys") or "")
         self.assertEqual(page.get_attribute("canvas.office-3d", "aria-describedby"), "office-keys")
         self.check_room_labels_apart(page, frames)
         page.click(".office-rooms button[data-room='']")
         page.wait_for_function(
-            "() => document.querySelectorAll('.office-labels .office-tag[data-kind=room]:not([hidden])').length === 8"
+            "() => { const r = [...document.querySelectorAll('.office-labels .office-tag[data-kind=room]')];"
+            " return r.length === 8 && r.every(e => e.dataset.why !== 'off-room') && r.filter(e => !e.hidden).length >= 6; }"
         )
         self.assertEqual(page.evaluate(keyed, "canvas.office-3d"), [True, True, True, False])  # (xoay az: làm sau cùng)
         for theme in page.eval_on_selector_all("#office-theme option", "os => os.map(o => o.value)"):
@@ -649,7 +663,14 @@ class OfficeTest(AppCase):
         boxes = page.evaluate(self.ROOM_BOXES)
         names = [b[0] for b in boxes]
         self.assertTrue(0 < len(boxes) < 8, names)  # còn nhãn (không kiểm trên tập rỗng), nhưng không phải mọi phòng
-        self.assertIn("▸ Khu làm việc", names)  # bàn agent nằm trong Khu làm việc
+        self.assert_kept(page, ["▸ Khu làm việc"])  # bàn agent nằm trong Khu làm việc
+        far = page.eval_on_selector_all(  # phòng xa hẳn bàn: ẩn vì ra khỏi phòng của nó, không phải nhường chỗ
+            ".office-labels .office-tag[data-kind=room]", "es => es.map(e => [e.textContent, e.dataset.why || ''])"
+        )
+        self.assertEqual(
+            {n: w for n, w in far if n in ("▸ Vườn & hồ bơi", "▸ Ngủ trưa")},
+            {"▸ Vườn & hồ bơi": "off-room", "▸ Ngủ trưa": "off-room"},
+        )
         # Phòng xa hẳn khỏi bàn (ra ngoài hình) không bị ghim vào mép khung.
         self.assertEqual({"▸ Vườn & hồ bơi", "▸ Ngủ trưa", "▸ Pantry"} & set(names), set(), names)
         self.assert_labels_apart(boxes)
@@ -683,15 +704,15 @@ class OfficeTest(AppCase):
         go(page, "office", "Văn phòng")
         page.locator("canvas.office-3d").wait_for()
         page.wait_for_function(
-            "() => document.querySelectorAll('.office-labels .office-tag[data-kind=room]:not([hidden])').length === 8"
+            "() => { const r = [...document.querySelectorAll('.office-labels .office-tag[data-kind=room]')];"
+            " return r.length === 8 && r.every(e => e.dataset.why !== 'off-room') && r.filter(e => !e.hidden).length >= 6; }"
         )
         frames = "() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))"
         for _ in range(3):
             page.click("button[aria-label='Phóng to']")
         page.evaluate(frames)
-        names = [b[0] for b in page.evaluate(self.ROOM_BOXES)]
         # Phóng 1,95×: các phòng hàng sau giữa hình vẫn còn — nhãn của chúng không bị ẩn chỉ vì điểm neo ra ngoài khung.
-        self.assertLessEqual({"▸ Giám đốc", "▸ Phòng họp", "▸ Server"}, set(names), names)
+        self.assert_kept(page, ["▸ Giám đốc", "▸ Phòng họp", "▸ Server"])
         for _ in range(2):
             page.click("button[aria-label='Phóng to']")
         page.evaluate(frames)
@@ -741,6 +762,48 @@ class OfficeTest(AppCase):
         ".map(e => { const r = e.getBoundingClientRect(); return [e.textContent, r.left - s.left, r.top - s.top,"
         " r.right - s.left, r.bottom - s.top, s.width, s.height]; }); }"
     )
+
+    def test_office_focus_label_in_crowd(self) -> None:
+        """390 px, mọi agent đang làm (thêm nhãn trạng thái), phóng 1,95× rồi tới Khu làm việc: quanh nhãn phòng chật kín
+        nhãn bám người, không còn chỗ trống để dịch — nhãn của phòng đang xem vẫn hiện (không nhường như phòng khác)."""
+        ctx = self.new_context("mobile")
+        ctx.add_init_script(
+            "try { localStorage.setItem('xt-office', JSON.stringify({scale: 'company', renderer: '3d',"
+            " motion: false})); } catch (e) {}"
+        )
+        page, watch = self.open_app(ctx)
+
+        def busy(route: Any) -> None:
+            res = route.fetch()
+            body = res.json()
+            for seat in body["seats"]:
+                seat["state"], seat["task"] = "work", {"id": "T-1234", "title": "x"}
+            route.fulfill(response=res, json=body)
+
+        page.route("**/api/office*", busy)
+        go(page, "office", "Văn phòng")
+        page.locator("canvas.office-3d").wait_for()
+        page.wait_for_function(
+            "() => document.querySelectorAll('.office-labels .office-tag[data-kind=state]:not([hidden])').length >= 3"
+        )
+        for _ in range(3):
+            page.click("button[aria-label='Phóng to']")
+        page.click(".office-rooms button[data-room='work']")
+        page.evaluate("() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))")
+        self.assertIn("▸ Khu làm việc", [b[0] for b in page.evaluate(self.ROOM_BOXES)])
+        self.assertEqual(watch.take(), [])
+
+    def assert_kept(self, page: Page, names: List[str]) -> None:
+        """Nhãn phòng `names` vẫn còn: hiện, hoặc chỉ nhường nhãn khác (`data-why=overlap` — tuỳ cỡ chữ của máy). Ẩn vì
+        ra khỏi phòng (`off-room`) hay ẩn không lý do là sai."""
+        got = dict(
+            page.eval_on_selector_all(
+                ".office-labels .office-tag[data-kind=room]",
+                "es => es.map(e => [e.textContent, e.hidden ? (e.dataset.why || '?') : 'shown'])",
+            )
+        )
+        self.assertEqual({n: got.get(n) for n in names if got.get(n) not in ("shown", "overlap")}, {}, got)
+        self.assertTrue(any(got.get(n) == "shown" for n in names), got)
 
     def assert_labels_apart(self, boxes: List[Any]) -> None:
         """Mọi nhãn nằm trọn trong khung và không hai nhãn nào chồng nhau."""

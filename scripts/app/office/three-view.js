@@ -204,29 +204,32 @@ export function createThreeView(stage) {
       el.textContent = t.text;
       el.dataset.kind = t.kind; // agent | state | room — test và CSS phân biệt nhãn agent với nhãn phòng
       el.hidden = false;
+      el.dataset.why = "";
       let left = ((p.x + 1) / 2) * rect.w, top = ((1 - p.y) / 2) * rect.h;
       if (t.kind === "room") {
         // Nhãn phòng là biển chỉ dẫn: kẹp trọn vào khung (khung hẹp, xoay sát biên không cắt chữ), rồi chỉ giữ khi chỗ
         // nhãn đứng vẫn là sàn/tường của CHÍNH phòng đó — phòng ra ngoài hình (tới bàn, tới phòng khác, phóng to) thì
-        // nhãn bị kẹp sang phòng khác → ẩn. Phòng đang xem ("Tới phòng") luôn giữ nhãn.
+        // nhãn bị kẹp sang phòng khác → ẩn. Bị nhãn khác đè → dịch lên/xuống tìm chỗ trống vẫn trên phòng đó; không có
+        // thì nhường. Phòng đang xem ("Tới phòng") luôn có nhãn. `data-why` ghi lý do ẩn (off-room | overlap).
         const hw = el.offsetWidth / 2 + 2;
+        const raw = [left, top];
         left = Math.min(rect.w - hw, Math.max(hw, left));
         top = Math.min(rect.h - 2, Math.max(el.offsetHeight + 2, top));
+        el.dataset.clamped = Math.abs(left - raw[0]) > 1 || Math.abs(top - raw[1]) > 1 ? "1" : ""; // điểm neo ngoài khung
         const room = rooms.get(t.id);
-        if (t.id !== focus && !(room && onOwnRoom(left, top, rect, room, zb, plan.H))) {
+        const own = (y) => t.id === focus || Boolean(room && onOwnRoom(left, y, rect, room, zb, plan.H));
+        const hide = (why) => {
           el.hidden = true;
-          return;
-        }
+          el.dataset.why = why;
+        };
+        if (!own(top)) return hide("off-room");
         const h = el.offsetHeight + 2;
         const boxAt = (y) => ({ l: left - hw + 2, r: left + hw - 2, t: y - el.offsetHeight, b: y });
         const free = (y) => y >= h && y <= rect.h - 2 && !placed.some((o) => overlaps(o, boxAt(y)));
         if (!free(top)) {
-          // Phòng đang xem luôn có nhãn: dịch lên/xuống tìm chỗ trống; không có thì vẫn đặt ở chỗ cũ. Phòng khác nhường.
-          if (t.id !== focus) {
-            el.hidden = true;
-            return;
-          }
-          top = [top - h, top + h, top - 2 * h, top + 2 * h].find(free) ?? top;
+          const alt = [top - h, top + h, top - 2 * h, top + 2 * h].find((y) => free(y) && own(y));
+          if (alt !== undefined) top = alt;
+          else if (t.id !== focus) return hide("overlap");
         }
         placed.push(boxAt(top));
       }
