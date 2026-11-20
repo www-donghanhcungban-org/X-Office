@@ -437,7 +437,7 @@
 
 - Phương án: (1) Giữ: người/phiên agent update-branch, review lại ở head mới · (2) Steward gọi REST update-branch ghim expected_head_sha; review sạch mang sang head mới khi head là merge commit có cha đầu là head đã review và tập thay đổi so với base (tên file, tên cũ, trạng thái, blob sha) không đổi — tối đa 5 bước · (3) Steward update-branch và bỏ yêu cầu review lại cho mọi merge base
 - Chọn: Steward gọi REST update-branch ghim expected_head_sha; review sạch mang sang head mới khi head là merge commit có cha đầu là head đã review và tập thay đổi so với base (tên file, tên cũ, trạng thái, blob sha) không đổi — tối đa 5 bước
-- Lý do (tiêu chí chất lượng cuối): Đúng: merge base sạch không đổi nội dung PR (so blob sha từng file qua REST compare) nên review cũ vẫn phủ đúng mã; merge có xung đột hoặc đổi file nào thì tập thay đổi khác → review lại; ghim expected_head_sha tránh ghi đè push mới; hôm nay kẹt 4 lần (X-Company#23 ×2, hotel-manager#87, X-Office#151)
+- Lý do (tiêu chí chất lượng cuối): Đúng: merge base sạch không đổi nội dung PR (so blob sha từng file qua REST compare) nên review cũ vẫn phủ đúng mã; merge có xung đột hoặc đổi file nào thì tập thay đổi khác → review lại; ghim expected_head_sha tránh ghi đè push mới; hôm nay kẹt 4 lần (X-Company#23 ×2, hotel-manager#87, X-Templates#151)
 - Đường lùi: Bỏ baseMergeOf trong _pr_rest và nhánh update trong _steward_command/_steward_one
 - Bổ sung (review #153): không mang review khi nhánh đích, kể từ merge-base với head đã review, chạm file nào của PR (merge "giữ bản của mình" giữ blob phía PR nhưng gỡ thay đổi của nhánh đích); steward chạy bằng GITHUB_TOKEN (`XT_STEWARD_UPDATE=off`) không cập nhật nhánh vì commit đó không kích CI. Giới hạn chấp nhận: so blob không thấy đổi quyền file (`chmod`) trong merge commit.
 
@@ -452,7 +452,7 @@
 
 - Phương án: (1) Giữ: auto-merge bật thì chờ GitHub; phiên agent vẫn được bảo bật auto-merge · (2) Đủ điều kiện là merge ghim head ngay (kể cả khi auto-merge đang bật); nhánh đích không có check bắt buộc thì pr next không bao giờ trả enable-auto-merge mà chờ CI xanh rồi merge ghim head — chốt ở pr_next cho cả phiên agent lẫn steward
 - Chọn: Đủ điều kiện là merge ghim head ngay (kể cả khi auto-merge đang bật); nhánh đích không có check bắt buộc thì pr next không bao giờ trả enable-auto-merge mà chờ CI xanh rồi merge ghim head — chốt ở pr_next cho cả phiên agent lẫn steward
-- Lý do (tiêu chí chất lượng cuối): Chủ repo yêu cầu đủ điều kiện là luôn được merge (X-Office#155 treo ở trạng thái clean, phải merge tay); merge ghim head chỉ khi merge-check thấy mọi check xanh và GitHub báo sạch nên không mở rủi ro mới; một chỗ chốt trong pr_next thay cho bộ lọc riêng của steward (D-062), phiên agent cũng được che
+- Lý do (tiêu chí chất lượng cuối): Chủ repo yêu cầu đủ điều kiện là luôn được merge (X-Templates#155 treo ở trạng thái clean, phải merge tay); merge ghim head chỉ khi merge-check thấy mọi check xanh và GitHub báo sạch nên không mở rủi ro mới; một chỗ chốt trong pr_next thay cho bộ lọc riêng của steward (D-062), phiên agent cũng được che
 - Đường lùi: Bỏ nhánh verdict merge khi auto_merge và nhánh base_has_required trong _pr_next_final; trả lại bộ lọc --auto ở _steward_one
 
 ### D-064 · 2026-10-19T11:13:18+00:00 · Duyệt kế hoạch sửa audit 2026-10-19 (5 đợt, T-1401…T-1417, bản 3.8.0)

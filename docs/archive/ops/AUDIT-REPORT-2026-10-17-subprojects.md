@@ -1,4 +1,4 @@
-# AUDIT-REPORT 2026-10-17 (delta #85–#93 + luồng dự án con) — Khung X-Office
+# AUDIT-REPORT 2026-10-17 (delta #85–#93 + luồng dự án con) — Khung X-Templates
 
 > Quét lại theo diff sau `536584f`, trọng tâm: những gì dự án con nhận khi cài khung (install, hook/guard, mẫu, doctor, feedback).
 > SHA quét `main` `11f2770`. Người quét: phiên chính (cổng, công cụ) + 2 subagent `reviewer` (harness/guard; install/mẫu/dự án con).

@@ -2,7 +2,7 @@
 
 > Chủ dự án duyệt ngày 2026-11-08. Pilot xác minh artifact sau deploy trên xboss staging cô lập, dữ liệu giả, dùng đúng archive CI. Production dùng cổng environment `Production` nêu ở mục Điểm dừng; phải xác minh cổng và phê duyệt đúng run trước khi triển khai. Rollback và restore mở sau mốc pilot đạt.
 >
-> Mốc kiểm lúc lập PLAN gồm X-Office `50be630` và xboss `4e365442`. Quyết định kỹ thuật D-398. Cơ sở là [ADR-0068](../adr/0068-software-factory-direction.md) và [thiết kế bằng chứng](../../research/2026-11-04-software-factory-direction.md).
+> Mốc kiểm lúc lập PLAN gồm X-Templates `50be630` và xboss `4e365442`. Quyết định kỹ thuật D-398. Cơ sở là [ADR-0068](../adr/0068-software-factory-direction.md) và [thiết kế bằng chứng](../../research/2026-11-04-software-factory-direction.md).
 >
 > Cú pháp mỗi task là `- [ ] T-NNNN <việc> — Gate: <lệnh>`, với ID và lệnh trong backtick.
 

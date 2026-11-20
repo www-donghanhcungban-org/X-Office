@@ -1,4 +1,4 @@
-# PLAN-3.17-feedback.md — Khung X-Office · sửa lỗi dự án đích báo về → bản 3.17.0
+# PLAN-3.17-feedback.md — Khung X-Templates · sửa lỗi dự án đích báo về → bản 3.17.0
 
 > Lập ngày 2026-10-23. Chủ repo gọi lại `/autopilot` sau PLAN-3.16.0-ceiling (done). Nguồn: gộp phản hồi 4 dự án đích
 > (T-2410, [TARGETS](../../ops/TARGETS.md)) → phân loại 30 nhóm trên HEAD 3.16.0: 11 đã sửa · 15 còn lỗi (6 🟠, 9 🟢) · 3 thiết

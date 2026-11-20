@@ -4,7 +4,7 @@ kind: research
 updated: 2026-10-23
 ---
 
-# Khung X-Office phát triển được đến đâu với công nghệ hiện tại? — nghiên cứu 2026-10-23
+# Khung X-Templates phát triển được đến đâu với công nghệ hiện tại? — nghiên cứu 2026-10-23
 
 Đầu vào: câu hỏi chủ repo 2026-10-23 *"dự án khung này có thể phát triển đến mức nào với công nghệ hiện tại, giữ mục tiêu
 đơn giản, chất lượng cao, phát triển phần mềm nhanh nhất"*. Khung ở 3.15.6 (`59e0731`), pha `harden`, vừa xong PLAN-3.16
@@ -120,7 +120,7 @@ tái lập độc lập qua REST hoặc do phiên chính chạy lại; số ch�
 - Song song worktree nhiều lát, agent teams, mods: thử nghiệm hoặc tốn token chưa đo; subagent worktree không nạp đủ ngữ
   cảnh (chưa xác minh — §9).
 - Thêm vòng review LLM cho mọi PR; Copilot code review làm "reviewer khác họ" (docs: "mix of models", không chọn model).
-- Xoá stub `merge-gate.yml`: ruleset X-Office đã gỡ context, nhưng stub vẫn phát cho dự án đích tới khi hotel-manager
+- Xoá stub `merge-gate.yml`: ruleset X-Templates đã gỡ context, nhưng stub vẫn phát cho dự án đích tới khi hotel-manager
   và X-Company gỡ (T-1834) — xoá sớm làm PR ở đó treo.
 - Thu `guard.py` về nhỏ dựa vào bộ phân loại Auto: docs ghi Auto "does not guarantee safety".
 - Thêm module/ID; dịch sang tiếng Anh; cache Playwright (D-133).

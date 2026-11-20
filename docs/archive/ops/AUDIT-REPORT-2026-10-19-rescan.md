@@ -1,4 +1,4 @@
-# AUDIT-REPORT — X-Office · 2026-10-19 (quét lại 11 nhóm sau khi SHA nhánh mất)
+# AUDIT-REPORT — X-Templates · 2026-10-19 (quét lại 11 nhóm sau khi SHA nhánh mất)
 
 > Commit quét: `a4f929c` (`main`, #171; cây làm việc của nhánh phiên `1301a6d` = merge của `main` vào nhánh, giống hệt) · Phạm vi: **quét lại từ đầu** ARCH, SEC, CODE, TEST, DOC, XFEAT, HAR (sổ cũ ghi SHA nhánh `fd64dd6` đã bị squash-merge xoá — AUD-HAR-077) + delta CI (`pr-review.yml`, `pr-steward.yml`) + DEP, PERF, CFG đo lại ·
 > Người quét: phiên chính (CI/DEP/PERF/sổ) + 5 subagent đọc-only song song — `reviewer` ×4 (SEC+CFG · ARCH/CODE/TEST/XFEAT · HAR cơ chế · HAR 51 bằng chứng blueprint), `Explore` ×1 (DOC) · Xác minh đối kháng: `reviewer-alt` (khác họ model với người tìm) tái hiện độc lập 9 phát hiện 🔴/🟠 mới (đợt 1: 6, đợt 2: 3) — kết quả ở §4 ·

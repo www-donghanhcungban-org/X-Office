@@ -1,4 +1,4 @@
-# Kế hoạch khắc phục và nâng cấp tự động hóa X-Office
+# Kế hoạch khắc phục và nâng cấp tự động hóa X-Templates
 
 > Ngày: 2026-10-19 · Bản 2 (thay bản nháp #160) · Trạng thái: đề xuất đã tái hiện, kèm kế hoạch máy đọc
 > [`PLAN-3.9-automation.md`](../archive/autopilot/PLAN-3.9-automation.md) · Quyết định tự duyệt: D-066…D-070
@@ -195,7 +195,7 @@ giữa required gate.
 
 ## 6. Nâng cấp tự động hóa (AUTO) — cơ chế thật
 
-X-Office đã có vòng lặp có bằng chứng, `pr next`, steward, `merge-gate`, guard không hỏi. Các gói dưới nối chúng
+X-Templates đã có vòng lặp có bằng chứng, `pr next`, steward, `merge-gate`, guard không hỏi. Các gói dưới nối chúng
 bằng hợp đồng máy đọc và bỏ điều phối tay. Bảng ghi **cơ chế cụ thể** đã đối chiếu nguồn §3.
 
 | Gói | Tự động hóa thêm | Cơ chế | Điều kiện chất lượng | Task |

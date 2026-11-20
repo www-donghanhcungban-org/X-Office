@@ -1,4 +1,4 @@
-# PLAN-harden-2026-10-26.md — Khung X-Office · gắn lệnh kiểm máy cho MUST đã tick
+# PLAN-harden-2026-10-26.md — Khung X-Templates · gắn lệnh kiểm máy cho MUST đã tick
 
 > Lập ngày 2026-10-26 theo `/complete` (pha harden). Nguồn: `release-check` tại `339759f` GO (chờ người), hàng SHOULD
 > `unchecked_must` WARN 57/64 MUST đạt không có lệnh kiểm. Phiên chính tự duyệt (D-193).

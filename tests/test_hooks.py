@@ -3031,6 +3031,48 @@ class FenceExtractMembersMoreTest(_FenceRootsMixin, unittest.TestCase):
         self.assertIsNone(self.g._extract_members(["pax", "-r", "-c", "-f", "a.pax", "src"]))
         self.assertIsNone(self.g._extract_members(["jar", "xf", "a.jar"]))
 
+    def test_pr17_review_escapes_blocked(self):
+        """Đường lách review PR 17 (đo UnZip 6.00, GNU tar 1.35) ghim trên bộ đọc thành viên của main: sau tên zip `-P`/
+        `-O` là mẫu tên, `-x` trước tên zip chỉ là cờ, `-d`/`-dDIR` trước hay sau tên zip, `UNZIP`/`TAR_OPTIONS` không
+        ghép hai lần, strip giữ hậu tố hàng rào, bsdtar có `-C` sau toán hạng đầu."""
+        for cmd in (
+            "unzip -o /tmp/a.zip -P .claude/settings.json",
+            "unzip -o /tmp/a.zip -O .claude/hooks/guard.py",
+            "unzip -qP pw /tmp/a.zip .claude/settings.json",
+            "unzip -x /tmp/a.zip .claude/settings.json",
+            "unzip -d . /tmp/a.zip -d sub '.claude/*'",
+            "UNZIP=-l unzip --l /tmp/a.zip .codex/hooks.json",
+            "cd src && TAR_OPTIONS=-C.. tar -xf /tmp/a.tar .claude",
+            "tar -xf /tmp/a.tar --strip-components=1 x/.claude/settings.json",
+            "tar -xf /tmp/a.tar --strip-components=2 x/y/.codex/hooks.json",
+            "bsdtar -xf /tmp/a.tar x -C sub .claude/settings.json",
+            "unzip -d.claude /tmp/a.zip settings.json",
+            "unzip /tmp/a.zip settings.json -d.claude",
+            "unzip /tmp/a.zip -x '*.md' -d.claude settings.json",
+        ):
+            self.assert_blocked(cmd, ("HOOK_BYPASS", "BUDGET"))
+        self.assert_blocked(
+            "tar -xf /tmp/a.tar --transform=s,x/,, x/.claude/settings.json",
+            ("EVIDENCE_HANDWRITE", "HOOK_BYPASS"),
+            strict="ask",
+        )
+
+    def test_pr17_review_variants_allowed(self):
+        """Không chặn oan các biến thể review PR 17: `-dDIR`/`-P` dính liền, `-d` cụt, chỉ tuỳ chọn không tên zip."""
+        for cmd in (
+            "unzip -dout /tmp/a.zip src/app.py",
+            "unzip /tmp/a.zip src/app.py -dout",
+            "unzip -qPpw /tmp/a.zip src/app.py",
+            "unzip /tmp/a.zip src/app.py -d",
+            "unzip -d out",
+            "unzip -qo -d out -P pw",
+            "tar -xf a.tar --strip-components=1 x/src/app.py",
+            "unzip -o /tmp/a.zip -P pw src/app.py",
+            "unzip -d out /tmp/a.zip src/app.py -x '.claude/*'",
+            "UNZIP=-q unzip -o a.zip src/app.py",
+        ):
+            self.assert_allowed(cmd)
+
     def test_concurrent_decisions_match_sequential(self):
         cmds = ("tar -xf a.tar --no-anchored settings.json", "jar xf a.jar src/app.py", "pax -r -f a.pax .claude")
         jobs = [(root, cmd) for root in self.roots for cmd in cmds] * 6
@@ -3087,6 +3129,72 @@ class FenceXargsAdapterAncestorTest(_FenceRootsMixin, unittest.TestCase):
         self.assertFalse(self.g._xargs_segs_hit(["*"], [".github", "hooks"]))
         self.assertTrue(self.g._xargs_segs_hit([".git*"], [".github", "hooks"]))
         self.assertTrue(self.g._xargs_segs_hit(["*", "hook?"], [".github", "hooks"]))  # đủ đoạn: như AUD-SEC-989
+
+
+class FenceMergeFileTest(_FenceRootsMixin, unittest.TestCase):
+    """AUD-SEC-999 (T-3971): `git merge-file <hiện tại> <gốc> <khác>` ghi kết quả trộn vào tệp ĐẦU (chọn gốc = bản hiện
+    tại, khác = bản cũ → thay hẳn tệp) = `cp old <hàng rào>` — chặn như ghi hàng rào qua Bash (HOOK_BYPASS). `-p`/
+    `--stdout` in ra stdout, `--object-id` ghi object: cho chạy; tệp khác: cho chạy."""
+
+    FENCE = (".claude/hooks/guard.py", ".claude/settings.json", ".codex/hooks.json", ".cursor/hooks.json")
+
+    def test_merge_file_into_fence_blocked(self):
+        for rel in self.FENCE:
+            for form in (
+                "git merge-file {} base.py old.py",
+                "git merge-file --ours {} base.py old.py",
+                "git merge-file -L a -L b -L c {} base.py old.py",
+                "git merge-file --marker-size=5 {} base.py old.py",
+                "git merge-file --diff-algorithm patience {} base.py old.py",
+                "git -C . merge-file {} base.py old.py",
+            ):
+                self.assert_blocked(form.format(rel))
+
+    def test_option_parsing_escapes_blocked(self):
+        """Review PR 17 🟠-1 (đo git 2.43): nhãn `-L` dính/tách, `--no-…`, viết tắt tên dài không được làm lọt đích ghi."""
+        for form in (
+            "git merge-file -Lp {} base.py old.py",
+            "git merge-file -Lupstream {} base.py old.py",
+            "git merge-file -L -p -L b -L c {} base.py old.py",
+            "git merge-file -p --no-stdout {} base.py old.py",
+            "git merge-file --stdout --no-stdout {} base.py old.py",
+            "git merge-file --marker 9 {} base.py old.py",
+            "git merge-file -L --stdout {} base.py old.py",
+            "git merge-file -L x --object-id --no-object-id {} base.py old.py",
+            "git merge-file -- {} base.py old.py",
+        ):
+            for rel in self.FENCE[:2]:
+                self.assert_blocked(form.format(rel))
+
+    def test_option_parsing_stdout_variants_allowed(self):
+        for cmd in (
+            "git merge-file --std .claude/settings.json base.py old.py",
+            "git merge-file -L a -p .claude/settings.json base.py old.py",
+            "git merge-file -pq .claude/settings.json base.py old.py",
+            "git merge-file --no-stdout --stdout .claude/settings.json base.py old.py",
+            "git merge-file --marker 9 -p .claude/settings.json base.py old.py",
+        ):
+            self.assert_allowed(cmd)
+
+    def test_stdout_object_id_and_other_files_allowed(self):
+        for cmd in (
+            "git merge-file -p .claude/settings.json base.py old.py",
+            "git merge-file --stdout .claude/settings.json base.py old.py",
+            "git merge-file --object-id a b c",
+            "git merge-file src/app.py base.py old.py",
+            "git merge-file -L a -L b -L c src/app.py list.txt old.py",
+        ):
+            self.assert_allowed(cmd)
+
+    def test_concurrent_decisions_match_sequential(self):
+        cmds = ("git merge-file .claude/settings.json b c", "git merge-file -p .claude/settings.json b c")
+        jobs = [(root, cmd) for root in self.roots for cmd in cmds] * 6
+        with mock.patch.dict(os.environ, {"XT_GUARD_POLICY": "strict"}):
+            want = [str(self.g.bash_decision(c, r).get("decision") or "") for r, c in jobs]
+            with concurrent.futures.ThreadPoolExecutor(8) as pool:
+                got = list(pool.map(lambda j: str(self.g.bash_decision(j[1], j[0]).get("decision") or ""), jobs))
+        self.assertEqual(got, want)
+        self.assertEqual(set(want), {"ask", ""})
 
 
 class FenceBaselineMonotoneTest(unittest.TestCase):

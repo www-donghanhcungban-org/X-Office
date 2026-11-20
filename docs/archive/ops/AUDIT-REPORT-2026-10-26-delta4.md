@@ -1,4 +1,4 @@
-# AUDIT-REPORT — X-Office · 2026-10-26 (delta `daefc7c..ce5d9a7`)
+# AUDIT-REPORT — X-Templates · 2026-10-26 (delta `daefc7c..ce5d9a7`)
 
 > Commit quét: `main` `ce5d9a7` (3.26.1, tag `v3.26.1` annotated tạo bởi `release-tag.yml`) · Phạm vi: delta `daefc7c..ce5d9a7`
 > (#264 sổ delta3, #265 ADR-0049 / 3.26.0, #266–#267 GO-NO-GO v3.25.0, #268 D-192 / 3.26.1) — nhóm 1 ARCH, 2 SEC, 3 CODE, 4 TEST, 9 DOC,

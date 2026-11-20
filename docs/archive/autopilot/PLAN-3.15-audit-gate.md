@@ -1,4 +1,4 @@
-# PLAN-3.15-audit-gate.md — Khung X-Office · sửa phát hiện audit 2026-10-21 (bằng chứng Gate, cổng nhất quán)
+# PLAN-3.15-audit-gate.md — Khung X-Templates · sửa phát hiện audit 2026-10-21 (bằng chứng Gate, cổng nhất quán)
 
 > Lập ngày 2026-10-21. Chủ repo: "đọc commit mới, kiểm tra lại, nghiên cứu thêm rồi thi hành" — commit chưa merge
 > `d388802` (nhánh `docs/audit-workflow-optimization-20261021`): [audit tại `ec4c7d2`](../ops/AUDIT-REPORT-2026-10-21.md)

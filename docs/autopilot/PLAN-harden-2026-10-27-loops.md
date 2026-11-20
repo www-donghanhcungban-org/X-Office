@@ -1,4 +1,4 @@
-# PLAN-harden-2026-10-27-loops.md — Khung X-Office · nâng tự chủ ba vòng, lát 0–3
+# PLAN-harden-2026-10-27-loops.md — Khung X-Templates · nâng tự chủ ba vòng, lát 0–3
 
 > Lập ngày 2026-10-27 theo `/complete` (pha harden) và yêu cầu chủ repo "hoàn thành hết đi" (sáu lát của
 > [nghiên cứu 2026-10-26](../../research/2026-10-26-autopilot-complete-optimize.md) §11). Thiết kế: ADR-0051, ADR-0052 (lát 3: ADR riêng, D-203). Phiên chính tự duyệt (D-202, D-203).

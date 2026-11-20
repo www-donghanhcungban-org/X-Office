@@ -1,4 +1,4 @@
-# PLAN harden X-Office 2026-11-17 — đợt 2 (🟠)
+# PLAN harden X-Templates 2026-11-17 — đợt 2 (🟠)
 
 > Duyệt: D-496 (phiên chính tự duyệt) · Blueprint: BLUEPRINT.md · Quy trình: ADR-0080 (D-494) · Đợt trước: PLAN-harden-2026-11-16 (🔴 = 0)
 
@@ -160,4 +160,4 @@
 - [x] `T-3967` 🟠 AUD-SEC-987: guard xếp `.agents/skills/*`, `.codex/agents/*`, `.codex/hooks.json` vào nhóm năng lực cần duyệt ở dự án đích — Gate: `python3 -m unittest tests.test_hooks.CapabilityCodexPathsTest` (files: .claude/hooks/guard.py, tests/)
 - [x] `T-3968` 🟠 AUD-SEC-988: khôi phục tệp/thư mục hàng rào từ rev/stash (`git checkout <rev> --`, `git restore --source`) → chặn — Gate: `python3 -m unittest tests.test_hooks.FenceRestoreFromRevTest` (files: .claude/hooks/guard.py, tests/)
 - [x] `T-3969` 🟠 AUD-SEC-989: rào tệp nối guard của Cursor/Copilot/Grok/OpenCode như `.codex/hooks.json` — Gate: `python3 -m unittest tests.test_hooks.FenceAdapterFilesTest` (sau: T-3968; files: .claude/hooks/guard.py, scripts/xt.py, tests/)
-- [ ] `T-3970` 🟠 AUD-SEC-990: giải nén (`tar -x`, `unzip`) có thành viên phủ tệp hàng rào → chặn — Gate: `python3 -m unittest tests.test_hooks.FenceExtractMembersTest` (files: .claude/hooks/guard.py, tests/)
+- [x] `T-3970` 🟠 AUD-SEC-990: giải nén (`tar -x`, `unzip`) có thành viên phủ tệp hàng rào → chặn — Gate: `python3 -m unittest tests.test_hooks.FenceExtractMembersTest` (files: .claude/hooks/guard.py, tests/)
