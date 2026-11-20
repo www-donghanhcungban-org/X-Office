@@ -884,6 +884,18 @@ class OfficeTest(AppCase):
         work = [b for b in everyone if b[1] == "▸ Khu làm việc"][0]
         for o in (b for b in everyone if b[0] != "room"):
             self.assertFalse(work[2] < o[4] and o[2] < work[4] and work[3] < o[5] and o[3] < work[5], o[1])
+        # Toàn cảnh 390 px, phóng 1× → 3,05×: điểm neo của Khu làm việc (tường trái) ra ngoài khung nhưng sàn phòng chiếm
+        # phần lớn hình — nhãn tìm điểm khác trên sàn của chính phòng thay vì ẩn (nợ review PR #14: luật chỉ thử một điểm).
+        page.click(".office-rooms button[data-room='']")
+        missing = []
+        for clicks in range(6):
+            page.evaluate(frames)
+            boxes = page.evaluate(self.ROOM_BOXES)
+            if "▸ Khu làm việc" not in [b[0] for b in boxes]:
+                missing.append(clicks)
+            self.assert_labels_apart(boxes)
+            page.click("button[aria-label='Phóng to']")
+        self.assertEqual(missing, [])
         self.assertEqual(watch.take(), [])
 
 
