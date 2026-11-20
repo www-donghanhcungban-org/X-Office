@@ -2840,6 +2840,27 @@ class FenceExtractMembersTest(_FenceRootsMixin, unittest.TestCase):
         ):
             self.assert_blocked(cmd)
 
+    def test_unzip_glued_dir_value(self):
+        """`-dDIR` dính liền (trước và sau tên zip) và `-d` cụt ở cuối: đích vẫn tính đúng."""
+        for cmd in (
+            "unzip -d.claude /tmp/a.zip settings.json",
+            "unzip /tmp/a.zip settings.json -d.claude",
+            "unzip /tmp/a.zip -x '*.md' -d.claude settings.json",
+        ):
+            self.assert_blocked(cmd)
+        for cmd in (
+            "unzip -dout /tmp/a.zip src/app.py",
+            "unzip /tmp/a.zip src/app.py -dout",
+            "unzip -qPpw /tmp/a.zip src/app.py",
+            "unzip /tmp/a.zip src/app.py -d",
+        ):
+            self.assert_allowed(cmd)
+
+    def test_unzip_without_archive_allowed(self):
+        """Chỉ có tuỳ chọn, không có tên zip: không có thành viên nào để ghi (nhánh "hết đối số" của bộ đọc)."""
+        for cmd in ("unzip -o", "unzip -d out", "unzip -qo -d out -P pw"):
+            self.assert_allowed(cmd)
+
     def test_review_variants_allowed(self):
         for cmd in (
             "tar -xf a.tar --strip-components=1 x/src/app.py",
