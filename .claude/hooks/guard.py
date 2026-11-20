@@ -15087,7 +15087,19 @@ def _checkout_index_targets(args: List[str]) -> List[str]:
     return ([prefix] if prefix else []) + [prefix + p for p in pos] + partial
 
 
+MERGE_FILE_VALUE_OPTS = ("-L", "--marker-size", "--diff-algorithm")
+
+
+def _merge_file_target(args: List[str]) -> List[str]:
+    """`git merge-file <hiện tại> <gốc> <khác>` ghi kết quả trộn vào tệp ĐẦU (AUD-SEC-992); `-p`/`--stdout` in ra stdout
+    và `--object-id` ghi object, không ghi tệp. Viết tắt tuỳ chọn dài (`--std`) không nhận: coi là ghi (chiều chặt)."""
+    if "p" in _short_flags(args) or "--stdout" in args or "--object-id" in args:
+        return []
+    return _positionals(args, MERGE_FILE_VALUE_OPTS)[:1]
+
+
 GIT_WRITERS: Dict[str, Callable[[List[str]], List[str]]] = {
+    "merge-file": _merge_file_target,
     "rm": _positionals,
     "mv": _positionals,
     "checkout-index": _checkout_index_targets,

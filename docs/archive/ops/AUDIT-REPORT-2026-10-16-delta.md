@@ -1,4 +1,4 @@
-# AUDIT-REPORT 2026-10-16 (delta #58–#66) — Khung X-Office
+# AUDIT-REPORT 2026-10-16 (delta #58–#66) — Khung X-Templates
 
 > Quét lại theo diff sau các đợt sửa của `docs/ops/AUDIT-REPORT-2026-10-16.md`. SHA quét `main` `541e81f` (từ `58b8c8b`).
 > Sổ: `docs/ops/AUDIT-STATUS.md` (ID mới AUD-SEC-028…032, AUD-CFG-006…008, AUD-CODE-007…010, AUD-TEST-006, AUD-HAR-040…045, AUD-DOC-031…037).

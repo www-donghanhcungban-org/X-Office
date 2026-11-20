@@ -1,4 +1,4 @@
-# Audit X-Office và bộ mẫu — 2026-10-21
+# Audit X-Templates và bộ mẫu — 2026-10-21
 
 > Commit quét: `main` `ec4c7d2da946730a945d719a3385ae381463987e` · Phạm vi: khung và bộ mẫu trong repo; không audit repo đích đang triển khai. PR này chỉ bổ sung báo cáo, bằng chứng rút gọn và [kế hoạch tối ưu](OPTIMIZATION-PLAN-2026-10-21.md); chưa sửa công cụ hoặc CI.
 

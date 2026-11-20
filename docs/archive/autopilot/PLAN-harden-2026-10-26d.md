@@ -1,4 +1,4 @@
-# PLAN-harden-2026-10-26d.md — Khung X-Office · việc chờ người đã duyệt: hook trích lỗi, ca đối kháng, mutation guard
+# PLAN-harden-2026-10-26d.md — Khung X-Templates · việc chờ người đã duyệt: hook trích lỗi, ca đối kháng, mutation guard
 
 > Lập ngày 2026-10-26 theo `/complete` (pha harden). Chủ repo duyệt 2026-10-26 ("xem nó là gì tôi duyệt luôn" → chọn
 > T-1822, T-1832, T-1823, đóng sổ T-1814). T-1834 vẫn chờ chủ hai repo đích gỡ `merge-gate` khỏi ruleset. Phiên chính tự

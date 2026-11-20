@@ -2847,6 +2847,36 @@ class FenceExtractMembersTest(_FenceRootsMixin, unittest.TestCase):
             self.assert_blocked(cmd)
 
 
+class FenceMergeFileTest(_FenceRootsMixin, unittest.TestCase):
+    """AUD-SEC-992 (T-3971): `git merge-file <hiện tại> <gốc> <khác>` ghi kết quả trộn vào tệp ĐẦU (chọn gốc = bản hiện
+    tại, khác = bản cũ → thay hẳn tệp) = `cp old <hàng rào>` — chặn như ghi hàng rào qua Bash (HOOK_BYPASS). `-p`/
+    `--stdout` in ra stdout, `--object-id` ghi object: cho chạy; tệp khác: cho chạy."""
+
+    FENCE = (".claude/hooks/guard.py", ".claude/settings.json", ".codex/hooks.json", ".cursor/hooks.json")
+
+    def test_merge_file_into_fence_blocked(self):
+        for rel in self.FENCE:
+            for form in (
+                "git merge-file {} base.py old.py",
+                "git merge-file --ours {} base.py old.py",
+                "git merge-file -L a -L b -L c {} base.py old.py",
+                "git merge-file --marker-size=5 {} base.py old.py",
+                "git merge-file --diff-algorithm patience {} base.py old.py",
+                "git -C . merge-file {} base.py old.py",
+            ):
+                self.assert_blocked(form.format(rel))
+
+    def test_stdout_object_id_and_other_files_allowed(self):
+        for cmd in (
+            "git merge-file -p .claude/settings.json base.py old.py",
+            "git merge-file --stdout .claude/settings.json base.py old.py",
+            "git merge-file --object-id a b c",
+            "git merge-file src/app.py base.py old.py",
+            "git merge-file -L a -L b -L c src/app.py list.txt old.py",
+        ):
+            self.assert_allowed(cmd)
+
+
 class FenceBaselineMonotoneTest(unittest.TestCase):
     """Review AUD-SEC-988 🔴-2: luật hàng rào mới KHÔNG được lỏng hơn guard nền (cefba45d, trước AUD-SEC-988/989) ở bất
     kỳ (lệnh, gốc, chính sách) nào. `tests/fixtures/autonomy/guard_fence_baseline.json`: quyết định nền ghi sẵn cho lệnh

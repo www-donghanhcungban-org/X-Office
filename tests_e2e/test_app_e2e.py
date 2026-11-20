@@ -633,6 +633,46 @@ class OfficeTest(AppCase):
         self.assertIn(f"500 {self.origin}/api/office", problems)  # lỗi chủ ý đã xảy ra
         self.assertEqual([p for p in problems if "/api/office" not in p], [])  # ngoài lỗi chủ ý: sạch
 
+    def test_office_poll_error_keeps_focus_and_alert(self) -> None:
+        """AUD-A11Y-004: máy chủ lỗi, poll 10 s cùng một lỗi → KHÔNG dựng lại hộp `role=alert` (trình đọc màn hình không
+        bị đọc lại mỗi 10 s) và nút "Thử lại" đang giữ focus không bị gỡ (WCAG 2.4.3); bấm "Thử lại" thủ công vẫn dựng
+        lại (có phản hồi cho thao tác của người dùng)."""
+        ctx = self.new_context("desktop")
+        page, _watch = self.open_app(ctx)
+        hits: list[int] = []
+
+        def fail(route: Any) -> None:
+            hits.append(1)
+            route.fulfill(status=500, json={"error": "lỗi thử"})
+
+        def wait_hits(n: int) -> None:
+            for _ in range(100):
+                if len(hits) >= n:
+                    break
+                page.wait_for_timeout(50)
+            page.wait_for_timeout(200)  # để phản hồi lỗi kịp vẽ
+
+        page.route("**/api/office*", fail)
+        page.clock.install()
+        go(page, "office", "Văn phòng")
+        retry = page.locator("main .state.error button")
+        retry.wait_for()
+        retry.focus()
+        page.evaluate(
+            "() => { window.__alerts = 0; new MutationObserver((ms) => ms.forEach((m) => m.addedNodes.forEach((n) => {"
+            " if (n.nodeType === 1 && (n.matches('[role=alert]') || n.querySelector('[role=alert]'))) window.__alerts++;"
+            " }))).observe(document.getElementById('main'), { childList: true, subtree: true }); }"
+        )
+        before = len(hits)
+        page.clock.run_for(10500)  # đúng một lần poll
+        wait_hits(before + 1)
+        self.assertGreater(len(hits), before)  # poll đã chạy và lỗi lần nữa
+        self.assertEqual(page.evaluate("() => window.__alerts"), 0)
+        self.assertEqual(page.evaluate("() => document.activeElement && document.activeElement.textContent"), "Thử lại")
+        retry.click()  # thủ công: dựng lại hộp lỗi mới
+        wait_hits(before + 2)
+        self.assertEqual(page.evaluate("() => window.__alerts"), 1)
+
     def check_pan_bounds(self, page: Page, canvas2d: Any, frames: str) -> None:
         """Biên dời 2D theo cỡ cảnh đã phóng; thu nhỏ thì góc nhìn được kẹp lại (cảnh không biến khỏi khung)."""
 

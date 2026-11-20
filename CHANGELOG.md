@@ -69,7 +69,7 @@ Bản < 3.20.0: [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md) (T-3651; `changel
 ### Changed
 
 - ADR riêng của X-Office (bản phái sinh) dùng dải số **9001+** để không va với số tăng dần của X-Templates: ADR màn
-  Văn phòng đổi `ADR-0082` → [ADR-9001](docs/adr/9001-office-view-renderers.md) (nội dung không đổi; D-521) vì đồng bộ
+  Văn phòng đổi `ADR-0082` → [ADR-9001](docs/adr/9001-office-view-renderers.md) (nội dung không đổi; D-9001, trước ghi nhầm D-521) vì đồng bộ
   X-Templates mang `ADR-0082` của chính nó (harness Codex). Đồng bộ X-Templates tới `9a65104b` (#684–#686).
 - `xt.py test-select --unittest` (cổng commit `gate-fast`, khoá `test_fast`) chọn test theo **lớp** thay vì theo tệp: lớp
   chạy khi thân lớp nhắc tên tệp đổi, có glob khớp tên đó (`GO-NO-GO*.md` không còn khớp mọi `.md`), hoặc nhắc tên một
@@ -90,6 +90,12 @@ Bản < 3.20.0: [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md) (T-3651; `changel
 ### Fixed
 
 - Guard chặn giải nén có thành viên nêu tên phủ tệp hàng rào (`tar -xf a.tar <tệp hàng rào>`, `unzip -o a.zip …`, tính theo `-C`/`-d`): AUD-SEC-990 (T-3970). Đổi guard của khung (`.claude/hooks/`) — dự án đích nhận khi chạy lại `install.py`; không đổi ID checklist. Giới hạn đã biết ở `harness-files.md`.
+
+- Guard chặn `git merge-file <tệp hàng rào> …` (ghi đè tệp đầu; `-p`/`--stdout`/`--object-id` vẫn cho chạy): AUD-SEC-992 (T-3971). Đổi guard của khung — dự án đích nhận khi chạy lại `install.py`.
+
+- Màn Văn phòng: poll 10 s gặp lại cùng lỗi API không dựng lại hộp `role=alert` và không gỡ focus nút "Thử lại"; bấm "Thử lại"/"Làm mới" vẫn dựng lại: AUD-A11Y-004.
+
+- Tài liệu lịch sử (ADR `0xxx`, `docs/archive/`, research, báo cáo audit, PLAN đã xong; 84 tệp) trở lại chữ X-Templates của lúc sự kiện xảy ra — đổi chữ hàng loạt khi tách repo làm sai lịch sử và gây xung đột đồng bộ (AUD-DOC-305; `tests/test_docs_history.py`). Quyết định riêng của X-Office dùng dải `D-9001+` (mục D-521 cục bộ → D-9001, trùng D-521 của X-Templates — AUD-DOC-306). README thêm cờ `--with-office-3d`, `CLAUDE.md` thêm `/factory`.
 
 - Màn Văn phòng 3D: nhãn phòng ẩn/hiện theo chỗ nhãn đứng có còn là sàn hay tường của **chính** phòng đó (tia từ
   camera, không theo hộp nhãn) — phóng to ở toàn cảnh, phòng còn trên hình vẫn giữ nhãn: thử điểm neo đã kẹp rồi các điểm trên sàn phòng (lưới 3×3)

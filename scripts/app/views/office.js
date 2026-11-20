@@ -141,12 +141,21 @@ export async function render(main, { api, h, error }) {
     label();
   }
 
-  async function load() {
+  // Poll 10 s gặp lại CÙNG lỗi thì giữ nguyên hộp lỗi: dựng lại sẽ làm trình đọc màn hình đọc lại `role=alert` và gỡ nút
+  // "Thử lại" đang giữ focus (WCAG 2.4.3, AUD-A11Y-004). Bấm "Thử lại"/"Làm mới" (tham số là sự kiện click) luôn dựng lại.
+  let errKey = "";
+
+  async function load(ev) {
     try {
       apply(await api("/api/office"));
       msg.replaceChildren();
+      errKey = "";
     } catch (e) {
-      error(msg, e, load);
+      const key = String((e && (e.error || e.message)) || "");
+      if (ev instanceof Event || key !== errKey || !msg.firstChild) {
+        errKey = key;
+        error(msg, e, load);
+      }
     }
   }
 

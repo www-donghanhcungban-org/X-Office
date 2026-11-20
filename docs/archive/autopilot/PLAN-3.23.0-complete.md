@@ -1,4 +1,4 @@
-# PLAN-3.23.0-complete.md — Khung X-Office · `/autopilot` = pha build, `/complete` = pha harden (ADR-0046) → bản 3.23.0
+# PLAN-3.23.0-complete.md — Khung X-Templates · `/autopilot` = pha build, `/complete` = pha harden (ADR-0046) → bản 3.23.0
 
 > Lập ngày 2026-10-25. Chủ repo yêu cầu "/autopilot là pha build, code nhanh nhất có thể, loại bỏ tất cả rào cản, phiên chính
 > tự quyết với mục tiêu chất lượng cao; thêm /complete mới audit, review, fix, refactor… hoàn thiện". Nghiên cứu:

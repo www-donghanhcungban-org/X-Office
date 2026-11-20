@@ -1,4 +1,4 @@
-# AUDIT-REPORT — X-Office · 2026-10-20 lần 2 (delta sau #186)
+# AUDIT-REPORT — X-Templates · 2026-10-20 lần 2 (delta sau #186)
 
 > Commit quét: `main` `0afa30d` · Phạm vi: delta `f36ea90..0afa30d` (3 commit, #184…#186) — nhóm 1 ARCH, 2 SEC, 3 CODE,
 > 4 TEST, 8 CI, 9 DOC, 12 XFEAT, 13 HAR, kèm xác minh lại 52 bằng chứng blueprint `stale_evidence` · Lý do: `release-check`

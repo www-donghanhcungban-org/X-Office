@@ -6,7 +6,7 @@ updated: 2026-10-26
 
 # Nâng mức tự chủ của ba vòng — nghiên cứu và đề xuất 2026-10-26 (bản 2)
 
-> Mốc nghiên cứu ban đầu (bản 1): X-Office 3.26.1, `4e7bade7625ec9f70accfc9f293d533b905533a7`; đối chiếu trước PR: `main` 3.27.0 tại `74c47aa34755df9e6c38bf74ede31179fb6ad04c`.
+> Mốc nghiên cứu ban đầu (bản 1): X-Templates 3.26.1, `4e7bade7625ec9f70accfc9f293d533b905533a7`; đối chiếu trước PR: `main` 3.27.0 tại `74c47aa34755df9e6c38bf74ede31179fb6ad04c`.
 > **Bản 2** (cùng ngày): đối chiếu `main` 3.27.0 tại `e1748c6ecc3158403edecdc01882fb6e964394e8` (một commit đổi số bản phụ thuộc trong docs so với `74c47aa`; `scripts/xt.py`, hook, ba skill không đổi); cây đo là `3c62ab5` = `e1748c6` + `research/` và ba dòng CHANGELOG. Bản 2 thêm **ba tái hiện mới** (lỗi luân phiên A/B không bao giờ `blocked`, mất cập nhật `state.json`, `perf sample` không ghi vân tay cây bẩn), chạy lại hai tái hiện cũ trên HEAD, thêm **15 dữ kiện nguồn sống** (Claude Code 2.1.310, GitHub REST và changelog, hai bài Anthropic engineering), hợp đồng CLI/state/artefact đề xuất, corpus nghiệm thu luồng có ID, và mục đính chính so với bản 1.
 > Đầu vào: “nâng cấp tự động lên được nữa không? nghiên cứu sâu và đề xuất”, bổ sung cả `/complete` và `/optimize`; bản 2: “nghiên cứu sâu thêm và nâng cấp lên bản hoàn chỉnh nhất”.
 > Trạng thái: **đề xuất, chưa triển khai hoặc chốt kiến trúc**. Chỉ thêm báo cáo và bằng chứng nghiên cứu; không đổi quyền, cổng, skill, runtime hay bản phát hành. Mọi lệnh tái hiện chạy trong thư mục tạm hoặc bộ nhớ, không chạm `.autopilot/` thật của repo khung.
@@ -297,7 +297,7 @@ Mỗi lát runtime giữ C901 ≤ 10, `mypy --strict`, coverage 100 % dòng + nh
 | [GitHub workflow events](https://github.com/github/docs/blob/02c25d16369fe27f9bdb28d1201f6b452f0d21dd/content/actions/reference/workflows-and-actions/events-that-trigger-workflows.md) | Schedule chỉ default branch, public không hoạt động 60 ngày có thể tắt; `workflow_run` không đồng nghĩa workflow trước thành công | Cron không bảo đảm tiến độ hay quyền chạy lại |
 | [GitHub secure use](https://github.com/github/docs/blob/02c25d16369fe27f9bdb28d1201f6b452f0d21dd/content/actions/reference/security/secure-use.md) | Token tối thiểu; `workflow_run` đặc quyền không checkout PR không tin cậy; artefact là dữ liệu không tin cậy | Không xác minh quyền/ruleset sống của repo đích |
 | [Persistence (LangGraph)](https://github.com/langchain-ai/docs/blob/1f44f7efcc914cbd493dc2ccc1d850a4d0a01ca2/src/oss/langgraph/persistence.mdx) | Checkpoint theo định danh, lưu bền và retention; RAM mất khi restart | Không phải lý do đưa LangGraph/DB vào khung stdlib |
-| [autoresearch](https://github.com/karpathy/autoresearch/blob/228791fb499afffb54b46200aca536f79142f117/README.md) | Bộ đo cố định, metric/ngân sách định trước, giữ/bỏ từng thử; không so điểm giữa máy khác nhau | Không chứng minh speedup trên X-Office |
+| [autoresearch](https://github.com/karpathy/autoresearch/blob/228791fb499afffb54b46200aca536f79142f117/README.md) | Bộ đo cố định, metric/ngân sách định trước, giữ/bỏ từng thử; không so điểm giữa máy khác nhau | Không chứng minh speedup trên X-Templates |
 | [Go benchstat](https://github.com/golang/perf/blob/be2c69fb417e05de5fec05c732911f4c5f172606/cmd/benchstat/main.go#L363) | Kiểm noise, đo xen kẽ, định trước số lần; không rerun tới khi significant; ý nghĩa thống kê ≠ ý nghĩa thực tế | Không áp ngưỡng mẫu của Go thành MUST chung |
 
 ### 13.2 Bản 2 — `researcher` xác minh 2026-10-26 (docs Claude Code là bản live không có SHA; đọc bằng WebFetch hoặc tải bản `.md` của trang; trích dẫn ≤ 25 từ)

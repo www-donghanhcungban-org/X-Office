@@ -719,6 +719,14 @@
     "AUD-SEC-986",
     "AUD-HAR-445"
    ]
+  },
+  {
+   "reason": "Audit delta 2026-11-20, không phải quyết định cho/chặn của PR, rollup, review hay guard: màn Văn phòng giữ nguyên hộp lỗi và focus khi poll gặp lại cùng lỗi (E2E trình duyệt thật tests_e2e.test_app_e2e.OfficeTest.test_office_poll_error_keeps_focus_and_alert — AUD-A11Y-004); tài liệu lịch sử không bị đổi chữ hàng loạt và ID quyết định duy nhất (tests.test_docs_history — AUD-DOC-305/306); sửa ở #17",
+   "ids": [
+    "AUD-A11Y-004",
+    "AUD-DOC-305",
+    "AUD-DOC-306"
+   ]
   }
  ]
 }

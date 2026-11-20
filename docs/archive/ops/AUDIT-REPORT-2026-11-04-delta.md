@@ -1,4 +1,4 @@
-# AUDIT-REPORT — X-Office · 2026-11-04 (delta)
+# AUDIT-REPORT — X-Templates · 2026-11-04 (delta)
 
 > Mốc quét `23447d817d2b` trên `main`, sau [PR #434](https://github.com/seeker19110/X-Templates/pull/434). Phiên chính rà sổ và chạy cổng. Hai lượt rà độc lập tập trung vào Git guard và workflow GitHub. Kết quả theo ID được theo dõi tại [sổ audit](../../ops/AUDIT-STATUS.md).
 

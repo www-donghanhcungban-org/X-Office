@@ -1,4 +1,4 @@
-# AUDIT-REPORT — X-Office · 2026-10-25 (delta `81cc549..00ead5f`)
+# AUDIT-REPORT — X-Templates · 2026-10-25 (delta `81cc549..00ead5f`)
 
 > Commit quét: `main` `00ead5f` (3.23.0) · Phạm vi: delta `81cc549..00ead5f` (#258 sổ audit, #259 ADR-0046, #260 cắt bản; D-174, D-175)
 > — nhóm 1 ARCH, 2 SEC, 3 CODE, 4 TEST, 9 DOC, 12 XFEAT, 13 HAR theo `xt.py audit plan --status` · Lý do: `release-check` NO-GO hàng

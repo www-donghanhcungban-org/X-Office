@@ -1,4 +1,4 @@
-# PLAN harden X-Office 2026-11-14
+# PLAN harden X-Templates 2026-11-14
 
 - D-490 chọn xử lý mục đỏ đã có bằng chứng trước, giữ G7 làm cổng phát hành.
 - Mốc audit `e0745c07`. Sổ: 16 🔴 và 47 🟠 còn mở, TEST/HAR chưa quét đủ. Blueprint không có MUST mở; sàn M/L không áp dụng cho khung quy mô S.

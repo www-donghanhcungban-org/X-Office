@@ -1,6 +1,6 @@
 # PLAN — Củng cố sau đánh giá 2026-10-28
 
-> Phiên: X-Office — harden/assessment-2026-10-28 · G8/harden · D-219 · gốc `main` `07c428f` (#308).
+> Phiên: X-Templates — harden/assessment-2026-10-28 · G8/harden · D-219 · gốc `main` `07c428f` (#308).
 
 - Vấn đề: corpus chưa giữ hai lỗi #308; state có thể mất cập nhật khi bỏ khóa; guard lỗi nạp có đường cho chạy; cài mới chưa có preset quyền hạn chế.
 - Người dùng: người quản trị khung và dự án đích chạy agent phát triển phần mềm.

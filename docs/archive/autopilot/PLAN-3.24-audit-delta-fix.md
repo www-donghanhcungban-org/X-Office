@@ -1,4 +1,4 @@
-# PLAN-3.24-audit-delta-fix.md — Khung X-Office · sửa audit delta `e5ff88c..3ba5828` → bản 3.22.1
+# PLAN-3.24-audit-delta-fix.md — Khung X-Templates · sửa audit delta `e5ff88c..3ba5828` → bản 3.22.1
 
 > Lập ngày 2026-10-25. Chủ repo: "Audit delta xoá review_debt"; phiên chính tự duyệt kế hoạch sửa (D-173).
 

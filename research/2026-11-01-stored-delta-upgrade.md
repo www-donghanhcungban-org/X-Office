@@ -7,7 +7,7 @@ updated: 2026-11-01
 # Đề xuất từ stored (đợt nâng cấp tổng thể 2026-10-31)
 
 Bổ sung cho [`2026-10-31-stored-delta-autonomy.md`](2026-10-31-stored-delta-autonomy.md) (không sửa file đó). Ký hiệu `NN §x` là
-chuyên mục NN, mục x của catalog. **File này chỉ là đề xuất**: chưa thêm ID, chưa sửa `framework/`. Phiên X-Office tự xác minh,
+chuyên mục NN, mục x của catalog. **File này chỉ là đề xuất**: chưa thêm ID, chưa sửa `framework/`. Phiên X-Templates tự xác minh,
 tự cấp số ID (trần 4 MUST/module, ADR-0004), quyết định thêm/bỏ và ghi `CHANGELOG.md` khi nâng cấp.
 
 ## 1. Phạm vi

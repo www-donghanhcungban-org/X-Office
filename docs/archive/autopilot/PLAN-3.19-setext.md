@@ -1,4 +1,4 @@
-# PLAN-3.19-setext.md — Khung X-Office · tiêu đề setext nhiều dòng/trong `>` cho `check-links` → bản 3.18.1
+# PLAN-3.19-setext.md — Khung X-Templates · tiêu đề setext nhiều dòng/trong `>` cho `check-links` → bản 3.18.1
 
 > Lập ngày 2026-10-24. Chủ repo gọi lại `/autopilot` sau PLAN-3.18-feedback2 (done, `v3.18.0`, #241). Việc máy làm được
 > còn lại duy nhất: 🟢 review #238 (ghi ở PROGRESS và GO-NO-GO 3.18.0). Phiên chính tự duyệt (D-158).

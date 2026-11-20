@@ -560,7 +560,9 @@
 - Lý do (tiêu chí chất lượng cuối): Đúng: gương là bản sao byte của nguồn; khi người dùng chủ động --force-harness thay .claude/skills/<tên> thì gương giữ bản cũ sẽ LỆCH nguồn (test gương trùng byte của dự án như dhcb đỏ) — đi theo nguồn mới là hành vi nhất quán với mô hình 'tệp trùng bản khung ghi là của khung' mà install.py dùng cho mọi tệp harness. Phương án (a) thêm một ngoại lệ nữa vào luật sở hữu, để lại gương lệch nguồn, và nội dung cũ vẫn còn trong git. Lần cài ĐẦU với --force-harness vẫn giữ gương và để .xtemplates-new (chưa có ghi nhận) — đã sửa ở lượt 2.
 - Đường lùi: Áp phương án (a) trong install.py + test cài hai lượt
 
-### D-521 · 2026-11-20T00:01:37+00:00 · Đồng bộ X-Templates #684 mang ADR-0082 (harness Codex) trùng số với ADR-0082 riêng của X-Office (màn Văn phòng). Đánh số thế nào?
+### D-9001 · 2026-11-20T00:01:37+00:00 · Đồng bộ X-Templates #684 mang ADR-0082 (harness Codex) trùng số với ADR-0082 riêng của X-Office (màn Văn phòng). Đánh số thế nào?
+
+- Đính chính số (AUD-DOC-306): mục này ghi lúc đầu là D-521, trùng D-521 của X-Templates (quyết định factory, ADR-0083) — một ID chỉ một quyết định. Quyết định riêng của X-Office nay dùng dải `D-9001+` như ADR `9001+`; `loop decide` cấp số kế bằng max+1 nên các mục sau là D-9002, D-9003… và không bao giờ đụng số upstream. Nội dung quyết định dưới đây không đổi.
 
 - Phương án: (1) Giữ cả hai tệp 0082-* (khác slug), để ID ADR-0082 trỏ hai quyết định · (2) Đổi ADR riêng của X-Office sang dải số dành riêng cho bản phái sinh (ADR-9001+), cập nhật mọi chỗ nhắc ở X-Office; ADR của X-Templates giữ nguyên số · (3) Đổi số ADR Codex của upstream khi đồng bộ
 - Chọn: Đổi ADR riêng của X-Office sang dải số dành riêng cho bản phái sinh (ADR-9001+), cập nhật mọi chỗ nhắc ở X-Office; ADR của X-Templates giữ nguyên số

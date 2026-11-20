@@ -4,7 +4,7 @@ kind: research
 updated: 2026-10-19
 ---
 
-# Đối chiếu đề xuất "Fast Build + Quality Gates + Deep Audit" với khung X-Office (2026-10-19)
+# Đối chiếu đề xuất "Fast Build + Quality Gates + Deep Audit" với khung X-Templates (2026-10-19)
 
 Đầu vào: bản đề xuất quy trình (dán vào phiên 2026-10-19) gồm 5 giai đoạn (Rapid Build → Continuous Validation → Deep
 Audit & Hardening → Fix & Optimization → Production Gate), bảng "làm ngay / trước production", mô hình 7 agent
@@ -120,7 +120,7 @@ Ghi chú của đề xuất "checklist tự đánh giá, mỗi mục cần bằn
 - Cả (a) và (b) là sửa tài liệu phương pháp (không đổi ID, không đổi công cụ) → một PR nhỏ, cập nhật `updated` và
   `CHANGELOG.md` mục Unreleased; có thể gộp vào đợt 3.9 (`docs/autopilot/PLAN-3.9-automation.md`) hoặc đi riêng.
 
-## 8. Đối chiếu bản "Kế hoạch nâng cấp X-Office" (PD-01…PD-12, gửi thêm 2026-10-19)
+## 8. Đối chiếu bản "Kế hoạch nâng cấp X-Templates" (PD-01…PD-12, gửi thêm 2026-10-19)
 
 Bản này (38 KB, tự ghi "ĐỀ XUẤT — chưa triển khai", đọc khung ở `7ac3d80`) là phiên bản chi tiết của đề xuất ở §1–§6 và đã
 tự nhận ra phần lớn cơ chế khung đã có (mục 2 của bản). Đối chiếu từng lát PD với khung và PLAN 3.9/3.10:
