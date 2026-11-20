@@ -1,4 +1,4 @@
-# ADR-0006: Đổi tên repo thành X-Office, giữ định danh kỹ thuật `.xstored` / `xs`
+# ADR-0006: Đổi tên repo thành X-Templates, giữ định danh kỹ thuật `.xstored` / `xs`
 
 - **Trạng thái:** Bị thay thế bởi [ADR-0007](0007-rename-technical-identifiers-to-xtemplates.md)
 - **Trạng thái triển khai:** Đã triển khai (PR #30: tên hiển thị, URL clone, harness, mẫu; định danh kỹ thuật không đổi)
@@ -14,7 +14,7 @@ xuất hiện ở hai lớp khác nhau:
 
 ## Quyết định
 
-1. Đổi toàn bộ **tên hiển thị** sang X-Office (PR #30); tài liệu lịch sử (`research/`, báo cáo audit đã ký,
+1. Đổi toàn bộ **tên hiển thị** sang X-Templates (PR #30); tài liệu lịch sử (`research/`, báo cáo audit đã ký,
    trích dẫn "khung cũ X-stored commit `1b80fe4`") giữ tên cũ vì đó là sự kiện đã xảy ra.
 2. **Giữ nguyên định danh kỹ thuật**: `.xstored/`, `xs.py`, `xs.yaml`, `XS_*`, `.xstored-new`, manifest hash.
 

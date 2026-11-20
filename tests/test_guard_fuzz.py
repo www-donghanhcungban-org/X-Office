@@ -194,6 +194,10 @@ CWD_RELATIVE: Dict[str, str] = {
     "guard-sec988-restore-source-claude-dir": ".claude tương đối → /tmp/.claude (AUD-SEC-988)",
     "guard-sec988-restore-source-codex-dir": ".codex tương đối → /tmp/.codex (AUD-SEC-988)",
     "guard-sec989-rm-opencode-dir": ".opencode tương đối → /tmp/.opencode (AUD-SEC-989)",
+    "guard-sec990-unzip-member-glob-strict": "glob thành viên `.codex/*` tương đối → /tmp/.codex không phải hàng rào dự án "
+    "sau cd /tmp (AUD-SEC-990, như d503s5-deny-010)",
+    "guard-sec990-tar-strip-into-github": "-C .github tương đối → /tmp/.github không có tệp nối của ca sau cd /tmp "
+    "(AUD-SEC-990 T-4003, như guard-sec989-rm-copilot-hooks)",
     # AUD-SEC-989: tệp nối guard của host khác chỉ là hàng rào khi có thật — /tmp không có tệp nối của ca
     "guard-sec989-chain-delete-then-dir": ".cursor/hooks.json tương đối → /tmp không có tệp nối (AUD-SEC-989)",
     "guard-sec989-redirect-gemini-settings": ".gemini/settings.json tương đối → /tmp không có tệp nối (AUD-SEC-989)",
@@ -261,7 +265,8 @@ CWD_RELATIVE: Dict[str, str] = {
             ("468-cpio-Htar-ledger", "docs/autopilot", "AUD-SEC-468"),
             ("469-cp-ft-evidence", ".autopilot", "AUD-SEC-469"),
             ("470-cp-claude-into-root", ".", "AUD-SEC-470"),
-            ("471-tar-double-dash-O", ".claude/hooks", "AUD-SEC-471"),
+            # 471-tar-double-dash-O: gỡ — thành viên `guard.py` nêu tên giải vào `…/.claude/hooks/` là tệp hàng rào ở
+            # mọi thư mục như `cp` (AUD-SEC-990), chặn cả sau cd /tmp
             ("471-tar-exclude-eats-O", ".claude/hooks", "AUD-SEC-471"),
             ("471-tar-ge-abbrev", ".claude/hooks", "AUD-SEC-471"),
             ("472-py-Im-tarfile", ".claude/hooks", "AUD-SEC-472"),

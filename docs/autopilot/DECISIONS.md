@@ -580,3 +580,24 @@
 - Chọn: Dùng watch lúc viết, giữ nghiệm thu bản đóng gói, xếp lớp test nặng trước và gom Gate một lượt
 - Lý do (tiêu chí chất lượng cuối): Giảm việc lặp, giữ tập test và thứ tự Gate theo PLAN.
 - Đường lùi: Hoàn tác thay đổi của lượt này.
+
+### D-9002 · 2026-11-20T09:12:57+00:00 · Duyệt PLAN-harden-2026-11-20: đóng AUD-SEC-990 (T-4001) rồi cổng ký
+
+- Phương án: (1) A: chỉ T-4001 rồi audit delta · (2) B: thêm tách guard.py
+- Chọn: A: chỉ T-4001 rồi audit delta
+- Lý do (tiêu chí chất lượng cuối): Tiêu chí 1: 🟠 mở duy nhất chặn release-check; tách guard.py thuộc 3.35.0 (D-142)
+- Đường lùi: Thêm task vào PLAN mới
+
+### D-9003 · 2026-11-20T09:31:24+00:00 · AUD-SEC-990 còn lỗ: giải nén cả tệp nén dựng sẵn vào gốc (default cho chạy)
+
+- Phương án: (1) A: giữ chính sách hiện tại, ghi nợ AUD-SEC-992 · (2) B: guard đọc thành viên tệp nén bằng tarfile/zipfile (cần ADR)
+- Chọn: A: giữ chính sách hiện tại, ghi nợ AUD-SEC-992
+- Lý do (tiêu chí chất lượng cuối): Tiêu chí 1+3: chặn theo tên đã đóng ca cố ý; B đổi hành vi guard, tốn I/O, vẫn hở TOCTOU/7z/cpio — cần ADR, không thuộc harden
+- Đường lùi: Làm B ở 3.35.0 kèm ADR
+
+### D-9004 · 2026-11-20T12:50:25+00:00 · 2 🟠 của gói web-api-ts (rollback dev gặp migration expand; ảnh preview tích tụ ở .git/xt-preview): sửa tại X-Office hay chấp nhận có hạn
+
+- Phương án: (1) A: chấp nhận có hạn 2026-12-31, ghi nợ, gửi phản hồi về X-Templates · (2) B: sửa cục bộ compose.yaml/migrate.ts/dev-preview.mjs
+- Chọn: A: chấp nhận có hạn 2026-12-31, ghi nợ, gửi phản hồi về X-Templates
+- Lý do (tiêu chí chất lượng cuối): Tiêu chí 2+3: gói là mẫu đồng bộ từ X-Templates (D-521), registry không có dự án đích dùng gói (pack: null); sửa cục bộ gây lệch upstream và cần e2e Docker không có ở đây; không ảnh hưởng dữ liệu thật
+- Đường lùi: Làm B hoặc nhận bản sửa upstream qua đồng bộ

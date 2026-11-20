@@ -4490,7 +4490,8 @@ def _grep_source_safe(words: List[str], root: str, here: str) -> bool:
     for p in paths:
         full = os.path.realpath(os.path.join(here, os.path.expanduser(p)))
         rel = os.path.relpath(full, os.path.realpath(root))
-        bad = re.search(r"[$`~]", p) or _xargs_fence_word(p, root) or rel == "." or rel.split("/", 1)[0] == ".."
+        bad = re.search(r"[$`~]", p) or rel == "." or rel.split("/", 1)[0] == ".."
+        bad = bad or _xargs_fence_word(p, root) or _xargs_fence_word(rel, root)  # T-4003: `cd .github/x && grep … ..`
         if bad or os.path.lexists(os.path.join(full, ".git")):
             return False
     return bool(paths)
@@ -4574,7 +4575,8 @@ XARGS_FIND_PRINTS = ("-print", "-print0")  # chỉ ở cuối nhánh: đứng gi
 
 def _xargs_dirs(cmd: str, root: str, cwd: Optional[str]) -> Optional[List[str]]:
     """Mọi thư mục ứng viên của nguồn liệt kê và xargs khi lệnh có `cd`/`pushd`/`popd`; None khi có thư mục không biết,
-    ngoài dự án, hay trong thư mục hàng rào (`cd .autopilot && ls | xargs …`)."""
+    ngoài dự án, trong thư mục hàng rào (`cd .autopilot && ls | xargs …`) hay là tổ tiên (không phải gốc) của thư mục
+    hàng rào (T-4003: `cd .github && ls | xargs …` liệt kê `hooks`)."""
     placed = _commands_with_cwds(tokenize(cmd), cwd or root)
     dirs = {d for argv, cands in placed if XARGS_DIR_HEADS & {posixpath.basename(t) for t in argv} for d in cands}
     if not root or None in dirs:
@@ -4583,7 +4585,8 @@ def _xargs_dirs(cmd: str, root: str, cwd: Optional[str]) -> Optional[List[str]]:
     fence = [*XARGS_FENCE_DIRS, *_xargs_live_dirs(root)]
     for d in dirs:
         rel = os.path.relpath(os.path.realpath(str(d)), real)
-        if rel == ".." or rel.startswith("../") or any(rel == f or rel.startswith(f + "/") for f in fence):
+        near = any(rel == f or rel.startswith(f + "/") or f.startswith(rel + "/") for f in fence)
+        if rel == ".." or rel.startswith("../") or near:
             return None
     return sorted(str(d) for d in dirs)
 
@@ -4595,16 +4598,22 @@ def _xargs_live_dirs(root: str) -> List[str]:
 
 def _xargs_fence_word(word: str, root: str) -> bool:
     """Toán hạng nguồn của xargs chạm thư mục hàng rào: đoạn dấu chấm cũ (`XARGS_DOT_RE`), hay chuỗi đoạn khớp thư mục
-    tệp nối của host khác — đoạn có glob so bằng fnmatch (`.github/hook?/*`, `.github/h*/x*` — AUD-SEC-989)."""
+    tệp nối của host khác — đoạn có glob so bằng fnmatch (`.github/hook?/*`, `.github/h*/x*` — AUD-SEC-989) — hay kết
+    thúc ở thư mục tổ tiên của nó (T-4003: `grep -rl a .github | xargs …` liệt kê `.github/hooks/xt.json`)."""
     if XARGS_DOT_RE.search(word):
         return True
     segs = posixpath.normpath(word).split("/")
-    for d in _xargs_live_dirs(root):
-        ds = d.split("/")
-        for i in range(len(segs) - len(ds) + 1):
-            if all(s == p or set(s) & set("*?[") and fnmatch.fnmatchcase(p, s) for s, p in zip(segs[i:], ds)):
-                return True
-    return False
+    return any(_xargs_segs_hit(segs[i:], d.split("/")) for d in _xargs_live_dirs(root) for i in range(len(segs)))
+
+
+def _xargs_segs_hit(tail: List[str], ds: List[str]) -> bool:
+    """Đoạn đầu của `tail` khớp thư mục `ds` (đủ đoạn), hay cả `tail` là tổ tiên của nó (ít đoạn hơn); ở vị trí tổ
+    tiên, glob không khớp tên dấu chấm khi không viết `.` (shell không nở `*` thành `.github`: `ls * | xargs …` qua)."""
+    anc = len(tail) < len(ds)
+    return all(
+        s == p or set(s) & set("*?[") and fnmatch.fnmatchcase(p, s) and not (anc and p[:1] == "." != s[:1])
+        for s, p in zip(tail, ds)
+    )
 
 
 def _xargs_from_root(word: str, root: str, here: str) -> str:
@@ -15018,6 +15027,173 @@ def _fence_restore_asks(
     return out + [FENCE_WHY.format(f"{what} vào {s} {FENCE_NEW_TAG}") for s, h in hits if h == "fence"]
 
 
+# AUD-SEC-990 (T-4001): giải nén NÊU TÊN thành viên (`tar -xf a.tar .claude/settings.json`, `unzip -o a.zip '.codex/*'`,
+# `7z x`, `cpio -i`; T-4003: `jar x`, `pax -r`) mà đường thành viên tính từ thư mục đích phủ tệp hàng rào (tệp, thư mục cha, `.`, glob — `*` qua `/`
+# như wildcard của tar/unzip/cpio) = ghi đè hàng rào → như AUD-SEC-988 (FENCE_WHY + `FENCE_NEW_TAG`: HOOK_BYPASS, không
+# nới BUDGET). Ranh giới (quyết định của phiên chính): cả archive (không nêu thành viên, hay danh sách/tên đích không
+# đọc chắc: `-T`, biến, `7z @list`) → luật này không xét, giữ quyết định nền (guard không thấy nội dung; hỏi/chặn sẽ chặn
+# oan mọi `tar -xf a.tar` ở gốc); đích là thư mục hàng rào do luật đích ghi xét, `--transform`/`bsdtar -s` do AUD-SEC-340.
+# Trình bỏ đường thành viên (`7z e`, `ar x`) chỉ ghi vào thư mục đích — luật đích ghi (`_extract_here`) xét.
+TAR_MEMBERS_UNREAD = frozenset({"T", "files-from", "transform", "xform"})
+CPIO_MEMBERS_UNREAD = frozenset({"f", "nonmatching", "E", "pattern-file", "r", "rename", "rename-batch-file"})
+SEVEN_INCLUDE_RE = re.compile(r"-i(r[-0]?)?([!@])(.*)", re.I | re.S)
+MemberSet = Optional[Tuple[List[str], bool]]  # (thành viên, so không phân hoa thường); None = cả archive/không đọc chắc
+
+
+def _tar_members(name: str, args: List[str]) -> MemberSet:
+    """Thành viên nêu tên của `tar -x`; `--no-anchored` (T-4003: tên khớp sau mọi `/` — GNU tar ghi đè
+    `.claude/settings.json` với toán hạng `settings.json`) → thêm `*/tên`; `--strip-components` → thêm tên ghi ra sau
+    khi bóc (`_tar_stripped`)."""
+    opts = _tar_opts(args)
+    keys = _opt_keys(opts)
+    if keys & TAR_MEMBERS_UNREAD or name == "bsdtar" and "s" in keys:
+        return None
+    pos = _operands(opts)
+    pos += ["*/" + m.lstrip("/") for m in pos if "no-anchored" in keys]
+    if "strip-components" in keys:
+        vals = _opt_vals(opts, "strip-components")
+        count = int(vals[-1]) if vals and vals[-1].isascii() and vals[-1].isdigit() else None
+        pos += [s for m in pos for s in _tar_stripped(m, count)]
+    return (pos, "ignore-case" in keys) if pos else None
+
+
+def _tar_stripped(m: str, count: Optional[int]) -> List[str]:
+    """Tên ghi ra của thành viên `m` sau `--strip-components=count` (T-4003): bóc `count` đoạn đầu — bóc hết đường của
+    chính thành viên → rỗng (= thư mục đích: cây con của nó rơi thẳng vào đó, `--strip-components=1 pkg`); cả `count - 1`
+    (archive lưu `./` đầu lệch một đoạn). `count` không đọc chắc (biến) hay `m` có glob (`*` qua `/`, số đoạn không
+    biết) → mọi mức bóc."""
+    segs = m.strip("/").split("/")
+    exact = not GLOB_RE.search(m)
+    ks = range(max(count - 1, 1), count + 1) if count is not None and exact else range(1, len(segs) + 1)
+    return list(dict.fromkeys("/".join(segs[min(k, len(segs)) :]) for k in ks))
+
+
+def _unzip_zip_at(args: List[str]) -> Tuple[int, bool]:
+    """(vị trí tên zip, có `-C` — so tên không phân hoa thường) theo cụm cờ của `_unzip_parse` (`-d -P -O -I` ăn phần
+    còn lại của cụm, không thì token kế); không có tên zip → -1."""
+    i, icase = 0, False
+    while i < len(args):
+        a = args[i]
+        if a[:1] != "-" or a == "-":
+            return i, icase
+        k = next((j for j, c in enumerate(a[1:], 1) if c in "dPOI"), len(a))
+        icase = icase or "C" in a[1:k]
+        i += 2 if k == len(a) - 1 else 1
+    return -1, icase
+
+
+def _unzip_members(args: List[str]) -> MemberSet:
+    """Mẫu tên sau tên zip (trừ `-d D`/`-dD`), dừng ở `-x` (phần sau là loại trừ)."""
+    at, icase = _unzip_zip_at(args)
+    rest, out, i = args[at + 1 :] if at >= 0 else [], [], 0
+    while i < len(rest) and rest[i] != "-x":
+        a, i = rest[i], i + 1
+        if a[:2] == "-d":
+            i += 0 if a[2:] else 1
+        else:
+            out.append(a)
+    return (out, icase) if out else None
+
+
+def _seven_members(args: List[str]) -> MemberSet:
+    """`7z x`: tên sau archive và `-i!x`/`-ir!x`; `-r`/`-r0` (đệ quy) khớp tên ở mọi thư mục → thêm `*/tên`; `@list`/`-i@`
+    → không đọc chắc. `7z e` bỏ đường: không thành viên nào phủ hàng rào (đích do `_extract_here` xét)."""
+    pos = _positionals(args)
+    if pos[:1] and pos[0].lower() == "e":
+        return [], False
+    incl = [m for m in (SEVEN_INCLUDE_RE.fullmatch(a) for a in args) if m]
+    names = [*pos[2:], *(m[3] for m in incl)]
+    if any(m[2] == "@" for m in incl) or any(x[:1] == "@" for x in names):
+        return None
+    deep = any(a.lower() in ("-r", "-r+", "-r0") for a in args) or any(m[1] for m in incl)  # `-r0`: T-4003
+    names += ["*/" + x for x in names if deep]
+    return (names, False) if names else None
+
+
+def _cpio_members(args: List[str]) -> MemberSet:
+    """Mẫu của `cpio -i` (toán hạng); `-f` (lấy phần không khớp), `-E` (mẫu từ tệp), đổi tên, `-p` (danh sách từ
+    stdin) → không đọc chắc."""
+    items = _getopt(args, CPIO_OPTS)
+    keys = _opt_keys(items)
+    pos = _operands(items)
+    if keys & CPIO_MEMBERS_UNREAD or keys & {"p", "pass-through"} or not pos:
+        return None
+    return pos, False
+
+
+def _jar_members(args: List[str]) -> MemberSet:
+    """T-4003: tên thành viên của `jar x` — toán hạng trừ tệp sau `f`/`--file` (`_jar_opts`); tệp đối số `@list` →
+    không đọc chắc."""
+    items = _jar_opts(args)
+    pos = _operands(items)
+    if not _jar_extract(items) or any(x[:1] == "@" for x in pos):
+        return None
+    return (pos, False) if pos else None
+
+
+def _pax_members(args: List[str]) -> MemberSet:
+    """T-4003: mẫu toán hạng của `pax -r` (đọc archive); `-r -w` (chép: toán hạng là tệp nguồn), `-c` (lấy phần không
+    khớp), `-s` (đổi tên) → không đọc chắc."""
+    flags, pos, _ = _parse_opts(args, PAX_SHORT_VALUE, ())
+    if "-r" not in flags or flags & {"-w", "-c", "-s"}:
+        return None
+    return (pos, False) if pos else None
+
+
+def _extract_members(n: List[str]) -> MemberSet:
+    name, args = n[0], _no_redirects(n[1:])  # `cpio -i < a.cpio`: `<`, `a.cpio` không phải thành viên
+    if name in TAR_NAMES:
+        got = _tar_members(name, args)
+    elif name in SEVEN_ZIP:
+        got = _seven_members(args)
+    else:
+        read = MEMBER_READERS.get(name)
+        got = read(args) if read else None  # trình khác: cả archive
+    dyn = got is not None and any(set(m) & {"$", "`"} for m in got[0])
+    return None if dyn else got
+
+
+MEMBER_READERS: Dict[str, Callable[[List[str]], MemberSet]] = {
+    "unzip": _unzip_members,
+    "cpio": _cpio_members,
+    "jar": _jar_members,
+    "pax": _pax_members,
+    "ar": lambda _: ([], False),  # `ar` không lưu đường
+}
+
+
+def _extract_glob_hit(p: str, root: str, icase: bool) -> bool:
+    """Mẫu tuyệt đối `p` khớp tệp hàng rào/thư mục cha của nó — chỉ khi phần thư mục viết chữ trước glob nằm trong gốc
+    hay là cha của gốc (`/tmp/scratch/*` không chặn)."""
+    lit = re.split(r"[*?\[]", p, maxsplit=1)[0]
+    base = lit.rsplit("/", 1)[0] or "/"
+    if _rel_dir(base, root).startswith("/") and not _restore_covers(base, root):
+        return False
+    return _restore_glob_hit(p, root, icase)
+
+
+def _extract_member_hit(m: str, dirs: List[str], root: str, icase: bool) -> bool:
+    """Thành viên `m` giải vào một trong `dirs` (tuyệt đối) phủ hàng rào; `/` đầu: tar/unzip bỏ (vào thư mục đích), `tar
+    -P` giữ (đường tuyệt đối) — xét cả hai."""
+    paths = [posixpath.normpath(posixpath.join(d, m.lstrip("/") or ".")) for d in dirs]
+    paths += [posixpath.normpath(m)] if m.startswith("/") else []
+    glob = icase or bool(GLOB_RE.search(m))
+    return any(_extract_glob_hit(p, root, icase) if glob else _restore_covers(p, root) for p in paths)
+
+
+def _fence_extract_asks(n: List[str], root: str, cwd: Optional[str]) -> List[str]:
+    """AUD-SEC-990: câu hỏi cho thành viên nêu tên giải nén vào đường phủ hàng rào; cả archive → không xét (ranh giới:
+    chú thích trên `TAR_MEMBERS_UNREAD`)."""
+    dirs = _extract_here(n) if n and root else []
+    got = _extract_members(n) if dirs else None
+    if got is None:
+        return []
+    where = [x for d in dirs for x in _where(d, root, cwd)]
+    members, icase = got
+    hits = [m for m in members if _extract_member_hit(m, where, root, icase)]
+    return [FENCE_WHY.format(f"giải nén {m} vào cây làm việc — AUD-SEC-990 {FENCE_NEW_TAG}") for m in hits]
+
+
 PYCACHE_ENV_RE = re.compile(r"PYTHONPYCACHEPREFIX=(.+)")
 
 
@@ -15412,6 +15588,7 @@ def _write_asks(
     asks += _prod_decided_asks(n, argv, targets, root, cwd)  # AUD-SEC-804
     asks += [a for a in _fence_argv_asks(n, argv, root, cwd) if a not in asks]  # T-3951 A9
     asks += _fence_restore_asks(n, argv, root, cwd, env)  # AUD-SEC-988
+    asks += _fence_extract_asks(n, root, cwd)  # AUD-SEC-990
     asks += _home_dotfile_asks(n, argv, targets, root, cwd)  # T-3951 A11
     return asks + [EVIDENCE_WHY.format(f"git {n[1]} {t}") for t, k in restored if k == "evidence"]
 

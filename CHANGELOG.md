@@ -89,6 +89,15 @@ Bản < 3.20.0: [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md) (T-3651; `changel
 
 ### Fixed
 
+- Guard hàng rào (AUD-SEC-990, T-4001): giải nén (`tar -x`, `unzip`, `7z x`, `cpio -i`) nêu tên thành viên phủ tệp hàng rào
+  (`.claude/settings.json`, `.codex/hooks.json`, `.cursor/hooks.json`, thư mục cha, glob) bị chặn; giải nén cả tệp nén
+  không nêu thành viên giữ như cũ. Nợ AUD-SEC-992 (tệp nén dựng sẵn chứa hàng rào). Audit delta (T-4003): chặn thêm
+  `tar --no-anchored`, `7z -r0`, `--strip-components` bóc hết đường, `jar xf`/`pax -r` nêu thành viên và nguồn
+  xargs/grep ở thư mục cha của thư mục rào (`.github`).
+- Skill gate/autopilot/complete: `description` đặt trong nháy (YAML hợp lệ cho Codex); `render_skill` từ chối
+  frontmatter hỏng kèm lý do (AUD-HAR-447, T-4004). README.md:73 trỏ đúng `/tmp/x-office`; tên lịch sử "X-Templates"
+  được trả lại ở ADR-0006/0007/0068/0078 và mục [3.34.0] (T-4005).
+
 - Màn Văn phòng 3D: nhãn phòng ẩn/hiện theo chỗ nhãn đứng có còn là sàn hay tường của **chính** phòng đó (tia từ
   camera, không theo hộp nhãn) — phóng to ở toàn cảnh, phòng còn trên hình vẫn giữ nhãn: thử điểm neo đã kẹp rồi các điểm trên sàn phòng (lưới 3×3)
   nằm trọn trong khung — ở 390 px "Khu làm việc" có nhãn ở mọi mức phóng; giữ chỗ đã chọn ở khung trước (trễ chống
@@ -148,7 +157,7 @@ Bản harden (ADR-0080): guard mặc định chặn theo danh sách đóng (D-50
 
 ### Added
 
-- README thêm mục "Vì sao dùng X-Office" (vấn đề → lợi ích) và "Ủng hộ và liên hệ" (VietQR Techcombank,
+- README thêm mục "Vì sao dùng X-Templates" (vấn đề → lợi ích) và "Ủng hộ và liên hệ" (VietQR Techcombank,
   điện thoại/Zalo, email, hỗ trợ triển khai tại TP.HCM hoặc online); `.github/FUNDING.yml` bật nút Sponsor trỏ về mục này.
 
 - `NOTICE` ghi phạm vi giấy phép MIT, thành phần bên thứ ba (axe-core, MPL-2.0) và tuyên bố nhãn hiệu; README trỏ tới
