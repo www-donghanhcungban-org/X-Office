@@ -580,3 +580,10 @@
 - Chọn: Dùng watch lúc viết, giữ nghiệm thu bản đóng gói, xếp lớp test nặng trước và gom Gate một lượt
 - Lý do (tiêu chí chất lượng cuối): Giảm việc lặp, giữ tập test và thứ tự Gate theo PLAN.
 - Đường lùi: Hoàn tác thay đổi của lượt này.
+
+### D-9002 · 2026-11-20T09:12:57+00:00 · Duyệt PLAN-harden-2026-11-20: đóng AUD-SEC-990 (T-4001) rồi cổng ký
+
+- Phương án: (1) A: chỉ T-4001 rồi audit delta · (2) B: thêm tách guard.py
+- Chọn: A: chỉ T-4001 rồi audit delta
+- Lý do (tiêu chí chất lượng cuối): Tiêu chí 1: 🟠 mở duy nhất chặn release-check; tách guard.py thuộc 3.35.0 (D-142)
+- Đường lùi: Thêm task vào PLAN mới
