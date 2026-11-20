@@ -3015,7 +3015,7 @@ def sync_flags_error(args: argparse.Namespace) -> bool:
     """`--sync-codex` chỉ đi một mình (cùng đích là gốc repo khung) — cờ cài khác không có nghĩa ở đó."""
     names = (
         *("new", "idea", "name", "scale", "force_harness", "no_harness", "label", "with_github", "plan"),
-        *("no_git_hooks", "preset", "stage_init", "harness", "pack"),
+        *("no_git_hooks", "preset", "stage_init", "harness", "pack", "with_office_3d"),
     )
     used = [f"--{n.replace('_', '-')}" for n in names if getattr(args, n) not in (None, False, "")]
     if used:

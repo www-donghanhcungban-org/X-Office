@@ -798,7 +798,7 @@ class SyncCodexTest(unittest.TestCase):
         rc, err = self.sync(target=self.outside)
         self.assertEqual(rc, 2)
         self.assertIn("chỉ chạy ở gốc repo khung", err)
-        for flags in (("--plan",), ("--harness", "codex"), ("--no-harness",), ("--new",)):
+        for flags in (("--plan",), ("--harness", "codex"), ("--no-harness",), ("--new",), ("--with-office-3d",)):
             with self.subTest(flags=flags):
                 self.assertEqual(self.sync(*flags)[0], 2)
         self.assertFalse((self.src / ".agents").exists())
