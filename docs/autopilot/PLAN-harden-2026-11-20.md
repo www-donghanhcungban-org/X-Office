@@ -11,4 +11,4 @@
 - Số vòng: mặc định `--single-session` · Chi phí ngoài phiên: 0 · Timeout Gate: 1200 giây · Hạn: 24 giờ.
 
 ## Task
-- [ ] `T-4001` 🟠 AUD-SEC-990 (đợt 18, T-3970 chưa làm): giải nén (`tar -x`, `unzip`) có thành viên nêu tên phủ tệp hàng rào (`.claude/settings.json`, `.codex/hooks.json`, `.cursor/hooks.json`) → chặn; giải nén cả tệp nén vào gốc dự án → phân tích ranh giới — Gate: `python3 -m unittest tests.test_hooks.FenceExtractMembersTest` (files: .claude/hooks/guard.py, tests/test_hooks.py)
+- [x] `T-4001` 🟠 AUD-SEC-990 (đợt 18, T-3970 chưa làm): giải nén (`tar -x`, `unzip`) có thành viên nêu tên phủ tệp hàng rào (`.claude/settings.json`, `.codex/hooks.json`, `.cursor/hooks.json`) → chặn; giải nén cả tệp nén vào gốc dự án → phân tích ranh giới — Gate: `python3 -m unittest tests.test_hooks.FenceExtractMembersTest` (files: .claude/hooks/guard.py, tests/test_hooks.py)

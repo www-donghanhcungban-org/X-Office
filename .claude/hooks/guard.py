@@ -15018,6 +15018,132 @@ def _fence_restore_asks(
     return out + [FENCE_WHY.format(f"{what} vào {s} {FENCE_NEW_TAG}") for s, h in hits if h == "fence"]
 
 
+# AUD-SEC-990 (T-4001): giải nén NÊU TÊN thành viên (`tar -xf a.tar .claude/settings.json`, `unzip -o a.zip '.codex/*'`,
+# `7z x`, `cpio -i`) mà đường thành viên tính từ thư mục đích phủ tệp hàng rào (tệp, thư mục cha, `.`, glob — `*` qua `/`
+# như wildcard của tar/unzip/cpio) = ghi đè hàng rào → như AUD-SEC-988 (FENCE_WHY + `FENCE_NEW_TAG`: HOOK_BYPASS, không
+# nới BUDGET). Ranh giới (quyết định của phiên chính): cả archive (không nêu thành viên, hay danh sách/tên đích không
+# đọc chắc: `-T`, biến, `7z @list`) → luật này không xét, giữ quyết định nền (guard không thấy nội dung; hỏi/chặn sẽ chặn
+# oan mọi `tar -xf a.tar` ở gốc); đích là thư mục hàng rào do luật đích ghi xét, `--transform`/`bsdtar -s` do AUD-SEC-340.
+# Trình bỏ đường thành viên (`7z e`, `ar x`) chỉ ghi vào thư mục đích — luật đích ghi (`_extract_here`) xét.
+TAR_MEMBERS_UNREAD = frozenset({"T", "files-from", "transform", "xform"})
+CPIO_MEMBERS_UNREAD = frozenset({"f", "nonmatching", "E", "pattern-file", "r", "rename", "rename-batch-file"})
+SEVEN_INCLUDE_RE = re.compile(r"-i(r[-0]?)?([!@])(.*)", re.I | re.S)
+MemberSet = Optional[Tuple[List[str], bool]]  # (thành viên, so không phân hoa thường); None = cả archive/không đọc chắc
+
+
+def _tar_members(name: str, args: List[str]) -> MemberSet:
+    """Thành viên nêu tên của `tar -x`; `--strip-components` → thêm mọi hậu tố đường (tên ghi ra ngắn đi)."""
+    opts = _tar_opts(args)
+    keys = _opt_keys(opts)
+    if keys & TAR_MEMBERS_UNREAD or name == "bsdtar" and "s" in keys:
+        return None
+    pos = _operands(opts)
+    if "strip-components" in keys:
+        pos += [m.split("/", k)[k] for m in pos for k in range(1, m.count("/") + 1)]
+    return (pos, "ignore-case" in keys) if pos else None
+
+
+def _unzip_zip_at(args: List[str]) -> Tuple[int, bool]:
+    """(vị trí tên zip, có `-C` — so tên không phân hoa thường) theo cụm cờ của `_unzip_parse` (`-d -P -O -I` ăn phần
+    còn lại của cụm, không thì token kế); không có tên zip → -1."""
+    i, icase = 0, False
+    while i < len(args):
+        a = args[i]
+        if a[:1] != "-" or a == "-":
+            return i, icase
+        k = next((j for j, c in enumerate(a[1:], 1) if c in "dPOI"), len(a))
+        icase = icase or "C" in a[1:k]
+        i += 2 if k == len(a) - 1 else 1
+    return -1, icase
+
+
+def _unzip_members(args: List[str]) -> MemberSet:
+    """Mẫu tên sau tên zip (trừ `-d D`/`-dD`), dừng ở `-x` (phần sau là loại trừ)."""
+    at, icase = _unzip_zip_at(args)
+    rest, out, i = args[at + 1 :] if at >= 0 else [], [], 0
+    while i < len(rest) and rest[i] != "-x":
+        a, i = rest[i], i + 1
+        if a[:2] == "-d":
+            i += 0 if a[2:] else 1
+        else:
+            out.append(a)
+    return (out, icase) if out else None
+
+
+def _seven_members(args: List[str]) -> MemberSet:
+    """`7z x`: tên sau archive và `-i!x`/`-ir!x`; `-r` (đệ quy) khớp tên ở mọi thư mục → thêm `*/tên`; `@list`/`-i@`
+    → không đọc chắc. `7z e` bỏ đường: không thành viên nào phủ hàng rào (đích do `_extract_here` xét)."""
+    pos = _positionals(args)
+    if pos[:1] and pos[0].lower() == "e":
+        return [], False
+    incl = [m for m in (SEVEN_INCLUDE_RE.fullmatch(a) for a in args) if m]
+    names = [*pos[2:], *(m[3] for m in incl)]
+    if any(m[2] == "@" for m in incl) or any(x[:1] == "@" for x in names):
+        return None
+    deep = any(a.lower() in ("-r", "-r+") for a in args) or any(m[1] for m in incl)
+    names += ["*/" + x for x in names if deep]
+    return (names, False) if names else None
+
+
+def _cpio_members(args: List[str]) -> MemberSet:
+    """Mẫu của `cpio -i` (toán hạng); `-f` (lấy phần không khớp), `-E` (mẫu từ tệp), đổi tên, `-p` (danh sách từ
+    stdin) → không đọc chắc."""
+    items = _getopt(args, CPIO_OPTS)
+    keys = _opt_keys(items)
+    pos = _operands(items)
+    if keys & CPIO_MEMBERS_UNREAD or keys & {"p", "pass-through"} or not pos:
+        return None
+    return pos, False
+
+
+def _extract_members(n: List[str]) -> MemberSet:
+    name, args = n[0], _no_redirects(n[1:])  # `cpio -i < a.cpio`: `<`, `a.cpio` không phải thành viên
+    if name in TAR_NAMES:
+        got = _tar_members(name, args)
+    elif name == "unzip":
+        got = _unzip_members(args)
+    elif name in SEVEN_ZIP:
+        got = _seven_members(args)
+    elif name == "cpio":
+        got = _cpio_members(args)
+    else:
+        got = ([], False) if name == "ar" else None  # `ar` không lưu đường; trình khác: cả archive
+    dyn = got is not None and any(set(m) & {"$", "`"} for m in got[0])
+    return None if dyn else got
+
+
+def _extract_glob_hit(p: str, root: str, icase: bool) -> bool:
+    """Mẫu tuyệt đối `p` khớp tệp hàng rào/thư mục cha của nó — chỉ khi phần thư mục viết chữ trước glob nằm trong gốc
+    hay là cha của gốc (`/tmp/scratch/*` không chặn)."""
+    lit = re.split(r"[*?\[]", p, maxsplit=1)[0]
+    base = lit.rsplit("/", 1)[0] or "/"
+    if _rel_dir(base, root).startswith("/") and not _restore_covers(base, root):
+        return False
+    return _restore_glob_hit(p, root, icase)
+
+
+def _extract_member_hit(m: str, dirs: List[str], root: str, icase: bool) -> bool:
+    """Thành viên `m` giải vào một trong `dirs` (tuyệt đối) phủ hàng rào; `/` đầu: tar/unzip bỏ (vào thư mục đích), `tar
+    -P` giữ (đường tuyệt đối) — xét cả hai."""
+    paths = [posixpath.normpath(posixpath.join(d, m.lstrip("/") or ".")) for d in dirs]
+    paths += [posixpath.normpath(m)] if m.startswith("/") else []
+    glob = icase or bool(GLOB_RE.search(m))
+    return any(_extract_glob_hit(p, root, icase) if glob else _restore_covers(p, root) for p in paths)
+
+
+def _fence_extract_asks(n: List[str], root: str, cwd: Optional[str]) -> List[str]:
+    """AUD-SEC-990: câu hỏi cho thành viên nêu tên giải nén vào đường phủ hàng rào; cả archive → không xét (ranh giới:
+    chú thích trên `TAR_MEMBERS_UNREAD`)."""
+    dirs = _extract_here(n) if n and root else []
+    got = _extract_members(n) if dirs else None
+    if got is None:
+        return []
+    where = [x for d in dirs for x in _where(d, root, cwd)]
+    members, icase = got
+    hits = [m for m in members if _extract_member_hit(m, where, root, icase)]
+    return [FENCE_WHY.format(f"giải nén {m} vào cây làm việc — AUD-SEC-990 {FENCE_NEW_TAG}") for m in hits]
+
+
 PYCACHE_ENV_RE = re.compile(r"PYTHONPYCACHEPREFIX=(.+)")
 
 
@@ -15412,6 +15538,7 @@ def _write_asks(
     asks += _prod_decided_asks(n, argv, targets, root, cwd)  # AUD-SEC-804
     asks += [a for a in _fence_argv_asks(n, argv, root, cwd) if a not in asks]  # T-3951 A9
     asks += _fence_restore_asks(n, argv, root, cwd, env)  # AUD-SEC-988
+    asks += _fence_extract_asks(n, root, cwd)  # AUD-SEC-990
     asks += _home_dotfile_asks(n, argv, targets, root, cwd)  # T-3951 A11
     return asks + [EVIDENCE_WHY.format(f"git {n[1]} {t}") for t, k in restored if k == "evidence"]
 

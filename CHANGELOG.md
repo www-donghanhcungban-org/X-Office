@@ -89,6 +89,10 @@ Bản < 3.20.0: [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md) (T-3651; `changel
 
 ### Fixed
 
+- Guard hàng rào (AUD-SEC-990, T-4001): giải nén (`tar -x`, `unzip`, `7z x`, `cpio -i`) nêu tên thành viên phủ tệp hàng rào
+  (`.claude/settings.json`, `.codex/hooks.json`, `.cursor/hooks.json`, thư mục cha, glob) bị chặn; giải nén cả tệp nén
+  không nêu thành viên giữ như cũ. Nợ AUD-SEC-992 (tệp nén dựng sẵn chứa hàng rào).
+
 - Màn Văn phòng 3D: nhãn phòng ẩn/hiện theo chỗ nhãn đứng có còn là sàn hay tường của **chính** phòng đó (tia từ
   camera, không theo hộp nhãn) — phóng to ở toàn cảnh, phòng còn trên hình vẫn giữ nhãn: thử điểm neo đã kẹp rồi các điểm trên sàn phòng (lưới 3×3)
   nằm trọn trong khung — ở 390 px "Khu làm việc" có nhãn ở mọi mức phóng; giữ chỗ đã chọn ở khung trước (trễ chống

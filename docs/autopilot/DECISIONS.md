@@ -587,3 +587,10 @@
 - Chọn: A: chỉ T-4001 rồi audit delta
 - Lý do (tiêu chí chất lượng cuối): Tiêu chí 1: 🟠 mở duy nhất chặn release-check; tách guard.py thuộc 3.35.0 (D-142)
 - Đường lùi: Thêm task vào PLAN mới
+
+### D-9003 · 2026-11-20T09:31:24+00:00 · AUD-SEC-990 còn lỗ: giải nén cả tệp nén dựng sẵn vào gốc (default cho chạy)
+
+- Phương án: (1) A: giữ chính sách hiện tại, ghi nợ AUD-SEC-992 · (2) B: guard đọc thành viên tệp nén bằng tarfile/zipfile (cần ADR)
+- Chọn: A: giữ chính sách hiện tại, ghi nợ AUD-SEC-992
+- Lý do (tiêu chí chất lượng cuối): Tiêu chí 1+3: chặn theo tên đã đóng ca cố ý; B đổi hành vi guard, tốn I/O, vẫn hở TOCTOU/7z/cpio — cần ADR, không thuộc harden
+- Đường lùi: Làm B ở 3.35.0 kèm ADR
