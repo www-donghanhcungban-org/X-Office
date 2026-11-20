@@ -319,8 +319,9 @@
    ]
   },
   {
-   "reason": "Audit delta 2026-11-20: frontmatter skill gửi sang Codex (AUD-HAR-447, kiểm bằng tests.test_codex_harness.SkillFrontmatterTest) và tài liệu lịch sử/README (AUD-DOC-305/306, kiểm bằng `xt.py checks` và tests.test_docs_budget) — không phải quyết định guard/PR/review",
+   "reason": "Audit delta 2026-11-20: frontmatter skill gửi sang Codex (AUD-HAR-447, kiểm bằng tests.test_codex_harness.SkillFrontmatterTest) tài liệu lịch sử/README (AUD-DOC-305/306, kiểm bằng `xt.py checks` và tests.test_docs_budget) và hộp lỗi màn Văn phòng giữ focus (AUD-A11Y-004, kiểm bằng e2e Playwright OfficeTest.test_office_api_error_alert_and_focus) — không phải quyết định guard/PR/review",
    "ids": [
+    "AUD-A11Y-004",
     "AUD-HAR-447",
     "AUD-DOC-305",
     "AUD-DOC-306"

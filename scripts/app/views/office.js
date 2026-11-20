@@ -141,12 +141,31 @@ export async function render(main, { api, h, error }) {
     label();
   }
 
+  // Hộp lỗi API: cùng thông điệp với lần đang hiện thì giữ nguyên (poll 10 s không bắt trình đọc màn hình đọc lại role=alert);
+  // dựng lại thì trả focus về nút "Thử lại" mới, tải lại thành công thì về "Làm mới" (WCAG 2.4.3).
+  let shownError = null;
+  function showError(e) {
+    const text = (e && (e.error || e.message)) || "lỗi không rõ";
+    if (shownError === text && msg.firstChild) return;
+    const had = msg.contains(document.activeElement);
+    shownError = text;
+    error(msg, e, load);
+    if (had) msg.querySelector("button")?.focus({ preventScroll: true });
+  }
+
+  function clearError() {
+    const had = msg.contains(document.activeElement);
+    shownError = null;
+    msg.replaceChildren();
+    if (had) refresh.focus({ preventScroll: true });
+  }
+
   async function load() {
     try {
       apply(await api("/api/office"));
-      msg.replaceChildren();
+      clearError();
     } catch (e) {
-      error(msg, e, load);
+      showError(e);
     }
   }
 

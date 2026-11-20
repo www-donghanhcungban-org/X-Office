@@ -461,6 +461,39 @@ class OfficeTest(AppCase):
         self.assertEqual(page.locator(".office-labels").count(), 0)
         assert_clean(self, page, watch, self.origin)
 
+    def test_office_api_error_alert_and_focus(self) -> None:
+        """Audit a11y 2026-11-20: poll/Thử lại khi /api/office lỗi không dựng lại hộp role=alert cùng thông điệp (trình đọc
+        màn hình đọc lại mỗi 10 s) và không làm rơi focus (WCAG 2.4.3); tải lại thành công đưa focus về "Làm mới"."""
+        ctx = self.new_context("desktop")
+        page, _watch = self.open_app(ctx)
+        go(page, "office", "Văn phòng")
+        pattern = "**/api/office"
+        page.route(
+            pattern,
+            lambda r: r.fulfill(status=500, content_type="application/json", body='{"error":"hỏng thử"}'),
+        )
+        refresh = page.get_by_role("button", name="Làm mới")
+        retry = page.get_by_role("button", name="Thử lại")
+        refresh.click()
+        retry.wait_for()
+        page.evaluate(
+            "() => { window.__box = document.querySelector('.office-stage').parentElement.querySelector('[role=alert]'); }"
+        )
+        refresh.click()  # lỗi trùng: cùng một hộp, không dựng lại
+        page.wait_for_timeout(300)
+        self.assertTrue(page.evaluate("() => window.__box.isConnected"))
+        retry.focus()
+        retry.click()  # API vẫn lỗi: nút "Thử lại" còn nguyên và còn focus
+        page.wait_for_timeout(300)
+        self.assertTrue(page.evaluate("() => document.activeElement.textContent === 'Thử lại'"))
+        self.assertEqual(page.locator("main [role=alert]").count(), 1)
+        page.evaluate("() => { window.__box = null; }")
+        page.unroute(pattern)
+        retry.focus()
+        retry.click()  # thành công: nút bị gỡ, focus về "Làm mới"
+        page.wait_for_function("() => !document.querySelector('main [role=alert]')")
+        self.assertTrue(page.evaluate("() => document.activeElement.textContent === 'Làm mới'"))
+
     def test_office_labels_focus_and_keys(self) -> None:
         """Review PR #10: nhãn phòng đủ tương phản và neo đúng phòng; chú thích theo lựa chọn ngay; focus giữ (không
         cuộn) khi dữ liệu đổi; Toàn cảnh pressed đúng; tổ hợp Ctrl để lại cho trình duyệt; gợi ý phím gắn với canvas."""

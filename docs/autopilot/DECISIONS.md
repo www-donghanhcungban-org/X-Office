@@ -601,3 +601,10 @@
 - Chọn: A: chấp nhận có hạn 2026-12-31, ghi nợ, gửi phản hồi về X-Templates
 - Lý do (tiêu chí chất lượng cuối): Tiêu chí 2+3: gói là mẫu đồng bộ từ X-Templates (D-521), registry không có dự án đích dùng gói (pack: null); sửa cục bộ gây lệch upstream và cần e2e Docker không có ở đây; không ảnh hưởng dữ liệu thật
 - Đường lùi: Làm B hoặc nhận bản sửa upstream qua đồng bộ
+
+### D-9005 · 2026-11-20T15:02:46+00:00 · 3 🟠 a11y audit delta: sửa hay chấp nhận
+
+- Phương án: (1) A: sửa office.js tại X-Office; chấp nhận có hạn 2 lỗi UI mẫu notes-ui của gói web-api-ts · (2) B: sửa cả 3 tại X-Office
+- Chọn: A: sửa office.js tại X-Office; chấp nhận có hạn 2 lỗi UI mẫu notes-ui của gói web-api-ts
+- Lý do (tiêu chí chất lượng cuối): Tiêu chí 2+3: office.js là mã của X-Office, sửa gọn có test; notes-ui là mẫu đồng bộ từ X-Templates (D-521/D-9004), sửa cục bộ gây lệch upstream và e2e gói cần Docker; gửi phản hồi upstream
+- Đường lùi: Làm B hoặc nhận bản sửa upstream
