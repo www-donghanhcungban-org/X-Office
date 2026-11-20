@@ -89,6 +89,8 @@ Bản < 3.20.0: [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md) (T-3651; `changel
 
 ### Fixed
 
+- `xt.py audit check` đọc cả sổ lưu trữ: ghi chú `> Đợt …` và dòng trống xen giữa bảng không còn cắt bảng, nên 970/970
+  dòng (trước đây 585) được kiểm ID duy nhất và chỉ `đã sửa` (AUD-HAR-450).
 - Màn Văn phòng: lỗi `/api/office` lặp lại không dựng lại hộp `role="alert"` mỗi lượt poll và giữ focus ở nút "Thử
   lại" (AUD-A11Y-004, T-4006).
 - Guard hàng rào (AUD-SEC-990, T-4001): giải nén (`tar -x`, `unzip`, `7z x`, `cpio -i`) nêu tên thành viên phủ tệp hàng rào

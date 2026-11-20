@@ -2249,6 +2249,20 @@ class LedgerArchiveTest(unittest.TestCase):
         self.books([], [], table=False)
         self.assertEqual(self.check()[0], ["AUDIT-STATUS-ARCHIVE.md: thiếu bảng `## Phát hiện`"])
 
+    def test_archive_rows_after_interleaved_notes_are_checked(self):
+        """AUD-HAR-450: ghi chú `> Đợt …` và dòng trống xen giữa bảng không được cắt bảng — dòng dời sau ghi chú vẫn bị
+        kiểm (ID duy nhất, chỉ `đã sửa`) và được đếm."""
+        self.status.write_text(audit_status_text(findings=[self.FIXED]), encoding="utf-8")
+        later = "AUD-SEC-005 | 🟠 | đã sửa | d | đo được: x | `t` | #7"
+        text = archive_text([self.OPEN.replace("AUD-SEC-002", "AUD-SEC-003").replace("mở", "đã sửa") + "#1"])
+        text += "\n> Đợt 2026-11-20: dời nguyên văn AUD-SEC-005\n\n| " + later + " |\n| " + self.OPEN + " |\n"
+        (self.d / "AUDIT-STATUS-ARCHIVE.md").write_text(text, encoding="utf-8")
+        errors, counts = self.check()
+        self.assertEqual(counts["lưu trữ"], 3)
+        self.assertEqual(errors, ["AUD-SEC-002: sổ lưu trữ AUDIT-STATUS-ARCHIVE.md chỉ nhận dòng `đã sửa` (đang `mở`)"])
+        rows = xt.audit_findings(self.status)
+        self.assertEqual([r["ID"] for r in rows], ["AUD-SEC-001", "AUD-SEC-003", "AUD-SEC-005", "AUD-SEC-002"])
+
     def test_no_archive_keeps_counts(self):
         self.books([self.FIXED])
         errors, counts = self.check()

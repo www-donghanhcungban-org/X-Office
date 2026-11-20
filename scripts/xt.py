@@ -4321,13 +4321,21 @@ def audit_archive(status: Path) -> Path:
     return status.with_name(f"{status.stem}{ARCHIVE_SUFFIX}{status.suffix}")
 
 
+def archive_tables(text: str) -> Dict[str, List[Dict[str, str]]]:
+    """Bảng của sổ lưu trữ (AUD-HAR-450): chỉ giữ dòng `## ` và dòng bảng `|` — ghi chú `> Đợt …` và dòng trống xen giữa
+    các đợt dời không được cắt bảng (`md_tables` coi dòng không phải bảng là hết bảng nên mọi dòng dời sau ghi chú đầu
+    tiên lọt khỏi kiểm ID duy nhất và `chỉ đã sửa`)."""
+    kept = [ln for ln in text.splitlines() if ln.startswith(("|", "## "))]
+    return md_tables("\n".join(kept))
+
+
 def audit_findings(status: Path) -> List[Dict[str, str]]:
     """Dòng `## Phát hiện` của sổ rồi của sổ lưu trữ (vắng → chỉ sổ) — mọi máy đọc phát hiện đi qua đây. Ném
     OSError/ValueError khi không đọc được file nào."""
     rows = md_tables(status.read_text(encoding="utf-8")).get("Phát hiện", [])
     archive = audit_archive(status)
     if archive.is_file():
-        rows = rows + md_tables(archive.read_text(encoding="utf-8")).get("Phát hiện", [])
+        rows = rows + archive_tables(archive.read_text(encoding="utf-8")).get("Phát hiện", [])
     return rows
 
 
@@ -4603,7 +4611,7 @@ def _audit_archive_rows(status: Path, errors: List[str], counts: Dict[str, int])
     archive = audit_archive(status)
     if not archive.is_file():
         return []
-    tables = md_tables(archive.read_text(encoding="utf-8"))
+    tables = archive_tables(archive.read_text(encoding="utf-8"))
     if "Phát hiện" not in tables:
         errors.append(f"{archive.name}: thiếu bảng `## Phát hiện`")
     rows = tables.get("Phát hiện", [])
