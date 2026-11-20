@@ -183,6 +183,7 @@ export function createThreeView(stage) {
     return Boolean(side && inY(side) && inH(side));
   }
 
+  const lastSpot = new Map(); // phòng → chỉ số chỗ đặt nhãn ở khung trước (trễ chống nhảy)
   function syncTags(list, focus, plan) {
     const rect = { w: view.w, h: view.h };
     const rooms = new Map(plan.rooms.map((r) => [r.id, r]));
@@ -210,30 +211,46 @@ export function createThreeView(stage) {
       let left = ((p.x + 1) / 2) * rect.w, top = ((1 - p.y) / 2) * rect.h;
       if (t.kind === "room") {
         // Nhãn phòng là biển chỉ dẫn: kẹp trọn vào khung (khung hẹp, xoay sát biên không cắt chữ), rồi chỉ giữ khi chỗ
-        // nhãn đứng vẫn là sàn/tường của CHÍNH phòng đó — phòng ra ngoài hình (tới bàn, tới phòng khác, phóng to) thì
-        // nhãn bị kẹp sang phòng khác → ẩn. Bị nhãn khác đè → dịch lên/xuống tìm chỗ trống vẫn trên phòng đó; không có
-        // thì nhường. Phòng đang xem ("Tới phòng") luôn có nhãn. `data-why` ghi lý do ẩn (off-room | overlap).
+        // nhãn đứng là sàn/tường của CHÍNH phòng đó và không đè nhãn đã đặt. Thử lần lượt: điểm neo đã kẹp, dịch lên/xuống
+        // ±1, ±2 chiều cao nhãn; rồi các điểm trên sàn phòng (lưới 3×3, ưu tiên giữa) đang nằm trọn trong khung — phòng
+        // lớn chỉ lộ một phần vẫn có nhãn. Không có chỗ: phòng đang xem vẫn đặt ở điểm neo; phòng khác ẩn, `data-why` ghi
+        // lý do (off-room: điểm neo không còn trên phòng; overlap: phòng còn trong hình nhưng hết chỗ trống).
         const hw = el.offsetWidth / 2 + 2;
         const raw = [left, top];
         left = Math.min(rect.w - hw, Math.max(hw, left));
         top = Math.min(rect.h - 2, Math.max(el.offsetHeight + 2, top));
         el.dataset.clamped = Math.abs(left - raw[0]) > 1 || Math.abs(top - raw[1]) > 1 ? "1" : ""; // điểm neo ngoài khung
         const room = rooms.get(t.id);
-        const own = (y) => t.id === focus || Boolean(room && onOwnRoom(left, y, rect, room, zb, plan.H));
-        const hide = (why) => {
-          el.hidden = true;
-          el.dataset.why = why;
-        };
-        if (!own(top)) return hide("off-room");
         const h = el.offsetHeight + 2;
-        const boxAt = (y) => ({ l: left - hw + 2, r: left + hw - 2, t: y - el.offsetHeight, b: y });
-        const free = (y) => y >= h && y <= rect.h - 2 && !placed.some((o) => overlaps(o, boxAt(y)));
-        if (!free(top)) {
-          const alt = [top - h, top + h, top - 2 * h, top + 2 * h].find((y) => free(y) && own(y));
-          if (alt !== undefined) top = alt;
-          else if (t.id !== focus) return hide("overlap");
+        const own = (x, y) => Boolean(room && onOwnRoom(x, y, rect, room, zb, plan.H));
+        const boxAt = (x, y) => ({ l: x - hw + 2, r: x + hw - 2, t: y - el.offsetHeight, b: y });
+        const fits = (x, y) => x >= hw && x <= rect.w - hw && y >= h && y <= rect.h - 2;
+        const ok = (x, y, gap) =>
+          fits(x, y) && !placed.some((o) => overlaps(o, boxAt(x, y), gap)) && (t.id === focus || own(x, y));
+        const spots = [top, top - h, top + h, top - 2 * h, top + 2 * h].map((y) => [left, y]);
+        if (room) {
+          for (const u of [0.5, 0.25, 0.75]) {
+            for (const v of [0.5, 0.25, 0.75]) {
+              const q = new THREE.Vector3(room.x + u * room.w, zb + 0.6, room.y + v * room.d).project(camera);
+              if (q.z < 1) spots.push([((q.x + 1) / 2) * rect.w, ((1 - q.y) / 2) * rect.h]);
+            }
+          }
         }
-        placed.push(boxAt(top));
+        // Trễ chống nhảy: nhân vật nhún (chuyển động bật) làm nhãn bám người xê dịch từng khung — giữ chỗ đã chọn ở khung
+        // trước khi nó còn dùng được (khe 2 px); chỉ đổi sang chỗ khác hay hiện lại sau khi ẩn khi có khe rộng (8 px).
+        const prev = lastSpot.get(t.id);
+        const keep = prev !== undefined && prev < spots.length && ok(...spots[prev], 2) ? prev : -1;
+        const pick = keep >= 0 ? keep : spots.findIndex(([x, y]) => ok(x, y, 8));
+        if (pick >= 0) {
+          [left, top] = spots[pick];
+          lastSpot.set(t.id, pick);
+        } else if (t.id !== focus) {
+          lastSpot.delete(t.id);
+          el.hidden = true;
+          el.dataset.why = own(left, top) ? "overlap" : "off-room";
+          return;
+        }
+        placed.push(boxAt(left, top));
       }
       if (t.kind !== "room") {
         const w = el.offsetWidth / 2;

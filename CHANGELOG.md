@@ -74,8 +74,9 @@ Bản < 3.20.0: [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md) (T-3651; `changel
 ### Fixed
 
 - Màn Văn phòng 3D: nhãn phòng ẩn/hiện theo chỗ nhãn đứng có còn là sàn hay tường của **chính** phòng đó (tia từ
-  camera, không theo hộp nhãn) — phóng to ở toàn cảnh, phòng mà chỗ nhãn (đã kẹp vào khung) còn nằm trên nó vẫn giữ nhãn (chỉ thử một điểm: phòng
-  lớn chỉ lộ một phần có thể chưa có nhãn); nhãn phòng
+  camera, không theo hộp nhãn) — phóng to ở toàn cảnh, phòng còn trên hình vẫn giữ nhãn: thử điểm neo đã kẹp rồi các điểm trên sàn phòng (lưới 3×3)
+  nằm trọn trong khung — ở 390 px "Khu làm việc" có nhãn ở mọi mức phóng; giữ chỗ đã chọn ở khung trước (trễ chống
+  nhảy khi nhân vật nhún); nhãn phòng
   nhường cả nhãn agent/trạng thái (2D và 3D) sau khi đã thử dịch lên/xuống tìm chỗ trống (3D: vẫn trên phòng đó; 2D: chỉ
   khi bị nhãn bám người đè) — màn hẹp vẫn còn nhãn Khu làm việc; nhãn của
   phòng đang xem luôn hiện (nợ review PR #11). Nhãn HTML ghi `data-why` (lý do ẩn) và `data-clamped` cho test/gỡ lỗi.
