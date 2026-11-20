@@ -1,5 +1,7 @@
-# ADR-0082: Màn Văn phòng của `xt.py app` — bộ vẽ Canvas 2D mặc định, three.js vendor là tuỳ chọn tải lười
+# ADR-9001: Màn Văn phòng của `xt.py app` — bộ vẽ Canvas 2D mặc định, three.js vendor là tuỳ chọn tải lười
 
+- **Số hiệu:** trước là ADR-0082; đổi sang dải 9001+ dành cho ADR riêng của X-Office ngày 2026-11-20 khi
+  đồng bộ X-Templates mang ADR-0082 của chính nó (harness Codex) — D-521. Nội dung quyết định không đổi.
 - **Trạng thái:** Đã chấp nhận ngày 2026-11-19 (phiên chính tự duyệt theo ADR-0008; yêu cầu chủ dự án cùng ngày).
 - **Trạng thái triển khai:** nhánh `claude/tender-goldberg-u0d4db` (F-008, [`SPEC-app.md`](../specs/SPEC-app.md) §4).
 - **Làm rõ:** [ADR-0038](0038-local-app-on-xt.md) (app cục bộ: stdlib, JS thuần không build, CSP `script-src 'self'`,

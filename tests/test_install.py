@@ -67,7 +67,7 @@ class InstallTest(unittest.TestCase):
         self.assertIn("CPython 3.15.x", out.getvalue())
 
     def test_office_3d_only_when_chosen_and_kept_on_upgrade(self):
-        """ADR-0082: three.js (~2,1 MB) không chép mặc định; --with-office-3d chép; cài lại không cờ vẫn giữ."""
+        """ADR-9001: three.js (~2,1 MB) không chép mặc định; --with-office-3d chép; cài lại không cờ vẫn giữ."""
         app = self.target / ".xtemplates" / "scripts" / "app"
         with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
             self.assertEqual(self.run_install(), 0)

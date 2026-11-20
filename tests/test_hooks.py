@@ -2111,6 +2111,212 @@ class GuardStoredScanTest(unittest.TestCase):
         self.assertEqual(self.g.edit_decision(f"{self.root}/src/app.ts", self.root)[0], "")
 
 
+class CapabilityCodexPathsTest(unittest.TestCase):
+    """AUD-SEC-987 (ADR-0082): skill/agent của Codex CLI (`.agents/skills/*`, `.codex/agents/*`) là năng lực ở dự án đích
+    như `.claude/skills/*` (repo khung: không hỏi); `.codex/hooks.json` nối guard cho Codex là hàng rào như
+    `.claude/settings.json` ở mọi repo. So trực tiếp quyết định với đường tương ứng của Claude Code, cùng công cụ."""
+
+    CLAUDE_CAP = ".claude/skills/x/SKILL.md"
+    CODEX_CAPS = (".agents/skills/x/SKILL.md", ".agents/skills/x/agents/openai.yaml", ".codex/agents/a.toml")
+    HOOKS, CLAUDE_HOOKS = ".codex/hooks.json", ".claude/settings.json"
+    POLICIES = ("default", "strict")
+    TOOLS = ("Edit", "Write", "MultiEdit", "NotebookEdit")
+    BASH = (
+        "echo x > {}",
+        "echo x >> {}",
+        "tee {} < x",
+        "tee -a {} < x",
+        "cp x {}",
+        "mv x {}",
+        "rm -f {}",
+        "mv {} /tmp/x",
+        "sed -i s/a/b/ {}",
+        "truncate -s 0 {}",
+        "python3 -c \"open('{}','w').write('x')\"",
+    )
+    # Ranh giới của mẫu glob: không phải skill/agent/hook của Codex — không bị chặn oan
+    UNRELATED = (
+        ".agents/notes.md",
+        ".agents/skillsx/a.md",
+        "x.agents/skills/a/SKILL.md",
+        ".codex/other.json",
+        ".codex/hooks.json.bak",
+        ".codex/hooks/x.sh",
+        ".codex/agentsx/a.toml",
+        "docs/codex/agents/a.toml",
+    )
+
+    def setUp(self):
+        self.g = _guard()
+        base = os.path.realpath(self.enterContext(tempfile.TemporaryDirectory()))
+        self.target, self.frame = os.path.join(base, "target"), os.path.join(base, "frame")
+        for root in (self.target, self.frame):
+            for rel in (self.CLAUDE_CAP, *self.CODEX_CAPS, self.HOOKS, self.CLAUDE_HOOKS, ".claude/hooks/guard.py"):
+                os.makedirs(os.path.dirname(os.path.join(root, rel)), exist_ok=True)
+                Path(root, rel).write_text("a\n", encoding="utf-8")
+        os.makedirs(os.path.join(self.target, ".xtemplates"))
+
+    def _final(self, out: dict, policy: str) -> tuple[str, str]:
+        if policy != "strict":
+            out = self.g.apply_policy(out)
+        return str(out.get("decision") or ""), str(self.g.decide(out).code if policy == "strict" else out.get("code"))
+
+    def edit(self, root: str, path: str, tool: str = "Write", policy: str = "strict") -> tuple[str, str]:
+        key = "notebook_path" if tool == "NotebookEdit" else "file_path"
+        args = {"Edit": {"old_string": "a", "new_string": "b"}, "Write": {"content": "b"}}.get(tool, {})
+        args = {"edits": [{"old_string": "a", "new_string": "b"}]} if tool == "MultiEdit" else args
+        payload = {"tool_name": tool, "tool_input": {key: path, **args}}
+        with mock.patch.dict(os.environ, {"XT_GUARD_POLICY": policy}):
+            return self._final(self.g._rule_decision("edit", payload, root), policy)
+
+    def bash(self, root: str, cmd: str, policy: str = "strict") -> tuple[str, str]:
+        with mock.patch.dict(os.environ, {"XT_GUARD_POLICY": policy}):
+            return self._final(self.g.bash_decision(cmd, root), policy)
+
+    def variants(self, root: str, rel: str) -> tuple[str, ...]:
+        """Các cách viết cùng một đường mà guard chuẩn hoá: tương đối, `./`, `..`, tuyệt đối."""
+        return (rel, "./" + rel, "src/../" + rel, os.path.join(root, rel))
+
+    def test_target_edit_matches_claude_skill(self):
+        for policy, tool, rel in itertools.product(self.POLICIES, self.TOOLS, self.CODEX_CAPS):
+            for path, ref in zip(self.variants(self.target, rel), self.variants(self.target, self.CLAUDE_CAP)):
+                with self.subTest(policy=policy, tool=tool, path=path):
+                    got = self.edit(self.target, path, tool, policy)
+                    self.assertEqual(got, self.edit(self.target, ref, tool, policy))
+                    self.assertEqual(got, ("ask", "OTHER_ASK") if policy == "strict" else ("", "OTHER_ASK"))
+
+    def test_target_bash_matches_claude_skill(self):
+        for policy, cmd, rel in itertools.product(self.POLICIES, self.BASH, self.CODEX_CAPS):
+            with self.subTest(policy=policy, cmd=cmd.format(rel)):
+                got = self.bash(self.target, cmd.format(rel), policy)
+                self.assertEqual(got, self.bash(self.target, cmd.format(self.CLAUDE_CAP), policy))
+                self.assertEqual(got[0], "ask" if policy == "strict" else "")
+
+    def test_symlink_to_codex_skill_is_capability(self):
+        """Tên trung tính trỏ tới skill của Codex: guard xét đích thật (realpath) như với `.claude/skills`."""
+        for rel, name in ((self.CODEX_CAPS[0], "lnk"), (self.CLAUDE_CAP, "lnk-claude")):
+            os.symlink(os.path.join(self.target, rel), os.path.join(self.target, name))
+        for policy in self.POLICIES:
+            with self.subTest(policy=policy):
+                self.assertEqual(
+                    self.edit(self.target, "lnk", "Write", policy),
+                    self.edit(self.target, "lnk-claude", "Write", policy),
+                )
+                self.assertEqual(
+                    self.bash(self.target, "echo x > lnk", policy),
+                    self.bash(self.target, "echo x > lnk-claude", policy),
+                )
+                self.assertEqual(self.edit(self.target, "lnk", "Write", "strict")[0], "ask")
+
+    def test_codex_hooks_json_is_fence_like_claude_settings(self):
+        """Dự án đích và repo khung: Edit như `.claude/settings.json` (cổng — mặc định cho chạy, strict hỏi), Bash ghi/xoá/
+        đổi quyền/symlink → chặn như gỡ hook (HOOK_BYPASS)."""
+        cmds = (*self.BASH, "chmod 000 {}", "ln -sf /dev/null {}", "cp /dev/null {}")
+        for root, policy in itertools.product((self.target, self.frame), self.POLICIES):
+            for tool in self.TOOLS:
+                with self.subTest(root=root, policy=policy, tool=tool):
+                    got = self.edit(root, self.HOOKS, tool, policy)
+                    self.assertEqual(got, self.edit(root, self.CLAUDE_HOOKS, tool, policy))
+                    self.assertEqual(got, ("ask", "OTHER_ASK") if policy == "strict" else ("", "OTHER_ASK"))
+            for cmd in cmds:
+                with self.subTest(root=root, policy=policy, cmd=cmd):
+                    got = self.bash(root, cmd.format(self.HOOKS), policy)
+                    self.assertEqual(got, self.bash(root, cmd.format(self.CLAUDE_HOOKS), policy))
+                    self.assertEqual(got, ("ask", "HOOK_BYPASS") if policy == "strict" else ("deny", "HOOK_BYPASS"))
+
+    def test_codex_dir_glob_xargs_unknown_cwd_like_claude(self):
+        pairs = (
+            ("rm -rf .codex", "rm -rf .claude"),
+            ("cp x .codex/", "cp x .claude/"),
+            ("rm .codex/hook?.json", "rm .claude/setting?.json"),
+            ("rm .cod[e]x/hooks.json", "rm .clau[d]e/settings.json"),
+            ('cd "$X" && echo x > hooks.json', 'cd "$X" && echo x > settings.json'),
+            ("cd .codex && rm hooks.json", "cd .claude && rm settings.json"),
+            ("cd .codex && ls | xargs rm", "cd .claude && ls | xargs rm"),
+            ("ls .codex | xargs rm", "ls .claude | xargs rm"),
+            ("cd .agents/skills/x && ls | xargs rm", "cd .claude/skills/x && ls | xargs rm"),
+            ("echo x > ~/.codex/hooks.json", "echo x > ~/.claude/settings.json"),
+        )
+        for root, policy in itertools.product((self.target, self.frame), self.POLICIES):
+            for cmd, ref in pairs:
+                with self.subTest(root=root, policy=policy, cmd=cmd):
+                    got = self.bash(root, cmd, policy)
+                    self.assertEqual(got, self.bash(root, ref, policy))
+                    self.assertIn(got[0], ("ask", "deny") if policy == "strict" else ("deny",))
+        self.assertEqual(self.bash(self.target, "rm .agents/skills/*/SKILL.md")[0], "ask")  # glob nở ra tệp thật
+
+    def test_unrelated_paths_not_blocked(self):
+        for root, policy, rel in itertools.product((self.target, self.frame), self.POLICIES, self.UNRELATED):
+            with self.subTest(root=root, policy=policy, rel=rel):
+                self.assertEqual(self.edit(root, rel, "Write", policy)[0], "")
+                self.assertEqual(self.bash(root, f"echo x > {rel}", policy)[0], "")
+        # mẫu khớp ở mọi thư mục con như `.claude/skills` (monorepo) — phía bị bắt của ranh giới
+        for rel, ref in (
+            (".agents/skills/a", ".claude/skills/a"),
+            ("pkg/.codex/agents/a.toml", "pkg/.claude/agents/a"),
+        ):
+            with self.subTest(rel=rel):
+                self.assertEqual(self.edit(self.target, rel), self.edit(self.target, ref))
+                self.assertEqual(self.edit(self.target, rel)[0], "ask")
+
+    def test_framework_repo_codex_caps_not_asked(self):
+        """Repo khung (không `.xtemplates/`): skill/agent của Codex là sản phẩm đang phát triển như `.claude/skills`."""
+        for policy, tool, rel in itertools.product(self.POLICIES, self.TOOLS, self.CODEX_CAPS):
+            with self.subTest(policy=policy, tool=tool, rel=rel):
+                got = self.edit(self.frame, rel, tool, policy)
+                self.assertEqual(got, self.edit(self.frame, self.CLAUDE_CAP, tool, policy))
+                self.assertEqual(got[0], "")
+        for policy, cmd, rel in itertools.product(self.POLICIES, self.BASH, self.CODEX_CAPS):
+            with self.subTest(policy=policy, cmd=cmd.format(rel)):
+                got = self.bash(self.frame, cmd.format(rel), policy)
+                self.assertEqual(got, self.bash(self.frame, cmd.format(self.CLAUDE_CAP), policy))
+                self.assertEqual(got[0], "")
+
+    def test_legit_flows_allowed(self):
+        """Sinh lại bằng `install.py` (tiến trình python), khôi phục bằng git, đọc/kiểm, dọn bản `/import` cũ: cho chạy."""
+        for root, cmd in itertools.product(
+            (self.target, self.frame),
+            (
+                "python3 .xtemplates/scripts/install.py --harness codex .",
+                "python3 scripts/install.py --harness codex /srv/app",
+                "git checkout -- .codex/hooks.json",
+                "git restore .codex/hooks.json .agents/skills/x/SKILL.md",
+                "git add .codex/hooks.json .agents/skills .codex/agents",
+                "git diff -- .codex .agents",
+                "cat .codex/hooks.json",
+                "python3 -m json.tool .codex/hooks.json",
+                "ls .codex .agents/skills",
+                "rm -rf .codex/hooks",
+                "rm -f .codex/hooks.json.bak",
+            ),
+        ):
+            for policy in self.POLICIES:
+                with self.subTest(root=root, cmd=cmd, policy=policy):
+                    self.assertEqual(self.bash(root, cmd, policy)[0], "")
+
+    def test_codex_adapter_core_matches_claude(self):
+        """Đường của Codex qua adapter trung lập (`guard.py core`, ADR-0064): cùng quyết định với `.claude/…` tương ứng."""
+        for root, policy in itertools.product((self.target, self.frame), self.POLICIES):
+            for rel, ref in ((self.CODEX_CAPS[0], self.CLAUDE_CAP), (self.HOOKS, self.CLAUDE_HOOKS)):
+                with (
+                    self.subTest(root=root, policy=policy, rel=rel),
+                    mock.patch.dict(os.environ, {"XT_GUARD_POLICY": policy}),
+                ):
+                    raw = {"tool": "write", "path": os.path.join(root, rel), "project_dir": root}
+                    got = self._final(self.g._core_decision(raw), policy)
+                    want = self._final(self.g._core_decision({**raw, "path": os.path.join(root, ref)}), policy)
+                    self.assertEqual(got, want)
+
+    def test_concurrent_roots_do_not_leak(self):
+        """Quyết định theo gốc dự án của từng lời gọi: chạy song song dự án đích và repo khung cho cùng kết quả như tuần tự."""
+        jobs = [(root, rel) for root in (self.target, self.frame) for rel in (*self.CODEX_CAPS, self.HOOKS)] * 8
+        want = [self.g.edit_decision(rel, root)[0] for root, rel in jobs]
+        with concurrent.futures.ThreadPoolExecutor(8) as pool:
+            got = list(pool.map(lambda j: self.g.edit_decision(j[1], j[0])[0], jobs))
+        self.assertEqual(got, want)
+        self.assertEqual(set(want), {"ask", ""})
+
+
 @unittest.skipIf(shutil.which("bash") is None, "cần bash")
 class PreEditGuardTest(unittest.TestCase):
     def d(self, rel: str, project: Path = ROOT, via_hook: bool = False) -> str | None:

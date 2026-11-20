@@ -222,7 +222,7 @@ class OfficeApiTest(unittest.TestCase):
 
 
 class OfficeVendorTest(unittest.TestCase):
-    """ADR-0082: three.js vendor đúng từng byte như SOURCE ghi (sha256) và qua vendor-check --strict — lệnh kiểm grep của
+    """ADR-9001: three.js vendor đúng từng byte như SOURCE ghi (sha256) và qua vendor-check --strict — lệnh kiểm grep của
     blueprint (BASE-CFG-001/DATA-006) chỉ miễn ba tệp đã ghim nên sửa chúng phải lộ ra ở đây."""
 
     VENDOR = ROOT / "scripts" / "app" / "vendor" / "three"

@@ -127,7 +127,7 @@ lễ tân, giám đốc, phòng họp, server, pantry, ngủ trưa, khu làm vi�
 nhiều tầng mặt kính với mặt bằng công ty ở tầng thượng. Nút "Tới phòng" đưa camera tới từng phòng (2D lẫn 3D); bấm tên agent
 trong bảng → tới bàn của agent; kéo trên canvas 2D để dời góc nhìn. Người không nhãn là nhân viên minh hoạ (tắt được), bộ đếm
 tách "agent" và "nhân viên minh hoạ" — chỉ agent mang trạng thái.
-- Bộ vẽ mặc định là Canvas 2D tự viết; 3D dùng three.js vendor ([ADR-0082](../adr/0082-office-view-renderers.md)). Kiểu văn
+- Bộ vẽ mặc định là Canvas 2D tự viết; 3D dùng three.js vendor ([ADR-9001](../adr/9001-office-view-renderers.md)). Kiểu văn
 phòng là dữ liệu trong `office/themes.js`, quy mô/mặt bằng trong `office/plans.js`, bố cục trong `LAYOUTS` của `office/scene.js` — thêm kiểu không sửa mã vẽ. Canvas có `role="img"` + `aria-label` tóm tắt; mọi thông tin của cảnh có bản văn bản tương đương.
 
 ## 5. Ca biên

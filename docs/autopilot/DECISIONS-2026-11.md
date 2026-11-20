@@ -827,3 +827,17 @@
 - Chọn: ask/BUDGET: mặc định chặn, strict hỏi người; lệnh có dấu review giữ mã REVIEW_FORGE
 - Lý do (tiêu chí chất lượng cuối): (1) an toàn: không có đường cho qua — mặc định chặn, strict là chế độ người duyệt từng lệnh nên hỏi là đúng ngữ nghĩa strict; (3) giữ mã REVIEW_FORGE chính xác hơn cho lệnh giả dấu, test ghim D-410 không phải đổi
 - Đường lùi: Đổi _gh_dyn_name sang raise ScanTooComplex
+
+### D-412 · 2026-11-10T09:22:40+00:00 · Câu hỏi mở của executor #492 (mở rộng trong nháy kép đứng riêng ở vị trí cờ; mở rộng không nháy dính sau chữ; lệnh đăng chữ với biến đứng riêng): sửa ngay trong #492 hay ghi nợ?
+
+- Phương án: (1) Ghi nợ 🟠 riêng (AUD-SEC-591…593), làm ở lát sau với thiết kế chung (xét phương án miễn đối số vị trí đầu) · (2) Mở rộng #492 chặn mọi token chỉ gồm mở rộng ở lệnh có luật cờ
+- Chọn: Ghi nợ 🟠 riêng (AUD-SEC-591…593), làm ở lát sau với thiết kế chung (xét phương án miễn đối số vị trí đầu)
+- Lý do (tiêu chí chất lượng cuối): (1) an toàn: #492 không nới gì, chỉ chặt thêm; các dạng còn hở đã hở trên main và có dòng sổ; (3) phương án chặn rộng chặn oan lệnh đóng/merge PR có số PR trong biến — cần đo trên lệnh thật trước khi chọn; lát nhỏ (P8)
+- Đường lùi: Gộp vào lát sau
+
+### D-413 · 2026-11-10T11:52:01+00:00 · release-sign (AUD-HAR-340, #493): không worktree nào có .autopilot/state.json thì sao?
+
+- Phương án: (1) Từ chối ký (fail-closed); cần loop init trước — đường /complete đã có bước này · (2) Coi sổ vắng là không có việc chờ
+- Chọn: Từ chối ký (fail-closed); cần loop init trước — đường /complete đã có bước này
+- Lý do (tiêu chí chất lượng cuối): (1) đúng và an toàn: .autopilot/ không commit nên clone riêng không biết sổ dự án chính — coi vắng là sạch mở lại đúng lỗ AUD-HAR-340; (2) đường lùi: loop init tạo sổ rỗng; khoá release_signoff hiện chưa bật nên không chặn ai
+- Đường lùi: Cho sổ vắng ở mọi worktree là không có việc chờ

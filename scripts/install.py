@@ -7,7 +7,7 @@ Kết quả trong dự án đích:
   .xtemplates/scripts/xt.py     công cụ compose / blueprint-status / loop
   .xtemplates/scripts/dev-task.sh
   .xtemplates/scripts/{xt_app,app}/  app cục bộ `xt.py app` (ADR-0038); bộ vẽ 3D three.js của màn Văn phòng
-                                     (app/vendor/three/, ~2,1 MB) chỉ khi --with-office-3d hoặc bản cài cũ đã có (ADR-0082)
+                                     (app/vendor/three/, ~2,1 MB) chỉ khi --with-office-3d hoặc bản cài cũ đã có (ADR-9001)
   .xtemplates/VERSION           SHA/nhãn phiên bản khung đã cài
   .xtemplates/manifest.json     hash file harness/gốc/GitHub + rule do khung đặt (chỉ gỡ `ask` có trong đây) + chính sách (REC-09)
                                 — hash dạng `sha256:<hex>` (cả `harness.sha256.json`); đọc nhận cả hex trần của bản cũ
@@ -20,6 +20,8 @@ Kết quả trong dự án đích:
   .github/workflows/{ci,secret-scan,pr-title,merge-gate,pr-steward}.yml   chỉ khi --with-github (copy-if-absent, hash vào manifest;
                                 merge-gate.yml là stub tạm D-122)
   AGENTS.md, CLAUDE.md, PROGRESS.md, xt.yaml       từ framework/templates (copy-if-absent, bỏ frontmatter YAML; mẫu bọc ```markdown thì lấy phần trong)
+  .codex/hooks.json, .agents/skills/<tên>/SKILL.md, .codex/agents/<tên>.toml   chỉ khi --harness codex (ADR-0082): skill/agent
+                                sinh từ .claude/ của dự án, ghi như harness, hash ở `codex_files` của manifest.json
 
 File đã có mà khác bản khung (mọi nhóm): còn đúng hash lần cài trước → cập nhật tại chỗ; dự án đã sửa mà mẫu không đổi từ lần
 cài trước → `kept-own` (im lặng); dự án đã sửa và mẫu đổi (hoặc chưa biết hash) → `.xtemplates-new`, ghi hash mẫu MỚI nên chỉ
@@ -33,6 +35,7 @@ Dự án đã cài bản ≤ 2.x (`.xstored/`, `xs.py`, `xs.yaml`, `XS_*`): ch�
 Dùng:
   python3 scripts/install.py <thư-mục-dự-án> [--force-harness] [--no-harness] [--no-git-hooks] [--harness codex,…] [--with-github] [--with-office-3d] [--preset safe|autonomous] [--stage-init] [--pack <id>] [--label v1.0.0] [--plan]
   python3 scripts/install.py <thư-mục-mới-hoặc-rỗng> --new --pack <id> --idea "<ý tưởng>" [--name <slug>] [--scale S|M|L]
+  python3 scripts/install.py . --sync-codex     (chỉ ở repo khung) sinh lại .agents/skills, .codex/agents, .codex/hooks.json
   --new: một repo main, khung + gói + PROJECT + blueprint + giai đoạn 1; commit đầu trước khi cài hook, doctor offline.
   --plan: in JSON kế hoạch (quyền thêm/bớt, hook thêm/đổi matcher, file đè/giữ, git hook, adapter; gói và drift file
           managed khi có --pack), không ghi gì (REC-09)
@@ -140,7 +143,7 @@ def drop_symlink(path: Path) -> None:
 
 
 BYTECODE = shutil.ignore_patterns("__pycache__", "*.pyc")
-OFFICE_3D = ("app", "vendor", "three")  # three.js vendor của màn Văn phòng (ADR-0082) — chỉ cài khi chủ dự án chọn
+OFFICE_3D = ("app", "vendor", "three")  # three.js vendor của màn Văn phòng (ADR-9001) — chỉ cài khi chủ dự án chọn
 
 
 def without_office_3d(app_root: Path) -> Callable[[str, list[str]], set[str]]:
@@ -380,19 +383,31 @@ def classify_copy(
     mẫu trước khi thay SHA HEAD); cả hai nhận `sha256:<hex>` lẫn hex trần (`manifest_hash`). Dùng chung cho
     `copy_if_absent` và `--plan` để kế hoạch không lệch hành vi thật."""
     data = source_bytes(src, transform)
+    return classify_bytes(data, dst, force, installed_hash, template_hash, preserve_yaml_policy), data
+
+
+def classify_bytes(
+    data: bytes,
+    dst: Path,
+    force: bool = False,
+    installed_hash: str | None = None,
+    template_hash: str | None = None,
+    preserve_yaml_policy: bool = False,
+) -> str:
+    """Lõi của `classify_copy` khi nội dung bản khung đã có sẵn (tệp sinh — harness Codex, ADR-0082)."""
     if parent_symlink(dst) or dst.is_symlink() or dst.with_name(dst.name + ".xtemplates-new").is_symlink():
-        return "skipped-symlink", data
+        return "skipped-symlink"
     if not dst.exists() or force:
-        return "copied", data
+        return "copied"
     current = dst.read_bytes()
     if current == data:
-        return "kept", data
+        return "kept"
     if installed_hash is None:
-        return "updated-new", data
+        return "updated-new"
     installed = manifest_hash(installed_hash)
     if sha256(current) == installed:
-        return ("updated" if yaml_policy_unchanged(current, data, preserve_yaml_policy) else "updated-new"), data
-    return ("kept-own" if manifest_hash(template_hash or sha256(data)) == installed else "updated-new"), data
+        return "updated" if yaml_policy_unchanged(current, data, preserve_yaml_policy) else "updated-new"
+    return "kept-own" if manifest_hash(template_hash or sha256(data)) == installed else "updated-new"
 
 
 def write_copy(src: Path, dst: Path, status: str, data: bytes) -> None:
@@ -991,7 +1006,9 @@ MANIFEST_PATH_LISTS = (
     "git_hooks",
     "adapters",
     "packs",
-)  # file khung ghi ngoài `files` (AUD-HAR-204) + gói đã cài (`packs`, object) — giữ qua `write_manifests`
+    "codex_files",
+)  # file khung ghi ngoài `files` (AUD-HAR-204) + gói đã cài (`packs`, object) + hash tệp Codex sinh (`codex_files`,
+# object, ADR-0082) — giữ qua `write_manifests`
 
 
 def load_manifest_doc(target: Path) -> dict[str, Any]:
@@ -1003,10 +1020,11 @@ def load_manifest_doc(target: Path) -> dict[str, Any]:
     return doc if isinstance(doc, dict) else {}
 
 
-def record_manifest_paths(target: Path, key: str, paths: list[str]) -> None:
-    """Ghi danh sách đường dẫn khung đã ghi (`git_hooks`/`adapters`) vào manifest.json, giữ mọi khoá khác."""
+def record_manifest_paths(target: Path, key: str, paths: list[str] | dict[str, str]) -> None:
+    """Ghi danh sách đường dẫn khung đã ghi (`git_hooks`/`adapters`) — hoặc map đường → hash (`codex_files`) — vào
+    manifest.json, giữ mọi khoá khác."""
     doc = load_manifest_doc(target)
-    doc[key] = sorted(set(paths))
+    doc[key] = dict(sorted(paths.items())) if isinstance(paths, dict) else sorted(set(paths))
     (target / MANIFEST_V2).parent.mkdir(parents=True, exist_ok=True)
     write_atomic(target / MANIFEST_V2, json.dumps(doc, indent=2, sort_keys=True) + "\n")
 
@@ -1319,6 +1337,369 @@ def install_adapters(target: Path, hosts: list[str]) -> None:
             f"  adapter {host}: {rel} ({status}) — công cụ cần tin cậy hook dự án một lần (xem templates/harness/README.md)"
         )
     record_manifest_paths(target, "adapters", ours)
+
+
+# Harness Codex sinh từ `.claude/` (ADR-0082): skill của khung → `.agents/skills/<tên>/SKILL.md` (bản sao byte), agent →
+# `.codex/agents/<tên>.toml`. Nguồn là `.claude/` CỦA ĐÍCH sau bước harness (bản dự án đã sửa thì Codex thấy bản đó); chỉ
+# tên skill/agent khung cài (`SRC/.claude/`, trừ skill bị lệnh dự án che) — tệp khác dưới `.agents/`, `.codex/` là của dự
+# án. Ghi như file harness (`classify_bytes`, hash ở `codex_files` của manifest.json). Repo khung: `--sync-codex`.
+CODEX_MANIFEST = "codex_files"
+CODEX_SYNC = "python3 scripts/install.py . --sync-codex"
+CODEX_ROOTS = (".agents", ".codex")  # repo khung: mọi tệp dưới đây phải do bộ sinh tạo (`codex_extras`)
+CODEX_EFFORTS = ("low", "medium", "high", "xhigh", "max")  # `model_reasoning_effort` nhận được ở Codex (research §3)
+CODEX_ADAPTER = ("/.xtemplates/scripts/xt_adapter.py", "/scripts/xt_adapter.py")  # dự án đích → repo khung
+TOML_ESCAPES = {"\\": "\\\\", '"': '\\"', "\b": "\\b", "\t": "\\t", "\n": "\\n", "\f": "\\f", "\r": "\\r"}
+CodexJob = tuple[
+    str, str, Callable[[bytes, str], bytes | str]
+]  # nguồn `.claude/…`, đích, hàm sinh (str = lý do bỏ qua)
+CODEX_NO_SOURCE = "thiếu, là symlink, nằm dưới symlink hoặc không đọc được"
+
+
+def _toml_char(c: str) -> str:
+    return TOML_ESCAPES.get(c) or (f"\\u{ord(c):04X}" if ord(c) < 0x20 or ord(c) == 0x7F else c)
+
+
+def toml_string(s: str) -> str:
+    """Chuỗi TOML cơ bản một dòng: thoát `\\`, `"` và mọi ký tự điều khiển; Unicode khác giữ nguyên."""
+    return '"' + "".join(map(_toml_char, s)) + '"'
+
+
+def toml_multiline(s: str) -> str:
+    """Chuỗi TOML cơ bản nhiều dòng (dễ đọc): giữ xuống dòng và tab; mọi ký tự khác như `toml_string` (thoát `\\`, mọi
+    `"` — nên không bao giờ thành dấu đóng `\"\"\"` —, CR và ký tự điều khiển). Dòng mới ngay sau `\"\"\"` mở bị TOML bỏ,
+    nên nội dung giữ nguyên kể cả khi bắt đầu bằng dòng trống."""
+    return '"""\n' + "".join(c if c in "\n\t" else _toml_char(c) for c in s) + '"""'
+
+
+# Frontmatter agent: chỉ nhận tập con YAML PHẲNG mà bộ đọc hiểu chắc (review: YAML hợp lệ ngoài tập này từng thành TOML
+# sai nghĩa) — mỗi dòng `khoá: giá trị` không thụt lề, giá trị trơn hoặc nháy không thoát; còn lại → ValueError (fail-closed).
+FM_LINE_RE = re.compile(r"([A-Za-z_][\w-]*):(?: (.*))?")
+FM_SPECIAL_RE = re.compile(r"[\[\]{}&*!%@`#,]|[-?:](?:\s|$)")  # chỉ báo YAML ở đầu giá trị trơn (luồng, neo, thẻ…)
+FM_QUOTED_RE = {'"': re.compile(r'"([^"]*)"'), "'": re.compile(r"'([^']*)'")}
+
+
+# Giá trị trơn mà bộ đọc YAML (1.2 core, cả dạng 1.1 của PyYAML) đọc thành null/bool/số/ngày, không phải chuỗi — ở
+# `FM_TEXT_KEYS` thì từ chối (trong nháy vẫn là chuỗi).
+FM_TEXT_KEYS = frozenset({"name", "description", "effort"})
+FM_TYPED_RE = re.compile(
+    r"null|Null|NULL|~|true|True|TRUE|false|False|FALSE"
+    r"|y|Y|yes|Yes|YES|n|N|no|No|NO|on|On|ON|off|Off|OFF"
+    r"|[-+]?(?:[0-9][0-9_]*(?::[0-5]?[0-9])*(?:\.[0-9_]*)?|\.[0-9_]+)(?:[eE][-+]?[0-9]+)?"
+    r"|0x[0-9a-fA-F_]+|0o[0-7_]+|0b[01_]+|[-+]?\.(?:inf|Inf|INF)|\.(?:nan|NaN|NAN)"
+    # timestamp YAML 1.1 (đúng mẫu `timestamp` của đặc tả, như PyYAML): ngày trơn `YYYY-MM-DD`, hoặc ngày + `T`/khoảng
+    # trắng + giờ:phút:giây [+ phần giây] [+ múi giờ]; `2026-11-19 audit agent` là chuỗi
+    r"|[0-9]{4}-[0-9]{2}-[0-9]{2}"
+    r"|[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}(?:[Tt]|[ \t]+)[0-9]{1,2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]*)?"
+    r"(?:[ \t]*(?:Z|[-+][0-9]{1,2}(?::[0-9]{2})?))?"
+)
+# Chỉ dấu cách và tab là khoảng trắng YAML 1.2 (NBSP, U+3000 là nội dung, giữ nguyên); ngắt dòng YAML 1.1 (U+0085,
+# U+2028/2029), `\r` lẻ, mọi ký tự điều khiển C0/C1 khác và BOM giữa dòng: bộ đọc khác nhau hiểu khác nhau → từ chối.
+FM_BAD_CHAR_RE = re.compile(r"[\x00-\x08\x0a-\x1f\x7f-\x9f\u2028\u2029\ufeff]")  # C0, DEL, C1, LS, PS, BOM
+
+
+def _fm_value(raw: str, text_key: bool) -> str:
+    v = raw.strip(" \t")
+    if v[:1] in ("|", ">"):
+        raise ValueError("khối `|`/`>`")
+    if v[:1] in ('"', "'"):
+        if v[0] == '"' and "\\" in v:
+            raise ValueError("nháy kép có ký tự thoát `\\`")
+        if v[0] == "'" and "''" in v[1:]:
+            raise ValueError("nháy đơn có `''`")
+        m = FM_QUOTED_RE[v[0]].fullmatch(v)
+        if m is None:
+            raise ValueError("nháy không đóng hoặc có chữ sau nháy đóng")
+        return m[1]
+    if FM_SPECIAL_RE.match(v):
+        raise ValueError("giá trị bắt đầu bằng ký tự YAML đặc biệt")
+    if re.search(r"[ \t]#", v):
+        raise ValueError("chú thích ` #` cuối giá trị")
+    if text_key and FM_TYPED_RE.fullmatch(v):
+        raise ValueError("giá trị trơn có kiểu YAML (null/bool/số/ngày), không phải chuỗi — đặt trong nháy")
+    return v
+
+
+def _fm_pair(line: str, meta: dict[str, str]) -> tuple[str, str] | None:
+    """(khoá, giá trị) của một dòng không trống; chú thích cả dòng → None; ngoài tập con phẳng → ValueError(lý do)."""
+    if FM_BAD_CHAR_RE.search(line):
+        raise ValueError("ký tự điều khiển hoặc ngắt dòng lạ (`\\r` lẻ, U+0085, U+2028/2029…)")
+    if line.startswith("#"):
+        return None
+    if line[0] in " \t":
+        raise ValueError("thụt lề")
+    m = FM_LINE_RE.fullmatch(line)
+    if m is None:
+        raise ValueError("không phải `khoá: giá trị` một dòng")
+    if m[1] in meta:
+        raise ValueError(f"khoá `{m[1]}` lặp")
+    return m[1], _fm_value(m[2] or "", m[1] in FM_TEXT_KEYS)
+
+
+def _fm_line(line: str, n: int, meta: dict[str, str]) -> dict[str, str]:
+    """Một dòng frontmatter (số dòng `n` tính cả `---` mở) → {khoá: giá trị}; dòng trống/chú thích cả dòng → {}."""
+    if not line.strip(" \t"):
+        return {}
+    try:
+        pair = _fm_pair(line, meta)
+    except ValueError as exc:
+        raise ValueError(f"frontmatter dòng {n}: {exc} (YAML ngoài tập con phẳng)") from None
+    return dict([pair]) if pair else {}
+
+
+def agent_frontmatter(text: str) -> tuple[dict[str, str], str]:
+    """(khoá → giá trị, thân sau frontmatter bỏ dòng trống đầu); ngoài tập con phẳng → ValueError nêu dòng và lý do."""
+    lines = text.split("\n")
+    if lines[0].rstrip("\r") != "---":
+        raise ValueError("frontmatter: không mở bằng `---`")
+    end = next((i for i in range(1, len(lines)) if lines[i].rstrip("\r") == "---"), 0)
+    if not end:
+        raise ValueError("frontmatter: không có dòng `---` đóng")
+    meta: dict[str, str] = {}
+    for n, line in enumerate(lines[1:end], 2):
+        meta.update(_fm_line(line.removesuffix("\r"), n, meta))  # đúng một `\r` cuối dòng (CRLF); `\r` khác → từ chối
+    body = "\n".join(lines[end + 1 :]).lstrip("\r\n")
+    if body.split("\n", 1)[0].rstrip("\r") == "---":
+        raise ValueError("frontmatter: thân mở bằng `---` (nhiều tài liệu YAML)")
+    for key in ("name", "description"):
+        if not meta.get(key):
+            raise ValueError(f"frontmatter thiếu `{key}`")
+    return meta, body
+
+
+def agent_toml(text: str, source: str) -> str:
+    """`.claude/agents/<tên>.md` → TOML agent của Codex: `name`, `description`, `model_reasoning_effort` (từ `effort`
+    khi thuộc `CODEX_EFFORTS`), `developer_instructions` (thân sau frontmatter, bỏ dòng trống đầu, giữ đường `.claude/…`).
+    Không `model` (tên model Claude vô nghĩa với Codex). Frontmatter ngoài tập con phẳng → ValueError (`agent_frontmatter`)."""
+    meta, body = agent_frontmatter(text)
+    out = [
+        f"# Sinh từ {source} bởi install.py của X-Office (ADR-0082) — sửa tệp nguồn rồi sinh lại, không sửa tay.",
+        f"name = {toml_string(meta['name'])}",
+        f"description = {toml_string(meta['description'])}",
+    ]
+    if meta.get("effort") in CODEX_EFFORTS:
+        out.append(f"model_reasoning_effort = {toml_string(meta['effort'])}")
+    out.append(f"developer_instructions = {toml_multiline(body)}")
+    return "\n".join(out) + "\n"
+
+
+def render_agent(raw: bytes, source: str) -> bytes | str:
+    """TOML (byte) của agent; không sinh được → lý do (chuỗi) để cảnh báo."""
+    try:
+        return agent_toml(raw.decode("utf-8"), source).encode("utf-8")
+    except UnicodeDecodeError:
+        return "không phải UTF-8"
+    except ValueError as exc:
+        return str(exc)
+
+
+def render_skill(raw: bytes, source: str) -> bytes | str:
+    return raw
+
+
+def read_regular(path: Path) -> bytes | None:
+    """Byte của tệp thường; thiếu, là symlink hay nằm dưới symlink (đọc xuyên ra ngoài dự án), lỗi đọc → None."""
+    if path.is_symlink() or parent_symlink(path) or not path.is_file():
+        return None
+    try:
+        return path.read_bytes()
+    except OSError:
+        return None
+
+
+def codex_jobs(target: Path) -> list[CodexJob]:
+    """Skill (trừ skill bị lệnh dự án che — `shadowed_skills`) và agent của khung → việc sinh tệp Codex."""
+    claude = SRC / ".claude"
+    hidden = set(shadowed_skills(target))
+    skills = sorted(p.parent.name for p in (claude / "skills").glob("*/SKILL.md") if p.parent.name not in hidden)
+    jobs: list[CodexJob] = [
+        (f".claude/skills/{n}/SKILL.md", f".agents/skills/{n}/SKILL.md", render_skill) for n in skills
+    ]
+    agents = sorted(p.stem for p in (claude / "agents").glob("*.md"))
+    return jobs + [(f".claude/agents/{n}.md", f".codex/agents/{n}.toml", render_agent) for n in agents]
+
+
+def codex_render(job: CodexJob, read: Callable[[str], bytes | None]) -> bytes | str:
+    """Nội dung tệp Codex của `job`; không sinh được → lý do (chuỗi)."""
+    raw = read(job[0])
+    return CODEX_NO_SOURCE if raw is None else job[2](raw, job[0])
+
+
+def _framework_mirror_hashes(job: CodexJob, recorded: str | None, raw: bytes | None) -> set[str]:
+    """Hash mà gương của `job` mang nếu nó là bản khung đã cài. Chỉ tin manifest harness (`recorded` = hash nguồn khung
+    đã cài): skill (bản sao byte) → chính hash đó; agent → bản sinh từ nguồn `.md` hiện có, chỉ khi nguồn còn đúng
+    `recorded` (chưa bị dự án sửa). Gương trùng bản DỰ ÁN không chứng minh gì (review lượt 2 🟠: `--force-harness`)."""
+    if recorded is None:
+        return set()
+    if job[2] is render_skill:
+        return {recorded}
+    if raw is None or sha256(raw) != recorded:
+        return set()
+    data = job[2](raw, job[0])
+    return {sha256(data)} if isinstance(data, bytes) else set()
+
+
+def codex_baseline(target: Path) -> dict[str, set[str]]:
+    """Gương Codex có sẵn (dự án tự làm trước khi khung sinh — chưa có `codex_files`) mà là bản khung CHẮC CHẮN thì cập
+    nhật tại chỗ (review mục 5): đích → hash chứng minh (`_framework_mirror_hashes`), đọc TRƯỚC bước harness. Agent:
+    manifest chỉ giữ hash `.md`, nguồn đã đổi thì không dựng lại được TOML cũ → không nhận."""
+    files = load_manifest(target)
+    return {
+        job[1]: _framework_mirror_hashes(job, files.get(job[0]), read_regular(target / job[0]))
+        for job in codex_jobs(target)
+    }
+
+
+def _mirror_hash(dst: Path, known: set[str]) -> str | None:
+    current = read_regular(dst) if known else None
+    digest = None if current is None else sha256(current)
+    return digest if digest in known else None
+
+
+def codex_recorded(target: Path) -> dict[str, str]:
+    """`codex_files` của manifest.json (đường → hash); thiếu/sai dạng → {}."""
+    rec = load_manifest_doc(target).get(CODEX_MANIFEST)
+    return {k: v for k, v in rec.items() if isinstance(v, str)} if isinstance(rec, dict) else {}
+
+
+CodexAction = tuple[str, str, str, bytes, str]  # nguồn, đích, hành động, nội dung, lý do (`skipped-source`)
+
+
+def codex_actions(
+    target: Path, read: Callable[[str], bytes | None], recorded: dict[str, str], baseline: dict[str, set[str]]
+) -> list[CodexAction]:
+    """Quyết định cho từng tệp Codex — không ghi gì. Nguồn không sinh được → `skipped-source` kèm lý do. Chưa có hash
+    `codex_files` mà gương có sẵn trùng `baseline` → hash đó coi như bản khung đã ghi (cập nhật tại chỗ)."""
+    out: list[CodexAction] = []
+    for job in codex_jobs(target):
+        data, dst = codex_render(job, read), target / job[1]
+        if isinstance(data, str):
+            out.append((job[0], job[1], "skipped-source", b"", data))
+            continue
+        installed = recorded.get(job[1]) or _mirror_hash(dst, baseline.get(job[1], set()))
+        out.append((job[0], job[1], classify_bytes(data, dst, False, installed), data, ""))
+    return out
+
+
+def codex_plan(target: Path, files: list[dict[str, Any]], hosts: list[str]) -> list[dict[str, str]]:
+    """Kế hoạch tệp Codex (`--plan --harness codex`). Nguồn = bản `.claude/` mà bước harness SẼ để lại: file harness
+    `copied`/`updated` → bản khung, còn lại → bản đang có ở dự án (như cài thật, chạy sau bước harness)."""
+    if "codex" not in hosts:
+        return []
+    after = {f["path"]: f["action"] for f in files}
+
+    def read(rel: str) -> bytes | None:
+        return read_regular((SRC if after.get(rel) in ("copied", "updated") else target) / rel)
+
+    actions = codex_actions(target, read, codex_recorded(target), codex_baseline(target))
+    return [{"source": s, "path": d, "action": a} | ({"reason": r} if r else {}) for s, d, a, _, r in actions]
+
+
+def install_codex_harness(target: Path, hosts: list[str], baseline: dict[str, set[str]] | None = None) -> None:
+    """Sinh skill/agent cho Codex khi `--harness` có `codex` (sau bước harness); hash bản khung vào `codex_files`.
+    `baseline` = `codex_baseline` đọc trước bước harness (vắng → không nhận gương có sẵn là bản khung)."""
+    if "codex" not in hosts:
+        return
+    recorded = codex_recorded(target)
+    stats: Counter[str] = Counter()
+    hashes: dict[str, str] = {}
+    actions = codex_actions(target, lambda r: read_regular(target / r), recorded, baseline or {})
+    for src, rel, status, data, why in actions:
+        dst = target / rel
+        if status == "copied":
+            dst.parent.mkdir(parents=True, exist_ok=True)
+        write_copy(dst, dst, status, data)
+        stats[status] += 1
+        if status in HASHED:
+            hashes[rel] = hash_label(sha256(data))
+        elif rel in recorded:
+            hashes[rel] = hash_label(manifest_hash(recorded[rel]))
+        if status == "skipped-source":
+            log(f"  ⚠ codex: bỏ qua {rel} — nguồn {src}: {why}; giữ nguyên bản đang có")
+    record_manifest_paths(target, CODEX_MANIFEST, hashes)
+    log("✓ codex: .agents/skills + .codex/agents: " + " · ".join(f"{k} {v}" for k, v in sorted(stats.items())))
+    if stats["updated-new"]:
+        log("  ⚠ tệp Codex dự án tự có khác bản khung: bản khung ở `*.xtemplates-new` — gộp tay")
+
+
+def framework_codex_hooks() -> bytes:
+    """`.codex/hooks.json` của repo khung: mẫu dự án đích với adapter ở `scripts/` thay `.xtemplates/scripts/`."""
+    old, new = CODEX_ADAPTER
+    text = adapter_src("codex").read_text(encoding="utf-8")
+    if old not in text:
+        raise ValueError(f"mẫu {adapter_src('codex').name} không còn đường {old} — sửa bộ sinh theo mẫu mới")
+    return text.replace(old, new).encode("utf-8")
+
+
+def codex_framework_files() -> dict[str, bytes]:
+    """Đường → nội dung mọi tệp Codex của repo khung, sinh từ `SRC/.claude/` (cùng bộ sinh với dự án đích)."""
+    out = {ADAPTERS["codex"][1]: framework_codex_hooks()}
+    for job in codex_jobs(SRC):
+        data = codex_render(job, lambda rel: read_regular(SRC / rel))
+        if isinstance(data, str):
+            raise ValueError(f"{job[0]}: {data} — không sinh được {job[1]}")
+        out[job[1]] = data
+    return out
+
+
+def codex_extras(root: Path, expected: dict[str, bytes]) -> list[str]:
+    """Tệp dưới `CODEX_ROOTS` không do bộ sinh tạo (skill/agent đã bỏ ở `.claude/`, `.codex/hooks/` sót từ `/import`,
+    tệp tay); bỏ qua `__pycache__`."""
+    found = (p for d in CODEX_ROOTS for p in (root / d).rglob("*") if p.is_symlink() or not p.is_dir())
+    rels = (p.relative_to(root).as_posix() for p in found if "__pycache__" not in p.parts)
+    return sorted(rel for rel in rels if rel not in expected)
+
+
+def sync_codex(target: Path) -> int:
+    """`--sync-codex`: ghi đầu ra bộ sinh vào repo khung (chỉ khi `target` là chính repo khung). Không xoá tệp thừa —
+    báo để xoá tay (exit 1); không ghi xuyên symlink (exit 1); nguồn hỏng → exit 1."""
+    if target.resolve() != SRC:
+        log(f"✗ --sync-codex chỉ chạy ở gốc repo khung ({SRC}); dự án đích dùng `--harness codex`")
+        return 2
+    try:
+        files = codex_framework_files()
+    except ValueError as exc:
+        log(f"✗ --sync-codex: {exc}")
+        return 1
+    blocked = [rel for rel in files if (SRC / rel).is_symlink() or parent_symlink(SRC / rel)]
+    changed = [rel for rel, data in files.items() if rel not in blocked and read_regular(SRC / rel) != data]
+    for rel in changed:
+        (SRC / rel).parent.mkdir(parents=True, exist_ok=True)
+        (SRC / rel).write_bytes(files[rel])
+    log(f"✓ --sync-codex: {len(files)} tệp sinh, {len(changed)} tệp ghi lại")
+    for rel in blocked:
+        log(f"  ✗ bỏ qua symlink {rel} (không ghi qua liên kết)")
+    return 1 if report_codex_extras(codex_extras(SRC, files)) or blocked else 0
+
+
+def git_tracked(root: Path, paths: tuple[str, ...]) -> set[str] | None:
+    """Tệp git theo dõi dưới `paths` của repo `root` (`git ls-files`, bỏ biến vị trí git của tiến trình gọi — hook
+    `pre-commit` đặt `GIT_INDEX_FILE`…); không phải repo git / không chạy được git → None. Chỉ tin `ls-files` khi gốc git
+    (đường vật lý) đúng là `root`: thư mục con của repo khác (không `.git` riêng) thì `ls-files` đọc index của repo cha —
+    exit 0, rỗng — và bỏ sót tệp thừa (review lượt 3) → None."""
+    env = {k: v for k, v in os.environ.items() if k not in GIT_LOCATION_ENV}
+    git = ["git", "-C", str(root)]
+    try:
+        top = subprocess.run([*git, "rev-parse", "--show-toplevel"], capture_output=True, timeout=30, env=env)
+        if top.returncode or Path(os.fsdecode(top.stdout.strip())).resolve() != root.resolve():
+            return None
+        r = subprocess.run([*git, "ls-files", "-z", "--", *paths], capture_output=True, timeout=30, env=env, check=True)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return {p.decode("utf-8", "replace") for p in r.stdout.split(b"\0") if p}
+
+
+def report_codex_extras(extras: list[str]) -> bool:
+    """Báo tệp thừa dưới `.agents/`, `.codex/` của repo khung; True khi có tệp thừa ĐÃ track (sẽ lên repo — exit 1).
+    Tệp chưa track (`.DS_Store`, `.codex/config.toml` cục bộ, metadata skill của máy dev) chỉ cảnh báo. Không phải repo
+    git → không phân biệt được, coi mọi tệp thừa như đã track (thận trọng)."""
+    tracked = git_tracked(SRC, CODEX_ROOTS) if extras else set()
+    hard = [rel for rel in extras if tracked is None or rel in tracked]
+    soft = [rel for rel in extras if rel not in hard]
+    if hard:
+        log(f"  ✗ thừa (không do bộ sinh tạo — xoá tay nếu đã bỏ ở .claude/): {', '.join(hard)}")
+    if soft:
+        log(f"  ⚠ tệp chưa track dưới .agents/, .codex/ (cục bộ, không lên repo — bỏ qua): {', '.join(soft)}")
+    return bool(hard)
 
 
 # Gói sản phẩm (`--pack <id>`, ADR-0068 lát B/C): `framework/templates/packs/<id>/` gồm `pack.json` (schema 1, `id` = tên
@@ -2259,6 +2640,7 @@ def install_plan(
         "files": files,
         "git_hooks": git_hooks_plan(target, no_harness, no_git_hooks),
         "adapters": adapters_plan(target, adapters or []),
+        "codex_harness": codex_plan(target, files, adapters or []),
         "preset": {
             "requested": preset,
             "template": selected or "autonomous",
@@ -2315,12 +2697,14 @@ def install(
 
     migrate_legacy(target)
     inferred = infer_root_hashes(target)  # mẫu cũ trong .xtemplates/framework/ — trước khi install_framework thay
+    mirrors = codex_baseline(target) if "codex" in (adapters or []) else {}  # gương Codex có sẵn — trước bước harness
     version = install_framework(xt_dir, label, office_3d)
     if not no_harness:
         install_harness(target, force_harness)
         if not no_git_hooks:
             install_git_hooks(target)
     install_adapters(target, adapters or [])
+    install_codex_harness(target, adapters or [], mirrors)
     install_root_templates(target, version, inferred, selected)
     if with_github:
         install_github(target)
@@ -2627,6 +3011,18 @@ def new_flags_error(args: argparse.Namespace) -> str | None:
     return "--new chỉ nhận --pack/--idea/--name/--scale" if any(incompatible) else None
 
 
+def sync_flags_error(args: argparse.Namespace) -> bool:
+    """`--sync-codex` chỉ đi một mình (cùng đích là gốc repo khung) — cờ cài khác không có nghĩa ở đó."""
+    names = (
+        *("new", "idea", "name", "scale", "force_harness", "no_harness", "label", "with_github", "plan"),
+        *("no_git_hooks", "preset", "stage_init", "harness", "pack"),
+    )
+    used = [f"--{n.replace('_', '-')}" for n in names if getattr(args, n) not in (None, False, "")]
+    if used:
+        log(f"✗ --sync-codex không đi cùng {', '.join(used)}")
+    return bool(used)
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Cài khung X-Office vào dự án đích (cần CPython 3.15.x)")
     p.add_argument("target", help="thư mục gốc dự án đích")
@@ -2646,7 +3042,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--with-office-3d",
         action="store_true",
-        help="cài cả bộ vẽ 3D three.js (~2,1 MB) cho màn Văn phòng của `xt.py app` (ADR-0082); cài lại giữ lựa chọn",
+        help="cài cả bộ vẽ 3D three.js (~2,1 MB) cho màn Văn phòng của `xt.py app` (ADR-9001); cài lại giữ lựa chọn",
     )
     p.add_argument(
         "--plan",
@@ -2677,10 +3073,17 @@ def main(argv: list[str] | None = None) -> int:
         "--pack",
         help="gói sản phẩm framework/templates/packs/<id>: starter chỉ vào repo sạch, managed nâng theo hash (ADR-0068)",
     )
+    p.add_argument(
+        "--sync-codex",
+        action="store_true",
+        help="chỉ ở repo khung: sinh lại .agents/skills, .codex/agents, .codex/hooks.json từ .claude/ (ADR-0082)",
+    )
     a = p.parse_args(argv)
     if sys.implementation.name != "cpython" or sys.version_info[:2] != (3, 15):
         log(f"✗ cần CPython 3.15.x — hiện là {sys.implementation.name} {sys.version.split()[0]}")
         return 2
+    if a.sync_codex:
+        return 2 if sync_flags_error(a) else sync_codex(Path(a.target))
     new_error = new_flags_error(a)
     if new_error:
         log(f"✗ {new_error}")
