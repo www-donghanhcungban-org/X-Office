@@ -21,7 +21,7 @@ Bản < 3.20.0: [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md) (T-3651; `changel
   (tự động, Noel, Tết); 3 bố cục (mở chung, nhiều phòng liên thông, mỗi người một phòng); nhãn tên, chuyển động, chất
   lượng, phóng to/thu nhỏ. Bộ vẽ mặc định Canvas 2D tự viết (không phụ thuộc); tuỳ chọn **3D three.js** (0.187.0, MIT,
   vendor ở `scripts/app/vendor/three/` kèm `SOURCE`, tải lười khi chọn; kéo/phím mũi tên để xoay; không có WebGL → về 2D)
-  — [ADR-0082](docs/adr/0082-office-view-renderers.md), [nghiên cứu](research/2026-11-19-office-3d.md). Bàn không có nguồn
+  — [ADR-9001](docs/adr/9001-office-view-renderers.md), [nghiên cứu](research/2026-11-19-office-3d.md). Bàn không có nguồn
   bằng chứng (reviewer, researcher) hiện "chưa có tín hiệu"; lần chạy cũ hơn 30 phút không còn tính là đang làm. Tắt
   chuyển động khi `prefers-reduced-motion`; tab ẩn thì không hỏi lại dữ liệu; có bảng văn bản tương đương. Dự án đích:
   màn Văn phòng 2D nhận khi chạy lại `install.py`; bộ vẽ 3D (≈ 2,1 MB) chỉ khi thêm cờ mới `install.py --with-office-3d`
@@ -34,8 +34,27 @@ Bản < 3.20.0: [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md) (T-3651; `changel
   `--new`, tạo ghi chú qua UI rồi đăng nhập lại ở phiên mới để xác nhận dữ liệu đã lưu. Tiêu chí pilot yêu cầu
   bằng chứng của bản chạy và kết quả kiểm trình duyệt. Các khả năng này thuộc giai đoạn 1 của ADR-0075/0077.
 
+- Harness cho Codex CLI sinh từ `.claude/` ([ADR-0082](docs/adr/0082-codex-harness-generated.md), D-519, T-3966):
+  `install.py <dự-án> --harness codex` ngoài `.codex/hooks.json` (hook `PreToolUse` gọi `xt_adapter.py`, một guard) nay
+  sinh `.agents/skills/<tên>/SKILL.md` (bản sao byte của skill khung trong `.claude/skills/`) và
+  `.codex/agents/<tên>.toml` (từ `.claude/agents/<tên>.md`: `name`, `description`, `model_reasoning_effort`,
+  `developer_instructions`; không ghi `model`). Tệp sinh được ghi nhận ở khoá `codex_files` của `manifest.json` và đi
+  theo `.claude/` ở các lần cài sau (kể cả khi `--force-harness` thay nguồn — D-520); tệp dự án sửa khác bản đã ghi nhận,
+  hay gương dự án tự có khác đầu ra sinh ở lần cài Codex đầu, được giữ kèm `.xtemplates-new` — riêng gương có sẵn mà hash trùng bản khung
+  đã ghi ở manifest harness thì cập nhật tại chỗ; không ghi/đọc xuyên symlink; `--plan` có khoá
+  `codex_harness`. Frontmatter agent ngoài dạng phẳng một dòng (block scalar, khối lồng, chuỗi có thoát, giá trị trơn kiểu
+  null/bool/số…) → bỏ qua tệp đó kèm cảnh báo, không sinh TOML. Repo khung commit đầu ra của bộ sinh; cờ mới
+  `install.py . --sync-codex` sinh lại, `tests.test_codex_harness` so từng byte tệp đã commit dưới `.agents/`, `.codex/`
+  và báo tệp track thừa.
+  Dữ kiện Codex 0.170.0: [research 2026-11-19](research/2026-11-19-codex-harness.md). Mức hỗ trợ Codex vẫn là thử
+  nghiệm (chưa có payload thật). **Dự án đích:** tuỳ chọn — chạy `install.py --harness codex`, rồi tin cậy hook trong
+  Codex bằng `/hooks`; tệp do `/import` của Codex sinh trước đó (`.codex/hooks/`, `hooks.json` có đường tuyệt đối) nên xoá.
+
 ### Changed
 
+- ADR riêng của X-Office (bản phái sinh) dùng dải số **9001+** để không va với số tăng dần của X-Templates: ADR màn
+  Văn phòng đổi `ADR-0082` → [ADR-9001](docs/adr/9001-office-view-renderers.md) (nội dung không đổi; D-521) vì đồng bộ
+  X-Templates mang `ADR-0082` của chính nó (harness Codex). Đồng bộ X-Templates tới `9a65104b` (#684–#686).
 - `xt.py test-select --unittest` (cổng commit `gate-fast`, khoá `test_fast`) chọn test theo **lớp** thay vì theo tệp: lớp
   chạy khi thân lớp nhắc tên tệp đổi, có glob khớp tên đó (`GO-NO-GO*.md` không còn khớp mọi `.md`), hoặc nhắc tên một
   lớp cùng tệp đang chạy (lớp cha, lớp phụ trợ — bắc cầu); cả tệp chạy khi phần ngoài lớp khớp, tệp import module đổi,
@@ -67,6 +86,13 @@ Bản < 3.20.0: [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md) (T-3651; `changel
   dù không rơi ra ngoài mép vườn.
 - `xt.py`: đọc tệp JSON của vòng (`.autopilot/state.json`…) lồng quá sâu (RecursionError khi giải mã) nay coi như hỏng —
   trả `None` như JSON sai — thay vì ném lỗi; màn Tổng quan và Văn phòng của `xt.py app` không còn trả 500 (review #6).
+- Guard bảo vệ harness Codex (AUD-SEC-987, T-3967, ADR-0082): ở dự án đích `.agents/skills/*` và `.codex/agents/*` nay là
+  "năng lực" cần duyệt như `.claude/skills/*`, `.claude/agents/*` (`LOOP-STOP-023`, câu của mục có thêm ba đường; ID và
+  mức giữ nguyên); `.codex/hooks.json` (tệp nối guard cho Codex) được rào như `.claude/settings.json` ở cả repo khung lẫn
+  dự án đích — Bash ghi/xoá/`chmod`/`ln`, `rm -rf .codex`, xargs qua `.codex`/`.agents` bị chặn; Edit theo luật tệp cổng;
+  `install.py --harness codex`, `git add/restore`, đọc tệp và `rm -rf .codex/hooks` vẫn chạy. `merge-check` xếp
+  `.agents/skills/*`, `.codex/hooks.json` vào đường dẫn cổng. **Dự án đích:** chạy lại `install.py` để nhận guard.
+
 - Hook cổng commit (`pre-bash-guard.sh`): commit trong git worktree của **chính repo** (dưới gốc dự án, vd
   `.claude/worktrees/<tên>`, hay ngoài gốc) nay chạy cổng của dự án trên chính worktree đó — trước đây bị coi là repo
   lồng/ngoài và ở chính sách mặc định cổng **không chạy** (AUD-HAR-442, T-3964, D-517). Nhận diện: cùng common-dir và

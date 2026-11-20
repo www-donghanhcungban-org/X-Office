@@ -123,6 +123,7 @@ GATE_PATTERNS = (
     ".claude/settings.json",
     ".claude/settings.local.json",
     ".claude/hooks/*",
+    ".codex/hooks.json",  # AUD-SEC-987: nối guard cho Codex CLI (ADR-0082) — như `.claude/settings.json`
     ".xtemplates/*",
     "eslint.config.*",
     ".eslintrc*",
@@ -170,9 +171,13 @@ CAPABILITY_PATTERNS = (
     *(".mcp.json", "mcp.json", ".claude.json", ".claude-plugin/*", ".codex/config.toml", ".gemini/settings.json"),
     ".gemini/extensions/*",
 )
-# Agent/skill/lệnh tắt của Claude Code: ở dự án đích (có `.xtemplates/`) là harness đã cài → hỏi; ở repo khung là sản
-# phẩm đang phát triển → không hỏi (sửa hằng ngày).
-TARGET_CAPABILITY_PATTERNS = (".claude/agents/*", ".claude/skills/*", ".claude/commands/*")
+# Agent/skill/lệnh tắt của Claude Code, skill/agent của Codex CLI do `install.py --harness codex` sinh (ADR-0082,
+# AUD-SEC-987): ở dự án đích (có `.xtemplates/`) là harness đã cài → hỏi; ở repo khung là sản phẩm đang phát triển →
+# không hỏi (sửa hằng ngày).
+TARGET_CAPABILITY_PATTERNS = (
+    *(".claude/agents/*", ".claude/skills/*", ".claude/commands/*"),
+    *(".agents/skills/*", ".codex/agents/*"),
+)
 MIGRATION_RE = re.compile(r"(^|/)(migrations?|migrate)/|(^|/)db/schema\.|(^|/)prisma/schema\.prisma$")
 
 # File test (đa ngôn ngữ). Sửa test ĐÃ CÓ theo hướng làm yếu bài kiểm = nới cổng (LOOP-CI-001): agent đang sửa lỗi
@@ -4528,7 +4533,8 @@ def _xargs_listed(cmd: str, root: str = "", cwd: Optional[str] = None) -> bool:
 
 # T-3942: thư mục hàng rào (đoạn đầu đường tương đối với gốc dự án) và tệp hàng rào mẫu cho nguồn của xargs — tệp mà
 # lệnh xoá/ghi trực tiếp bị chặn (FENCE/EVIDENCE/GIT_HOOK/SECRET). Mẫu bí mật nằm ở mọi thư mục.
-XARGS_FENCE_DIRS = frozenset({".claude", ".autopilot", ".git"})
+# AUD-SEC-987: `.codex` (hàng rào `hooks.json`, agent) và `.agents` (skill của Codex) như `.claude` (ADR-0082).
+XARGS_FENCE_DIRS = frozenset({".claude", ".autopilot", ".git", ".codex", ".agents"})
 XARGS_DIR_HEADS = frozenset({"find", "ls", "git", "echo", "xargs"})  # lệnh mà thư mục chạy quyết định tệp được liệt kê
 XARGS_FENCE_FILES = (
     ".claude/settings.json",
@@ -4536,6 +4542,7 @@ XARGS_FENCE_FILES = (
     ".claude/hooks/guard.py",
     ".claude/hooks/_lib.sh",
     ".claude/hooks/pre-bash-guard.sh",
+    ".codex/hooks.json",
     ".autopilot/state.json",
     ".autopilot/evidence/T-001.json",
     "docs/autopilot/STAGE.json",
@@ -4552,7 +4559,7 @@ XARGS_FENCE_FILES = (
 )
 XARGS_SECRET_NAMES: Tuple[str, ...] = (".env", ".env.local", "a.pem", "a.key", "a.p12", "a.pfx", "id_rsa")
 XARGS_SECRET_NAMES += ("id_ed25519", ".envrc", ".npmrc", ".pypirc", ".netrc", "secrets/a")
-XARGS_DOT_RE = re.compile(r"(?:^|/)(?:\.claude|\.autopilot|\.git|\.[^/]*[*?\[][^/]*)(?:/|$)")
+XARGS_DOT_RE = re.compile(r"(?:^|/)(?:\.claude|\.autopilot|\.git|\.codex|\.agents|\.[^/]*[*?\[][^/]*)(?:/|$)")
 XARGS_FIND_FILTERS = frozenset({"-name", "-iname", "-path", "-ipath", "-wholename", "-iwholename", "-regex", "-iregex"})
 XARGS_FIND_ACTIONS = frozenset("-printf -fprint -fprint0 -fprintf -exec -execdir -ok -okdir -ls -fls".split())
 XARGS_FIND_PRINTS = ("-print", "-print0")  # chỉ ở cuối nhánh: đứng giữa thì in trước bộ lọc sau nó
@@ -4575,9 +4582,18 @@ def _xargs_dirs(cmd: str, root: str, cwd: Optional[str]) -> Optional[List[str]]:
 
 def _xargs_fence_paths(root: str) -> List[str]:
     """Tệp hàng rào (đường tương đối với gốc): mẫu cố định cộng tên có thật trong `.claude`, `.claude/hooks`,
-    `.autopilot` (hai cấp) và `.git/hooks`."""
+    `.autopilot` (hai cấp), `.git/hooks`, `.codex` và `.agents` (AUD-SEC-987)."""
     out = list(XARGS_FENCE_FILES)
-    for sub in (".claude", ".claude/hooks", ".autopilot", ".autopilot/evidence", ".git", ".git/hooks"):
+    for sub in (
+        ".claude",
+        ".claude/hooks",
+        ".autopilot",
+        ".autopilot/evidence",
+        ".git",
+        ".git/hooks",
+        ".codex",
+        ".agents",
+    ):
         try:
             out += [f"{sub}/{name}" for name in os.listdir(os.path.join(root, sub))]
         except OSError:
@@ -14810,8 +14826,10 @@ def _commit_flag_args(args: List[str]) -> List[str]:
 
 # Hàng rào của harness (AUD-SEC-046): Bash ghi đè/xoá/dời = gỡ hàng rào mà không để lại diff đọc được → chặn. Sửa hook
 # bằng Edit/Write vẫn được (ADR-0018: sửa cấu hình hook cho chạy, nêu lý do); khôi phục bằng `git checkout -- <file>`.
-FENCE_PATTERNS = (".claude/hooks/*", ".claude/settings.json", ".claude/settings.local.json")
-FENCE_DIRS = {".claude", ".claude/hooks"}
+# AUD-SEC-987: `.codex/hooks.json` nối guard cho Codex CLI (ADR-0082) — gỡ nó là tắt hook như gỡ `.claude/settings.json`.
+FENCE_FILES = (".claude/settings.json", ".claude/settings.local.json", ".codex/hooks.json")
+FENCE_PATTERNS = (".claude/hooks/*", *FENCE_FILES)
+FENCE_DIRS = {".claude", ".claude/hooks", ".codex"}
 FENCE_WHY = "ghi/xoá hàng rào qua Bash ({}) — tắt hook của khung; sửa bằng Edit/Write, khôi phục bằng git checkout"
 
 
@@ -14831,7 +14849,7 @@ def _fence_glob(target: str, root: str) -> bool:
         names = os.listdir(os.path.join(root, ".claude", "hooks"))
     except OSError:
         names = ["guard.py"]
-    known = [*FENCE_DIRS, ".claude/settings.json", ".claude/settings.local.json"]
+    known = [*FENCE_DIRS, *FENCE_FILES]
     segs = [k.split("/") for k in [*known, *(".claude/hooks/" + f for f in names)]]
     return any(
         len(k) == len(pat) and all((s[:1] != "." or p[:1] == ".") and fnmatch.fnmatchcase(s, p) for p, s in zip(pat, k))
@@ -14881,6 +14899,7 @@ GIT_HOOK_NAMES = frozenset(
 UNKNOWN_CWD_DIRS: Tuple[Tuple[str, FrozenSet[str]], ...] = (
     (".claude", frozenset({"settings.json", "settings.local.json", "hooks"})),
     (".claude/hooks", frozenset()),
+    (".codex", frozenset({"hooks.json"})),  # AUD-SEC-987
     (".autopilot", frozenset(EVIDENCE_NAMES)),
     (".git", frozenset({"config", "hooks"})),
     (".git/hooks", GIT_HOOK_NAMES),

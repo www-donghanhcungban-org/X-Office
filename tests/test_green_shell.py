@@ -24,7 +24,7 @@ import guard
 MERGE_OK = {"verdict": "merge", "hard": [], "head": "a" * 40, "eligible": True, "reasons": ["ok"]}
 
 
-def decide(cmd: str, policy: str = "") -> dict:
+def decide(cmd: str, policy: str = "", cwd: str = "") -> dict:
     # Nhánh hiện tại ghim về `feat` như tests/test_guard_strict.py; `origin` = `me/repo`. `strict`: quyết định thô như
     # hook ở `XT_GUARD_POLICY=strict` (không qua chính sách mặc định). AUD-TEST-112: merge-check giả xanh như
     # tests/test_green_gh.py — không gọi `xt.py merge-check`/`gh` thật; quyết định không phụ thuộc mạng hay PR thật.
@@ -34,7 +34,7 @@ def decide(cmd: str, policy: str = "") -> dict:
         mock.patch.object(guard, "_origin_repo", return_value="me/repo"),
         mock.patch.object(guard, "merge_check", return_value=MERGE_OK),
     ):
-        raw = guard.bash_decision(cmd, str(ROOT), str(ROOT))
+        raw = guard.bash_decision(cmd, str(ROOT), cwd or str(ROOT))
         return {**raw, "code": guard.decide(raw).code} if policy else guard.apply_policy(raw)
 
 
@@ -285,12 +285,33 @@ class MutantFormsTest(_Case):  # AUD-TEST-096
     def test_deny(self):
         self.assert_code(("gh auth status -thgithub.com", "gh auth status -h github.com -t"), "RULE_DENY")
         self.assert_code(("gh cache delete -a",), "DESTROY")
-        self.assert_code(("ssh host /usr/bin/gh pr comment 5 -F - < r.md",), "REVIEW_FORGE")
 
     def test_allow(self):
         self.assert_runs(
             ("gh auth status -hgithub.com", "gh cache delete -rrefs/heads/a k", "ssh host /usr/bin/gh pr view 5")
         )
+
+    def test_remote_gh_body_from_file(self):
+        """`gh` máy xa đăng thân từ stdin tệp cục bộ: tệp có dấu → chặn; tệp chuỗi lệnh đọc, có trên đĩa mà quá cỡ để
+        quét → coi như có dấu. Tất định: trước đây ca này chỉ đỏ được nhờ `/usr/bin/gh` của máy chạy (tệp nhị phân quá
+        cỡ) — máy không có tệp đó thì đột biến sống mà test vẫn xanh hay đỏ tuỳ máy."""
+        mark = "<!-- xt-review v1 head=" + "a" * 40 + " verdict=clean -->\n"
+        with tempfile.TemporaryDirectory() as d:
+            Path(d, "r.md").write_text(mark, encoding="utf-8")
+            for cmd in ("ssh host /usr/bin/gh pr comment 5 -F - < r.md", "ssh host gh pr comment 5 -F - < r.md"):
+                with self.subTest(cmd=cmd):
+                    got = decide(cmd, cwd=d)
+                    self.assertEqual((got["decision"], got["code"]), ("deny", "REVIEW_FORGE"), got["reason"])
+            # Tệp thân chưa có trên đĩa (lệnh trước có thể tạo) → nguồn là mọi tệp chuỗi lệnh đọc; tệp đó có mà quá cỡ để
+            # quét → coi như có dấu. Ca gốc ở #628 đỏ nhờ đúng nhánh này với `/usr/bin/gh` của máy chạy.
+            os.remove(os.path.join(d, "r.md"))
+            Path(d, "gh").write_bytes(b"\0" * (guard.REVIEW_READ_BYTES + 1))
+            got = decide("ssh host ./gh pr comment 5 -F - < r.md", cwd=d)
+            self.assertEqual((got["decision"], got["code"]), ("deny", "REVIEW_FORGE"), got["reason"])
+            os.remove(os.path.join(d, "gh"))  # đối chứng: không tệp nào để quét, thân sạch → không phải giả dấu review
+            self.assertNotEqual(decide("ssh host ./gh pr comment 5 -F - < r.md", cwd=d)["code"], "REVIEW_FORGE")
+            Path(d, "r.md").write_text("ok\n", encoding="utf-8")
+            self.assertNotEqual(decide("ssh host gh pr comment 5 -F - < r.md", cwd=d)["code"], "REVIEW_FORGE")
 
 
 class CorpusAndDepthTest(_Case):  # AUD-TEST-099

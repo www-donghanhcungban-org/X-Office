@@ -5982,7 +5982,7 @@ AGENT_RULE_GLOBS += (".github/copilot-instructions.md", ".github/instructions/*"
 # `GATE_PATTERNS` của `.claude/hooks/guard.py` — test giữ hai nhà khớp nhau (AUD-HAR-021); thêm luật agent.
 MERGE_GATE_GLOBS = (
     *(".github/workflows/*", ".github/rulesets/*", ".github/dependabot.yml", ".gitlab-ci.yml"),
-    *(".claude/settings.json", ".claude/settings.local.json", ".claude/hooks/*", ".xtemplates/*"),
+    *(".claude/settings.json", ".claude/settings.local.json", ".claude/hooks/*", ".xtemplates/*", ".codex/hooks.json"),
     *("eslint.config.*", ".eslintrc*", "biome.json*", ".oxlintrc*", "tsconfig*.json", "jsconfig*.json"),
     *("vitest.config.*", "jest.config.*", "playwright.config.*", "lighthouserc*", ".lighthouserc*"),
     *("pyproject.toml", "setup.cfg", "mypy.ini", "pyrightconfig.json", "ruff.toml", ".coveragerc"),
@@ -5996,6 +5996,7 @@ MERGE_GATE_GLOBS = (
     # Năng lực agent (LOOP-STOP-023; khớp `CAPABILITY_PATTERNS` của guard): MCP server, plugin, skill — PR chỉ đổi những
     # file này + một test từng vào làn nhanh (rà stored 2026-10-16).
     *(".mcp.json", "mcp.json", ".claude.json", ".claude-plugin/*", ".codex/*", ".gemini/*", "SKILL.md"),
+    ".agents/skills/*",  # skill của Codex CLI (ADR-0082, AUD-SEC-987): metadata `agents/openai.yaml` không tên SKILL.md
 )
 
 

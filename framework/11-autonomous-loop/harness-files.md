@@ -408,7 +408,8 @@ Copilot, Grok chưa xác minh) → vòng lặp ngoài tin `loop verify`, không 
 Cài và chạy (lát B–D đã làm): `install.py --harness codex,gemini,cursor,copilot,grok,opencode` chép cấu hình hook mẫu
 ([`../templates/harness/`](../templates/harness/README.md)) gọi `xt_adapter.py`; git hook sàn ([`../templates/git-hooks/`](../templates/git-hooks/README.md)) cài
 mặc định; công cụ không có Stop hook chặn (Gemini, Grok, OpenCode, Cursor `-p`) chạy vòng ngoài `xt.py loop run --agent
-<host>` — mỗi lượt một task do `loop_verdict` chọn, dừng khi xong/chặn hay 3 lượt không tiến triển.
+<host>` — mỗi lượt một task do `loop_verdict` chọn, dừng khi xong/chặn hay 3 lượt không tiến triển. Codex còn nhận skill
+`.agents/skills/` và agent `.codex/agents/*.toml` sinh từ `.claude/` (ADR-0082; chi tiết ở README của `harness/`).
 
 ### Khoá của `xt.yaml` (nhà — mẫu: [`../templates/xt.yaml`](../templates/xt.yaml) chỉ còn một dòng chú thích mỗi khoá)
 

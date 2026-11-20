@@ -1,21 +1,7 @@
 # Nhật ký quyết định tự duyệt
 
 > Ghi bởi `xt.py loop decide`. Phiên chính tự duyệt điểm quyết định theo tiêu chí chất lượng cuối (`LOOP-STOP-018`, ADR-0008 của khung). Người xem lại bất cứ lúc nào; đổi ý → quyết định mới ghi "thay D-NNN", không sửa mục cũ.
-> Bản tháng trước: [`DECISIONS-2026-10.md`](DECISIONS-2026-10.md) (D-001…D-287), [`DECISIONS-2026-11.md`](DECISIONS-2026-11.md) (D-292…D-411) — máy đọc cả bản tháng (T-3651).
-
-### D-412 · 2026-11-10T09:22:40+00:00 · Câu hỏi mở của executor #492 (mở rộng trong nháy kép đứng riêng ở vị trí cờ; mở rộng không nháy dính sau chữ; lệnh đăng chữ với biến đứng riêng): sửa ngay trong #492 hay ghi nợ?
-
-- Phương án: (1) Ghi nợ 🟠 riêng (AUD-SEC-591…593), làm ở lát sau với thiết kế chung (xét phương án miễn đối số vị trí đầu) · (2) Mở rộng #492 chặn mọi token chỉ gồm mở rộng ở lệnh có luật cờ
-- Chọn: Ghi nợ 🟠 riêng (AUD-SEC-591…593), làm ở lát sau với thiết kế chung (xét phương án miễn đối số vị trí đầu)
-- Lý do (tiêu chí chất lượng cuối): (1) an toàn: #492 không nới gì, chỉ chặt thêm; các dạng còn hở đã hở trên main và có dòng sổ; (3) phương án chặn rộng chặn oan lệnh đóng/merge PR có số PR trong biến — cần đo trên lệnh thật trước khi chọn; lát nhỏ (P8)
-- Đường lùi: Gộp vào lát sau
-
-### D-413 · 2026-11-10T11:52:01+00:00 · release-sign (AUD-HAR-340, #493): không worktree nào có .autopilot/state.json thì sao?
-
-- Phương án: (1) Từ chối ký (fail-closed); cần loop init trước — đường /complete đã có bước này · (2) Coi sổ vắng là không có việc chờ
-- Chọn: Từ chối ký (fail-closed); cần loop init trước — đường /complete đã có bước này
-- Lý do (tiêu chí chất lượng cuối): (1) đúng và an toàn: .autopilot/ không commit nên clone riêng không biết sổ dự án chính — coi vắng là sạch mở lại đúng lỗ AUD-HAR-340; (2) đường lùi: loop init tạo sổ rỗng; khoá release_signoff hiện chưa bật nên không chặn ai
-- Đường lùi: Cho sổ vắng ở mọi worktree là không có việc chờ
+> Bản tháng trước: [`DECISIONS-2026-10.md`](DECISIONS-2026-10.md) (D-001…D-287), [`DECISIONS-2026-11.md`](DECISIONS-2026-11.md) (D-292…D-413) — máy đọc cả bản tháng (T-3651).
 
 ### D-414 · 2026-11-10T15:03:52+00:00 · Workflow thiết kế AUD-SEC-591/592/593 phát hiện lỗi gốc: từ chỉ gồm toán tử shell trong nháy (';' hay dấu ống trong nháy đơn) làm tokenize/split_commands cắt lệnh ở MỌI luật (git push có --force sau ';' trong nháy được cho qua — đã tái hiện). Thứ tự làm và 4 điểm spec để phiên chính quyết?
 
@@ -587,3 +573,24 @@
 - Chọn: Rút T-3965 khỏi PR đợt 17 (chỉ ship T-3964 + hai 🟢 của reviewer); AUD-HAR-443 giữ mở với dữ kiện đã đính chính; làm lại sau: guard.py báo thêm trường 'lệnh là git commit đứng một mình' → chỉ khi đó loại MỌI tệp chưa track khỏi tập tệp đổi, còn lại giữ cách thận trọng
 - Lý do (tiêu chí chất lượng cuối): Đúng và an toàn: bản T-3965 hiện tại làm cổng yếu đi (tệp mới vào commit không được test) nên không được merge; dò chuỗi trong hook là phân tích lệnh lần hai ngoài guard — đúng loại lỗi 14 đợt harden vừa dọn; trường mới phải do guard.py tính (một nơi đọc lệnh) và cần corpus riêng, hợp với đợt tách guard.py (D-142). T-3964 độc lập và đóng một 🟠 mở nên ship trước.
 - Đường lùi: Khôi phục bản T-3965 từ /home/liend/xt-scratch-gatewt/full-before-split.patch nếu chứng minh được tiền đề (không khuyến nghị)
+
+### D-519 · 2026-11-19T15:20:48+00:00 · Chủ repo: 'cái nào liên quan đến harness thì tích hợp hết' cho .agents/ và .codex/ chưa track ở gốc repo (do /import của Codex CLI sinh 2026-11-14: hooks.json đường tuyệt đối và không có PreToolUse, bản sao guard.py cũ ở commit 331145c1, agent TOML trỏ .Codex/… không tồn tại, 5/16 skill lạc hậu — research/2026-11-19-codex-harness.md). Tích hợp thế nào?
+
+- Phương án: (1) ADR-0082: sinh từ .claude/ bằng máy — .codex/hooks.json chỉ PreToolUse gọi xt_adapter.py (một guard), .agents/skills là bản sao byte, .codex/agents/*.toml sinh từ .claude/agents; install.py --harness codex sinh cho dự án đích; repo khung commit đầu ra và test so từng byte · (2) Commit nguyên trạng tệp do /import sinh · (3) Symlink .agents/skills → .claude/skills, không làm agent
+- Chọn: ADR-0082: sinh từ .claude/ bằng máy — .codex/hooks.json chỉ PreToolUse gọi xt_adapter.py (một guard), .agents/skills là bản sao byte, .codex/agents/*.toml sinh từ .claude/agents; install.py --harness codex sinh cho dự án đích; repo khung commit đầu ra và test so từng byte
+- Lý do (tiêu chí chất lượng cuối): Đúng và an toàn: bản /import mang một guard thứ hai đã cũ và không gắn PreToolUse nên Codex trong repo không qua hàng rào; một nguồn (.claude/) + bộ sinh + test đồng bộ giữ 'một chủ đề một nhà' và không ghi đường của một máy vào repo. Symlink không chạy trên Windows/zip và trái luật không ghi xuyên symlink ở harness (AUD-SEC-650/651). Chủ repo đã đồng ý hướng này ('làm theo hướng của bạn').
+- Đường lùi: Revert PR của ADR-0082: xoá .agents/skills, .codex/ khỏi repo và nhánh sinh trong install.py
+
+### D-520 · 2026-11-19T17:03:58+00:00 · Review #684 lượt 3: gương Codex của dự án (.agents/skills/<tên>/SKILL.md = bản dự án tự sửa C, trùng đầu ra sinh từ .claude/ của dự án) được ghi nhận là tệp khung quản lý ở lần cài đầu (kept → ghi hash vào codex_files); lần cài sau có --force-harness thay .claude/ bằng bản khung F thì gương được cập nhật thành F, không có .xtemplates-new — trái câu tài liệu 'gương dự án tự có không bị ghi đè'. Sửa mã hay sửa tài liệu?
+
+- Phương án: (1) Sửa tài liệu và tên test (b): tệp Codex là sản phẩm SINH từ .claude/; tệp trùng đầu ra sinh được ghi nhận (như mọi tệp harness trùng bản khung) và đi theo .claude/ ở các lần cài sau, kể cả khi --force-harness thay nguồn; chỉ tệp khác bản đã ghi nhận mới được giữ kèm .xtemplates-new · (2) Sửa mã (a): khi --force-harness, bỏ qua hash codex_files cho tệp có nguồn không phải bản khung → .xtemplates-new
+- Chọn: Sửa tài liệu và tên test (b): tệp Codex là sản phẩm SINH từ .claude/; tệp trùng đầu ra sinh được ghi nhận (như mọi tệp harness trùng bản khung) và đi theo .claude/ ở các lần cài sau, kể cả khi --force-harness thay nguồn; chỉ tệp khác bản đã ghi nhận mới được giữ kèm .xtemplates-new
+- Lý do (tiêu chí chất lượng cuối): Đúng: gương là bản sao byte của nguồn; khi người dùng chủ động --force-harness thay .claude/skills/<tên> thì gương giữ bản cũ sẽ LỆCH nguồn (test gương trùng byte của dự án như dhcb đỏ) — đi theo nguồn mới là hành vi nhất quán với mô hình 'tệp trùng bản khung ghi là của khung' mà install.py dùng cho mọi tệp harness. Phương án (a) thêm một ngoại lệ nữa vào luật sở hữu, để lại gương lệch nguồn, và nội dung cũ vẫn còn trong git. Lần cài ĐẦU với --force-harness vẫn giữ gương và để .xtemplates-new (chưa có ghi nhận) — đã sửa ở lượt 2.
+- Đường lùi: Áp phương án (a) trong install.py + test cài hai lượt
+
+### D-521 · 2026-11-20T00:01:37+00:00 · Đồng bộ X-Templates #684 mang ADR-0082 (harness Codex) trùng số với ADR-0082 riêng của X-Office (màn Văn phòng). Đánh số thế nào?
+
+- Phương án: (1) Giữ cả hai tệp 0082-* (khác slug), để ID ADR-0082 trỏ hai quyết định · (2) Đổi ADR riêng của X-Office sang dải số dành riêng cho bản phái sinh (ADR-9001+), cập nhật mọi chỗ nhắc ở X-Office; ADR của X-Templates giữ nguyên số · (3) Đổi số ADR Codex của upstream khi đồng bộ
+- Chọn: Đổi ADR riêng của X-Office sang dải số dành riêng cho bản phái sinh (ADR-9001+), cập nhật mọi chỗ nhắc ở X-Office; ADR của X-Templates giữ nguyên số
+- Lý do (tiêu chí chất lượng cuối): Đúng và an toàn: ID không được dùng lại (AGENTS §3) — hai ADR-0082 làm mọi tham chiếu trong code/test/CHANGELOG mơ hồ; đổi số upstream làm X-Office lệch nguồn ở mọi lần đồng bộ sau. Dải 9001+ không bao giờ va với số tăng dần của X-Templates nên lỗi không tái diễn; ADR X-Office cũ chỉ đổi số định danh, giữ nguyên nội dung quyết định, có ghi chú đổi số. Cùng lý do, quyết định D-NNN ghi ở X-Office lấy số sau khi đã đồng bộ (lần đầu ghi trước khi merge đã va D-519 của upstream nên bỏ).
+- Đường lùi: Đổi tên tệp docs/adr/9001-office-view-renderers.md về 0082-… và thay ADR-9001 → ADR-0082 ở các chỗ nhắc (một commit hoàn lại)

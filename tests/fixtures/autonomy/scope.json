@@ -706,7 +706,7 @@
    ]
   },
   {
-   "reason": "Cấu hình/tài liệu/workflow của khung, không phải quyết định guard/harness/pr mô phỏng bằng corpus: ruleset `required_review_thread_resolution` theo `merge_review` (đỡ bằng tests.test_ci), bước `pnpm audit:exceptions` của workflow gói (tests.test_packs, tests.test_pack_audit_exceptions), `PROGRESS.md` lạc hậu (xt.py progress-check; sửa ở PR cắt bản 3.34.0); `compose` đọc quy mô cũ và câu LOOP-HARNESS-020 (xt.py compose, tests.test_xt_cli, tests.test_doctor — sửa ở #672); thứ tự bước của skill `/complete` (tests.test_audit_dot4_har.CompleteNextStepTest — sửa ở #677); `test-select` chọn theo lớp không ra 0 lớp (tests.test_commit_gate — sửa ở #678); gốc cổng commit của hook cho worktree cùng repo (tests.test_hooks.CommitGateWorktreeTest — sửa ở #680); `.git`/tiền tố là symlink không được nhận là cùng repo (cùng lớp test — sửa ở #680)",
+   "reason": "Cấu hình/tài liệu/workflow của khung, không phải quyết định guard/harness/pr mô phỏng bằng corpus: ruleset `required_review_thread_resolution` theo `merge_review` (đỡ bằng tests.test_ci), bước `pnpm audit:exceptions` của workflow gói (tests.test_packs, tests.test_pack_audit_exceptions), `PROGRESS.md` lạc hậu (xt.py progress-check; sửa ở PR cắt bản 3.34.0); `compose` đọc quy mô cũ và câu LOOP-HARNESS-020 (xt.py compose, tests.test_xt_cli, tests.test_doctor — sửa ở #672); thứ tự bước của skill `/complete` (tests.test_audit_dot4_har.CompleteNextStepTest — sửa ở #677); `test-select` chọn theo lớp không ra 0 lớp (tests.test_commit_gate — sửa ở #678); gốc cổng commit của hook cho worktree cùng repo (tests.test_hooks.CommitGateWorktreeTest — sửa ở #680); `.git`/tiền tố là symlink không được nhận là cùng repo (cùng lớp test — sửa ở #680); bộ đọc frontmatter agent của `install.py` (tests.test_codex_harness — sửa ở #684)",
    "ids": [
     "AUD-CI-034",
     "AUD-DEP-033",
@@ -716,7 +716,8 @@
     "AUD-HAR-440",
     "AUD-TEST-130",
     "AUD-HAR-442",
-    "AUD-SEC-986"
+    "AUD-SEC-986",
+    "AUD-HAR-445"
    ]
   }
  ]

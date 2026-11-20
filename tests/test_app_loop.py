@@ -259,7 +259,8 @@ class AdrsTest(unittest.TestCase):
 
     def test_real_repo_adrs(self) -> None:
         _, body = api_loop._adrs(ctx(ROOT))
-        files = sorted((ROOT / "docs" / "adr").glob("0*.md"))
+        # Cùng luật với api_loop._ADR_FILE_RE (4 chữ số): gồm cả dải 9001+ của ADR riêng X-Office (D-521).
+        files = sorted((ROOT / "docs" / "adr").glob("[0-9][0-9][0-9][0-9]-*.md"))
         self.assertEqual([a["number"] for a in body["adrs"]], [int(f.name[:4]) for f in files])
         self.assertTrue(all(a["title"] and a["status"] for a in body["adrs"]))
 
