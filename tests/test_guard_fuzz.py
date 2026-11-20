@@ -196,6 +196,8 @@ CWD_RELATIVE: Dict[str, str] = {
     "guard-sec989-rm-opencode-dir": ".opencode tương đối → /tmp/.opencode (AUD-SEC-989)",
     "guard-sec990-unzip-member-glob-strict": "glob thành viên `.codex/*` tương đối → /tmp/.codex không phải hàng rào dự án "
     "sau cd /tmp (AUD-SEC-990, như d503s5-deny-010)",
+    "guard-sec990-tar-strip-into-github": "-C .github tương đối → /tmp/.github không có tệp nối của ca sau cd /tmp "
+    "(AUD-SEC-990 T-4003, như guard-sec989-rm-copilot-hooks)",
     # AUD-SEC-989: tệp nối guard của host khác chỉ là hàng rào khi có thật — /tmp không có tệp nối của ca
     "guard-sec989-chain-delete-then-dir": ".cursor/hooks.json tương đối → /tmp không có tệp nối (AUD-SEC-989)",
     "guard-sec989-redirect-gemini-settings": ".gemini/settings.json tương đối → /tmp không có tệp nối (AUD-SEC-989)",

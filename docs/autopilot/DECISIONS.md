@@ -594,3 +594,10 @@
 - Chọn: A: giữ chính sách hiện tại, ghi nợ AUD-SEC-992
 - Lý do (tiêu chí chất lượng cuối): Tiêu chí 1+3: chặn theo tên đã đóng ca cố ý; B đổi hành vi guard, tốn I/O, vẫn hở TOCTOU/7z/cpio — cần ADR, không thuộc harden
 - Đường lùi: Làm B ở 3.35.0 kèm ADR
+
+### D-9004 · 2026-11-20T12:50:25+00:00 · 2 🟠 của gói web-api-ts (rollback dev gặp migration expand; ảnh preview tích tụ ở .git/xt-preview): sửa tại X-Office hay chấp nhận có hạn
+
+- Phương án: (1) A: chấp nhận có hạn 2026-12-31, ghi nợ, gửi phản hồi về X-Templates · (2) B: sửa cục bộ compose.yaml/migrate.ts/dev-preview.mjs
+- Chọn: A: chấp nhận có hạn 2026-12-31, ghi nợ, gửi phản hồi về X-Templates
+- Lý do (tiêu chí chất lượng cuối): Tiêu chí 2+3: gói là mẫu đồng bộ từ X-Templates (D-521), registry không có dự án đích dùng gói (pack: null); sửa cục bộ gây lệch upstream và cần e2e Docker không có ở đây; không ảnh hưởng dữ liệu thật
+- Đường lùi: Làm B hoặc nhận bản sửa upstream qua đồng bộ

@@ -176,6 +176,62 @@ class CodexHarnessSyncTest(unittest.TestCase):
         self.assertEqual(r.returncode, 1, r.stdout)  # 1 = không đường nào bị .gitignore chặn
 
 
+class SkillFrontmatterTest(unittest.TestCase):
+    """T-4004: `description` có `: ` không trong nháy là YAML hỏng (Codex không nạp) — nguồn phải hợp lệ, bộ sinh
+    từ chối nguồn hỏng thay vì chép."""
+
+    @staticmethod
+    def plain_yaml_problems(text: str) -> list[str]:
+        """Bộ kiểm stdlib độc lập (không import yaml): frontmatter phẳng `khoá: giá trị`; giá trị trơn không chứa `: `
+        hay kết thúc `:`; giá trị trong nháy phải đóng đúng ở cuối dòng."""
+        lines = text.split("\n")
+        if lines[0] != "---" or "---" not in lines[1:]:
+            return ["không có frontmatter mở/đóng bằng ---"]
+        problems = []
+        for n, line in enumerate(lines[1 : lines.index("---", 1)], 2):
+            m = re.fullmatch(r"([A-Za-z][\w-]*):(?: +(.*))?", line)
+            if m is None:
+                problems.append(f"dòng {n}: không phải `khoá: giá trị`")
+                continue
+            v = (m[2] or "").strip()
+            if v[:1] in ('"', "'"):
+                if len(v) < 2 or v[-1] != v[0] or v[0] in v[1:-1]:
+                    problems.append(f"dòng {n}: nháy sai")
+            elif ": " in v or v.endswith(":") or " #" in v:
+                problems.append(f"dòng {n}: giá trị trơn có `: ` hoặc ` #`")
+        return problems
+
+    def test_every_source_skill_has_plain_yaml_frontmatter(self):
+        for n in SKILL_NAMES:
+            with self.subTest(skill=n):
+                for base in (".claude", ".agents"):
+                    text = (ROOT / base / "skills" / n / "SKILL.md").read_text(encoding="utf-8")
+                    self.assertEqual(self.plain_yaml_problems(text), [], f"{base}/skills/{n}")
+
+    def test_checker_rejects_unquoted_colon_space(self):
+        bad = "---\nname: x\ndescription: Chạy (có CI: `gate-fast`) xong\n---\nthân\n"
+        self.assertEqual(len(self.plain_yaml_problems(bad)), 1)
+        good = "---\nname: x\ndescription: 'Chạy (có CI: `gate-fast`) \"xong\"'\n---\nthân\n"
+        self.assertEqual(self.plain_yaml_problems(good), [])
+
+    def test_render_skill_rejects_broken_frontmatter_with_reason(self):
+        bad = "---\nname: x\ndescription: Chạy (có CI: gate)\n---\nthân\n".encode()
+        out = install.render_skill(bad, ".claude/skills/x/SKILL.md")
+        self.assertIsInstance(out, str)
+        self.assertIn("frontmatter dòng 3", str(out))
+        self.assertIn("`: `", str(out))
+
+    def test_render_skill_keeps_valid_bytes_and_rejects_non_utf8(self):
+        ok = "---\nname: x\ndescription: 'Chạy (có CI: gate)'\n---\nthân\n".encode()
+        self.assertEqual(install.render_skill(ok, "s"), ok)
+        self.assertEqual(install.render_skill(b"\xff\xfe", "s"), "không phải UTF-8")
+
+    def test_codex_render_skips_broken_skill(self):
+        job = (".claude/skills/x/SKILL.md", ".agents/skills/x/SKILL.md", install.render_skill)
+        bad = b"---\nname: x\ndescription: a: b\n---\n"
+        self.assertIsInstance(install.codex_render(job, lambda _p: bad), str)
+
+
 class AgentTomlTest(unittest.TestCase):
     """`.claude/agents/<tên>.md` → TOML viết tay bằng stdlib: đọc lại bằng `tomllib` ra đúng từng trường của nguồn."""
 
@@ -632,10 +688,11 @@ class CodexInstallCasesTest(unittest.TestCase):
         old_gate = "---\nname: gate\ndescription: bản khung cũ\n---\ncũ\n".encode()  # bản khung cũ, dự án chưa sửa
         old_review = "---\nname: reviewer\ndescription: cũ\n---\nthân cũ\n"
         old_adr = b"ban khung adr cu\n"  # bản khung lần cài trước; dự án đã sửa nguồn
+        adr_project = "---\nname: adr\ndescription: dự án sửa adr\n---\nthân\n"
         own_research = "---\nname: researcher\ndescription: dự án sửa\n---\nriêng\n"
         sources = {
             "skills/gate/SKILL.md": old_gate,
-            "skills/adr/SKILL.md": "dự án sửa adr\n".encode(),
+            "skills/adr/SKILL.md": adr_project.encode(),
             "skills/review/SKILL.md": "skill review của dự án\n".encode(),  # không có trong manifest
             "agents/reviewer.md": old_review.encode(),
             "agents/researcher.md": own_research.encode(),
@@ -679,7 +736,7 @@ class CodexInstallCasesTest(unittest.TestCase):
             shutil.copy2(ROOT / ".claude" / rel, claude / rel)
         self.assertIn("updated 3 · updated-new 4", self.run_codex(baseline))
         self.assertEqual((agents_dir / "gate" / "SKILL.md").read_bytes(), (SKILLS / "gate" / "SKILL.md").read_bytes())
-        self.assertEqual((agents_dir / "adr" / "SKILL.md").read_text(encoding="utf-8"), "dự án sửa adr\n")
+        self.assertEqual((agents_dir / "adr" / "SKILL.md").read_text(encoding="utf-8"), adr_project)
         toml = tomllib.loads((self.target / ".codex" / "agents" / "reviewer.toml").read_text(encoding="utf-8"))
         self.assertTrue(toml["developer_instructions"].startswith(BODY_HEAD["reviewer"]))
         for rel in kept_new:
@@ -694,7 +751,8 @@ class CodexInstallCasesTest(unittest.TestCase):
         self.assertIsNotNone(install.read_regular(src))
 
     def test_plan_reads_source_the_harness_step_will_write(self):
-        (self.target / ".claude" / "skills" / "gate" / "SKILL.md").write_text("bản cũ\n", encoding="utf-8")
+        old = "---\nname: gate\ndescription: bản cũ\n---\ncũ\n"
+        (self.target / ".claude" / "skills" / "gate" / "SKILL.md").write_text(old, encoding="utf-8")
         rel = ".claude/skills/gate/SKILL.md"
         self.run_codex()
         self.assertEqual(self.plan()[".agents/skills/gate/SKILL.md"], "kept")

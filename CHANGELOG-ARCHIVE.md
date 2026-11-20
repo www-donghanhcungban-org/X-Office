@@ -541,7 +541,7 @@ Phần cũ của [`CHANGELOG.md`](CHANGELOG.md) (T-3651, AUD-DOC-180): mục `##
 ### Fixed
 - README mục "Dùng thế nào" bước 4 vẫn liệt kê deploy/publish và đổi cấu hình cổng là điểm dừng bắt buộc, trái với
   AGENTS.md §5/ADR-0018/D-023 (cho chạy, lớp đỡ là CI/ruleset/review) — đồng bộ lại; phát hiện khi đối chiếu bản "Kế hoạch
-  nâng cấp X-Office" trong [`research/2026-10-19-rapid-build-then-harden.md`](research/2026-10-19-rapid-build-then-harden.md)
+  nâng cấp X-Templates" trong [`research/2026-10-19-rapid-build-then-harden.md`](research/2026-10-19-rapid-build-then-harden.md)
   (đề xuất "code nhanh → kiểm liên tục → audit sâu → fix → tối ưu → nghiệm thu → production" và PD-01…PD-12 đối chiếu với
   G0–G8/autopilot/audit/GO-NO-GO: khung đã có phần lớn; còn thiếu nhịp audit theo mốc, verdict `inconclusive` cho reviewer,
   GO/NO-GO máy đọc — chưa làm, ghi §7/§8/§9 của bản nghiên cứu; §9 đối chiếu đề xuất hai tầng executor Sonnet/Opus — chưa có, kèm ràng buộc reviewer khác họ).
@@ -666,7 +666,7 @@ Phần cũ của [`CHANGELOG.md`](CHANGELOG.md) (T-3651, AUD-DOC-180): mục `##
 
 ### Fixed
 - `pr next`/`pr steward`: PR đủ điều kiện (`merge-check` = `merge`: mọi check xanh, GitHub báo sạch) mà auto-merge đã bật
-  nhưng GitHub chưa merge nay được merge ghim head ngay thay vì "chờ required check" mãi (X-Office#155 phải merge tay).
+  nhưng GitHub chưa merge nay được merge ghim head ngay thay vì "chờ required check" mãi (X-Templates#155 phải merge tay).
   Nhánh đích không có check bắt buộc: `pr next` không còn bảo phiên agent bật auto-merge — chờ CI xanh rồi merge ghim
   head; chốt chuyển từ steward vào `pr next` nên che cả phiên agent; kết quả đọc rule nhớ 5 phút (D-063).
 
@@ -1312,7 +1312,7 @@ Mục checklist từ đợt rà `seeker19110/stored` 2026-10-18 (stored `10ecf8b
   quyết; `templates/PLAN.md`/`SPEC.md`/`PROJECT.md`, skill `/autopilot`, subagent `executor` theo luật mới. Dự án đích: chạy lại
   `install.py` (AGENTS.md/skill copy-if-absent → gộp tay bản `*.xtemplates-new`) và `compose --out BLUEPRINT.md`.
 - CI: trigger `pull_request` thêm loại `edited` (cùng `opened`, `synchronize`, `reopened`) để sửa tiêu đề PR là chạy lại bước kiểm tiêu đề Conventional Commits ≤ 72 ký tự. Trước đây payload chụp tiêu đề lúc push và re-run dùng lại payload cũ, nên tiêu đề đã sửa vẫn đỏ cho tới commit kế tiếp.
-- **Phá vỡ (bản kế tiếp 3.0.0)** — định danh kỹ thuật theo tên X-Office, thay ADR-0006 bằng ADR-0007:
+- **Phá vỡ (bản kế tiếp 3.0.0)** — định danh kỹ thuật theo tên X-Templates, thay ADR-0006 bằng ADR-0007:
   `.xstored/` → `.xtemplates/`, `scripts/xs.py` → `scripts/xt.py`, `xs.yaml` → `xt.yaml`, `XS_*` → `XT_*`
   (`XT_ROOT`, `XT_DEBUG`, `XT_FRAMEWORK`, `XT_FRAMEWORK_LINK`, `XT_PROGRESS_BASE`, `XT_RECORD_TIMEOUT`),
   `*.xstored-new` → `*.xtemplates-new`; test `tests/test_xs*.py` → `tests/test_xt*.py`. Dự án đã cài: chạy lại `install.py`

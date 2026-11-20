@@ -319,6 +319,14 @@
    ]
   },
   {
+   "reason": "Audit delta 2026-11-20: frontmatter skill gửi sang Codex (AUD-HAR-447, kiểm bằng tests.test_codex_harness.SkillFrontmatterTest) và tài liệu lịch sử/README (AUD-DOC-305/306, kiểm bằng `xt.py checks` và tests.test_docs_budget) — không phải quyết định guard/PR/review",
+   "ids": [
+    "AUD-HAR-447",
+    "AUD-DOC-305",
+    "AUD-DOC-306"
+   ]
+  },
+  {
    "reason": "`install.py --plan`/cài thật: git hook, adapter, manifest.json — đường cài đặt có repo git thật; đỡ bằng Gate unittest tests.test_install -k plan_lists_git_hooks (AUD-HAR-325: -k worktree_manifest_uses_common_dir)",
    "ids": [
     "AUD-HAR-204",
