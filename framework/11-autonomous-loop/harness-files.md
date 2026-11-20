@@ -51,7 +51,7 @@ OS/devcontainer có egress allowlist (`LOOP-HARNESS-022`) và việc phiên chí
   `rm -rf .github` (cha của `.github/hooks`): lớp đỡ là diff PR (tệp cổng, không làn nhanh) và review; (b) hạ cấp chỉ ở
   cây làm việc, không để lại diff PR — `reset <rev> && checkout -- f && reset ORIG_HEAD`, `update-index --index-info`
   rồi `checkout -- f`: **chưa có lớp đỡ** ngoài sandbox OS (`LOOP-HARNESS-022`).
-- **Giải nén** (AUD-SEC-990): `tar`/`unzip` có thành viên nêu tên phủ hàng rào bị chặn; **không** chặn giải nén cả archive không nêu tên (guard không đọc ruột archive), `7z`/`jar`/`ar`/`cpio`/`pax` nêu thành viên — lớp đỡ là diff PR và review; hạn xét lại 2027-01-21.
+- **Giải nén** (AUD-SEC-990): `tar`/`unzip`/`7z x`/`cpio -i`/`jar x`/`pax -r` có thành viên nêu tên phủ hàng rào bị chặn; **không** chặn giải nén cả archive không nêu tên hay danh sách thành viên không đọc chắc (`-T`, `@list`, biến — guard không đọc ruột archive, AUD-SEC-992, D-9003) — lớp đỡ là diff PR và review; hạn xét lại 2027-01-21.
 
 - **Cơ chế kiểm không dùng được** (ADR-0054): CLI/Gate chặn mã 126 khi guard lỗi nạp hoặc fallback hỏng;
   không dùng module nạp dở; `apply_policy` hỏng không cho raw `ask` thành allow. Runtime fallback khỏe giữ ADR-0002. State thiếu `fcntl` hoặc FS không hỗ trợ

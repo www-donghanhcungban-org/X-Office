@@ -77,6 +77,6 @@ người duyệt → PR sửa khung theo từng nhóm đủ ngưỡng. Người 
 
 ## Nguồn
 
-- ADR-0010 (`docs/adr/0010-feedback-from-target-projects.md` của repo khung; <https://github.com/www-donghanhcungban-org/X-Office/blob/main/docs/adr/0010-feedback-from-target-projects.md>) — chủ repo yêu cầu 2026-10-15; xác minh 2026-10-23.
+- ADR-0010 (`docs/adr/0010-feedback-from-target-projects.md` của repo khung; <https://github.com/www-donghanhcungban-org/X-Office/blob/main/docs/adr/0010-feedback-from-target-projects.md>) — chủ repo yêu cầu 2026-10-15; xác minh 2026-10-23 (khi repo còn tên X-Templates; URL X-Office hiện tại chưa xác minh lại).
 - `scripts/xt.py` (`feedback_entries`, `write_feedback`, `feedback_aggregate`, `redact`, `redact_feedback` — che cả tên người dùng trong đường dẫn home) và `tests/test_xt_cli.py` `FeedbackTest` — đọc 2026-10-15.
 - Catalog `www-donghanhcungban-org/stored` 23 §4.2, §8 (X-Scanner: adoption pin SHA; thiếu `auto-complete-guard.sh` do adopt trước #287 — drift khung ↔ đích) — đọc 2026-10-16.

@@ -141,23 +141,31 @@ export async function render(main, { api, h, error }) {
     label();
   }
 
-  // Poll 10 s gặp lại CÙNG lỗi thì giữ nguyên hộp lỗi: dựng lại sẽ làm trình đọc màn hình đọc lại `role=alert` và gỡ nút
-  // "Thử lại" đang giữ focus (WCAG 2.4.3, AUD-A11Y-004). Bấm "Thử lại"/"Làm mới" (tham số là sự kiện click) luôn dựng lại.
-  let errKey = "";
+  // Hộp lỗi API: cùng thông điệp với lần đang hiện thì giữ nguyên (poll 10 s không bắt trình đọc màn hình đọc lại role=alert);
+  // dựng lại thì trả focus về nút "Thử lại" mới, tải lại thành công thì về "Làm mới" (WCAG 2.4.3).
+  let shownError = null;
+  function showError(e) {
+    const text = (e && (e.error || e.message)) || "lỗi không rõ";
+    if (shownError === text && msg.firstChild) return;
+    const had = msg.contains(document.activeElement);
+    shownError = text;
+    error(msg, e, load);
+    if (had) msg.querySelector("button")?.focus({ preventScroll: true });
+  }
 
-  async function load(ev) {
+  function clearError() {
+    const had = msg.contains(document.activeElement);
+    shownError = null;
+    msg.replaceChildren();
+    if (had) refresh.focus({ preventScroll: true });
+  }
+
+  async function load() {
     try {
       apply(await api("/api/office"));
-      msg.replaceChildren();
-      errKey = "";
+      clearError();
     } catch (e) {
-      const key = String((e && (e.error || e.message)) || "");
-      if (ev instanceof Event || key !== errKey || !msg.firstChild) {
-        const fromRetry = ev instanceof Event && ev.target instanceof Element && msg.contains(ev.target);
-        errKey = key;
-        error(msg, e, load);
-        if (fromRetry) msg.querySelector("button")?.focus({ preventScroll: true }); // hộp lỗi dựng lại: trả focus về nút mới
-      }
+      showError(e);
     }
   }
 

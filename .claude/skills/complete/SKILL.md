@@ -1,6 +1,6 @@
 ---
 name: complete
-description: Pha HARDEN — hoàn thiện dự án khi /autopilot hết việc và đề xuất /complete (hoặc người muốn phát hành): PR đặt delivery_phase: harden, PLAN-harden từ sổ audit (🔴/🟠, MUST blueprint còn mở, sàn Gate M/L, thiết kế đầy đủ, refactor, hiệu năng, tấn công thử) chạy vòng lặp có bằng chứng tới hết việc, rồi cổng ký: audit delta, trả nợ review theo lô, release-check GO + GO-NO-GO.md — lặp tới GO. Dùng khi người dùng muốn "hoàn thiện", "audit và sửa", "chuẩn bị phát hành" hoặc gõ /complete.
+description: 'Pha HARDEN — hoàn thiện dự án khi /autopilot hết việc và đề xuất /complete (hoặc người muốn phát hành): PR đặt delivery_phase: harden, PLAN-harden từ sổ audit (🔴/🟠, MUST blueprint còn mở, sàn Gate M/L, thiết kế đầy đủ, refactor, hiệu năng, tấn công thử) chạy vòng lặp có bằng chứng tới hết việc, rồi cổng ký: audit delta, trả nợ review theo lô, release-check GO + GO-NO-GO.md — lặp tới GO. Dùng khi người dùng muốn "hoàn thiện", "audit và sửa", "chuẩn bị phát hành" hoặc gõ /complete.'
 argument-hint: "[full|delta] [phiên bản phát hành]"
 ---
 

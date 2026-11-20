@@ -1,6 +1,6 @@
 ---
 name: gate
-description: Chạy cổng chất lượng đầy đủ (build · typecheck · lint · test, lint nên gồm kiểm format; qua dev-task.sh của khung — `.xtemplates/scripts/` ở dự án đích, `scripts/` ở repo khung) trước khi đẩy/mở PR (có CI: `gate-fast`, CI là cổng đầy đủ) và xuất Báo cáo xác thực; có mục ❌ thì KHÔNG đẩy/merge. Cổng commit do hook tự chạy (`gate-fast`). Dùng trước khi đẩy/mở PR, khi người dùng gõ /gate, "kiểm tra trước khi đẩy".
+description: 'Chạy cổng chất lượng đầy đủ (build · typecheck · lint · test, lint nên gồm kiểm format; qua dev-task.sh của khung — `.xtemplates/scripts/` ở dự án đích, `scripts/` ở repo khung) trước khi đẩy/mở PR (có CI: `gate-fast`, CI là cổng đầy đủ) và xuất Báo cáo xác thực; có mục ❌ thì KHÔNG đẩy/merge. Cổng commit do hook tự chạy (`gate-fast`). Dùng trước khi đẩy/mở PR, khi người dùng gõ /gate, "kiểm tra trước khi đẩy".'
 ---
 
 # /gate — cổng máy trước, người sau

@@ -7,10 +7,10 @@ là ADR của X-Templates, nhận về qua đồng bộ (merge commit) và giữ
   dải này cộng 1, không nối tiếp dãy `00xx` (dãy đó là của X-Templates; dùng số ở đó sẽ trùng ở lần đồng bộ sau).
 - **Quyết định `D-NNN` cũng chia dải**: `D-9001+` là quyết định riêng của X-Office (số kế = max+1 của sổ, nên tự nằm
   trong dải); `D-NNN` dưới 9000 — kể cả trong ADR `0001`–`8999` — là của X-Templates, `D-521` trong ADR-0083 là quyết định
-  factory của X-Templates (AUD-DOC-306).
+  factory của X-Templates (AUD-DOC-310).
 - Đổi ý về một ADR đã chấp nhận: viết ADR mới, ADR cũ chỉ đổi dòng trạng thái (`/adr`).
 - **Tài liệu lịch sử giữ chữ X-Templates** (ADR `0001`–`8999`, `docs/archive/`, `research/`, báo cáo audit, PLAN đã xong,
-  GO-NO-GO đã ký): đó là sự kiện xảy ra trước khi X-Office tách ra (2026-11-19) — không đổi chữ hàng loạt (AUD-DOC-305);
+  GO-NO-GO đã ký): đó là sự kiện xảy ra trước khi X-Office tách ra (2026-11-19) — không đổi chữ hàng loạt (AUD-DOC-306, AUD-DOC-309);
   đổi tên cũng làm mọi lần đồng bộ upstream xung đột ở từng tệp.
 
 | Số | Quyết định |

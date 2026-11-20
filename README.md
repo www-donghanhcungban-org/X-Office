@@ -70,7 +70,7 @@ thuộc của gói và có Docker Compose. Khi phát hành, kiểm các mục MU
 Với Codex, thêm `--harness codex` vào lệnh `--new`; skill và hook nằm ngay trong commit đầu. Repo đã có mã dùng `install.py <đích> --harness codex` để bổ sung chúng. Tại gốc sản phẩm, `python3 .xtemplates/scripts/xt_flow.py --json` đọc bằng chứng hiện có
 và cho biết bước tiếp theo thuộc về agent hay người duyệt.
 
-**Repo đã có mã.** Chạy `python3 /tmp/x-templates/scripts/install.py /đường/dẫn/dự-án --with-github`. Với bản ≤ 2.x,
+**Repo đã có mã.** Chạy `python3 /tmp/x-office/scripts/install.py /đường/dẫn/dự-án --with-github`. Với bản ≤ 2.x,
 installer chuyển sang `.xtemplates/`, `xt.py`, `xt.yaml` và liệt kê tên cũ cần sửa
 ([ADR-0007](docs/adr/0007-rename-technical-identifiers-to-xtemplates.md)). Ở lần cài thông thường, thêm `--stage-init`
 để khởi tạo giai đoạn 1 nếu chưa có sổ. Với sản phẩm đang ở giai đoạn 2 hoặc 3, chủ dự án dùng
@@ -216,7 +216,7 @@ python3 -m unittest discover -s tests    # chỉ test (cổng test còn đòi co
 - [ADR-0003](docs/adr/0003-scale-s-floor-only.md): ở quy mô S chỉ sàn (baseline, hồ sơ, ngành) là MUST.
 - [ADR-0004](docs/adr/0004-scale-m-module-must-cap.md): ở quy mô M mỗi module tối đa 4 MUST, phần vượt là `MUST@L`.
 - [ADR-0005](docs/adr/0005-audit-with-machine-support.md): audit có máy đỡ — sổ máy đọc, `xt.py audit plan/check`.
-- [ADR-0007](docs/adr/0007-rename-technical-identifiers-to-xtemplates.md): định danh kỹ thuật theo tên X-Office
+- [ADR-0007](docs/adr/0007-rename-technical-identifiers-to-xtemplates.md): định danh kỹ thuật theo tên X-Templates (tên lúc đó của repo)
   (`.xtemplates/`, `xt.py`, `xt.yaml`, `XT_*`); `install.py` tự chuyển dự án đã cài bản ≤ 2.x. Thay ADR-0006.
 - [ADR-0008](docs/adr/0008-main-session-self-approves-decisions.md): phiên chính tự duyệt điểm quyết định chuyên môn
   theo tiêu chí chất lượng cuối, ghi `D-NNN`; điểm dừng về hành động không tự duyệt (cơ chế sau: ADR-0018).

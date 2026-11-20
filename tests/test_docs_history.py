@@ -1,4 +1,4 @@
-"""Tài liệu lịch sử giữ nguyên chữ của thời điểm xảy ra sự kiện, ID quyết định không trùng (AUD-DOC-305/306).
+"""Tài liệu lịch sử giữ nguyên chữ của thời điểm xảy ra sự kiện, ID quyết định không trùng (AUD-DOC-309/310).
 
 X-Office tách từ X-Templates ngày 2026-11-19. ADR `0001`–`8999`, `docs/archive/`, research và báo cáo trước ngày đó là
 sự kiện của X-Templates: đổi chữ hàng loạt làm sai sự thật lịch sử (ADR-0006 vừa nói X-Office vừa nói X-Templates) và làm
@@ -60,7 +60,7 @@ class HistoricalDocsKeepNameTest(unittest.TestCase):
         self.assertTrue(any(p[0] == "research" for p in parents))
 
     def test_no_x_office_in_pre_split_history(self) -> None:
-        """AUD-DOC-305: không còn chữ X-Office trong tài liệu lịch sử trước ngày tách (restore từ bản X-Templates)."""
+        """AUD-DOC-309: không còn chữ X-Office trong tài liệu lịch sử trước ngày tách (restore từ bản X-Templates)."""
         bad = [p.relative_to(ROOT).as_posix() for p in _history_files() if OFFICE_RE.search(_read(p))]
         self.assertEqual(bad, [], "đổi chữ hàng loạt làm sai lịch sử — khôi phục chữ X-Templates (docs/adr/README.md)")
 
@@ -71,7 +71,7 @@ class DecisionIdsUniqueTest(unittest.TestCase):
         return [d / "DECISIONS.md", *sorted(d.glob("DECISIONS-20*.md"))]
 
     def test_decision_ids_unique_across_logs(self) -> None:
-        """AUD-DOC-306: mỗi D-NNN đúng một mục xuyên sổ chính và các bản tháng."""
+        """AUD-DOC-310: mỗi D-NNN đúng một mục xuyên sổ chính và các bản tháng."""
         ids = collections.Counter(m.group(1) for p in self.logs() for m in DECISION_RE.finditer(_read(p)))
         self.assertTrue(ids)
         self.assertEqual(sorted(k for k, v in ids.items() if v > 1), [])

@@ -1495,6 +1495,21 @@ def render_agent(raw: bytes, source: str) -> bytes | str:
 
 
 def render_skill(raw: bytes, source: str) -> bytes | str:
+    """Bản sao byte của `SKILL.md` cho Codex; frontmatter ngoài tập con YAML phẳng hợp lệ (vd `: ` trong giá trị trơn,
+    Codex không nạp được) hoặc không phải UTF-8 → lý do (chuỗi) để bỏ qua tệp và cảnh báo, không chép."""
+    try:
+        text = raw.decode("utf-8")
+        agent_frontmatter(text)
+    except UnicodeDecodeError:
+        return "không phải UTF-8"
+    except ValueError as exc:
+        return str(exc)
+    lines = [ln.rstrip("\r") for ln in text.split("\n")]
+    end = lines.index("---", 1)  # agent_frontmatter đã bảo đảm có dòng `---` đóng
+    for n, line in enumerate(lines[1:end], 2):
+        m = FM_LINE_RE.fullmatch(line)
+        if m and m[2] and m[2].strip(" \t")[:1] not in ('"', "'") and re.search(r":(?:[ \t]|$)", m[2]):
+            return f"frontmatter dòng {n}: giá trị trơn chứa `: ` (YAML đọc thành ánh xạ lồng) — đặt trong nháy"
     return raw
 
 

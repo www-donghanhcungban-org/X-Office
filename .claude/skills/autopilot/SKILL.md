@@ -1,6 +1,6 @@
 ---
 name: autopilot
-description: Chạy tự động pha BUILD theo khung X-Office — kế hoạch gọn (G0–G4 mức S), phiên chính tự duyệt mọi điểm quyết định, vòng lặp có bằng chứng máy (xt.py loop) trong MỘT phiên: build đợt → audit delta → sửa/đợt kế, lặp tới khi hết việc rồi /complete phát hành; không hỏi người (việc cần người: loop defer). Dùng khi người dùng mô tả dự án/tính năng mới, muốn "làm tự động đến khi xong", hoặc gõ /autopilot.
+description: 'Chạy tự động pha BUILD theo khung X-Office — kế hoạch gọn (G0–G4 mức S), phiên chính tự duyệt mọi điểm quyết định, vòng lặp có bằng chứng máy (xt.py loop) trong MỘT phiên: build đợt → audit delta → sửa/đợt kế, lặp tới khi hết việc rồi /complete phát hành; không hỏi người (việc cần người: loop defer). Dùng khi người dùng mô tả dự án/tính năng mới, muốn "làm tự động đến khi xong", hoặc gõ /autopilot.'
 argument-hint: "[mô tả yêu cầu hoặc đường dẫn PROJECT.md]"
 ---
 

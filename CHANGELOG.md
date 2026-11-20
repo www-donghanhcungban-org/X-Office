@@ -89,13 +89,23 @@ Bản < 3.20.0: [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md) (T-3651; `changel
 
 ### Fixed
 
-- Guard chặn giải nén có thành viên nêu tên phủ tệp hàng rào (`tar -xf a.tar <tệp hàng rào>`, `unzip -o a.zip …`, tính theo `-C`/`-d`): AUD-SEC-990 (T-3970). Đổi guard của khung (`.claude/hooks/`) — dự án đích nhận khi chạy lại `install.py`; không đổi ID checklist. Giới hạn đã biết ở `harness-files.md`.
-
-- Guard chặn `git merge-file <tệp hàng rào> …` (ghi đè tệp đầu; `-p`/`--stdout`/`--object-id` vẫn cho chạy): AUD-SEC-992 (T-3971). Đổi guard của khung — dự án đích nhận khi chạy lại `install.py`.
-
-- Màn Văn phòng: poll 10 s gặp lại cùng lỗi API không dựng lại hộp `role=alert` và không gỡ focus nút "Thử lại"; bấm "Thử lại"/"Làm mới" vẫn dựng lại: AUD-A11Y-004.
-
-- Tài liệu lịch sử (ADR `0xxx`, `docs/archive/`, research, báo cáo audit, PLAN đã xong; 84 tệp) trở lại chữ X-Templates của lúc sự kiện xảy ra — đổi chữ hàng loạt khi tách repo làm sai lịch sử và gây xung đột đồng bộ (AUD-DOC-305; `tests/test_docs_history.py`). Quyết định riêng của X-Office dùng dải `D-9001+` (mục D-521 cục bộ → D-9001, trùng D-521 của X-Templates — AUD-DOC-306). README thêm cờ `--with-office-3d`, `CLAUDE.md` thêm `/factory`.
+- Màn Văn phòng: lỗi `/api/office` lặp lại không dựng lại hộp `role="alert"` mỗi lượt poll và giữ focus ở nút "Thử
+  lại" (AUD-A11Y-004, T-4006).
+- Guard hàng rào (AUD-SEC-990, T-4001): giải nén (`tar -x`, `unzip`, `7z x`, `cpio -i`) nêu tên thành viên phủ tệp hàng rào
+  (`.claude/settings.json`, `.codex/hooks.json`, `.cursor/hooks.json`, thư mục cha, glob) bị chặn; giải nén cả tệp nén
+  không nêu thành viên giữ như cũ. Nợ AUD-SEC-992 (tệp nén dựng sẵn chứa hàng rào). Audit delta (T-4003): chặn thêm
+  `tar --no-anchored`, `7z -r0`, `--strip-components` bóc hết đường, `jar xf`/`pax -r` nêu thành viên và nguồn
+  xargs/grep ở thư mục cha của thư mục rào (`.github`). Đổi guard của khung (`.claude/hooks/`) — dự án đích nhận khi chạy
+  lại `install.py`; giới hạn đã biết ở `harness-files.md`.
+- Guard chặn `git merge-file <tệp hàng rào> …` (ghi đè tệp đầu; `-p`/`--stdout`/`--object-id` vẫn cho chạy): AUD-SEC-999
+  (T-3971). Đổi guard của khung — dự án đích nhận khi chạy lại `install.py`.
+- Skill gate/autopilot/complete: `description` đặt trong nháy (YAML hợp lệ cho Codex); `render_skill` từ chối
+  frontmatter hỏng kèm lý do (AUD-HAR-447, T-4004). README.md:73 trỏ đúng `/tmp/x-office`; tên lịch sử "X-Templates"
+  được trả lại ở ADR-0006/0007/0068/0078 và mục [3.34.0] (T-4005).
+- Tài liệu lịch sử (ADR `0xxx`, `docs/archive/`, research, báo cáo audit, PLAN đã xong; 84 tệp) trở lại chữ X-Templates
+  của lúc sự kiện xảy ra — đổi chữ hàng loạt khi tách repo làm sai lịch sử và gây xung đột đồng bộ (AUD-DOC-309, rộng hơn
+  T-4005; `tests/test_docs_history.py`). Quyết định riêng của X-Office dùng dải `D-9001+` (mục D-521 cục bộ → D-9001,
+  trùng D-521 của X-Templates — AUD-DOC-310). README thêm cờ `--with-office-3d`, `CLAUDE.md` thêm `/factory`.
 
 - Màn Văn phòng 3D: nhãn phòng ẩn/hiện theo chỗ nhãn đứng có còn là sàn hay tường của **chính** phòng đó (tia từ
   camera, không theo hộp nhãn) — phóng to ở toàn cảnh, phòng còn trên hình vẫn giữ nhãn: thử điểm neo đã kẹp rồi các điểm trên sàn phòng (lưới 3×3)
