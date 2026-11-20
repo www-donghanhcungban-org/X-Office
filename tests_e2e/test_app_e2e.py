@@ -646,11 +646,12 @@ class OfficeTest(AppCase):
             route.fulfill(status=500, json={"error": "lỗi thử"})
 
         def wait_hits(n: int) -> None:
-            for _ in range(100):
+            for _ in range(200):
                 if len(hits) >= n:
                     break
                 page.wait_for_timeout(50)
-            page.wait_for_timeout(200)  # để phản hồi lỗi kịp vẽ
+            page.wait_for_load_state("networkidle")  # phản hồi lỗi đã về hết; rồi cho lần vẽ kế tiếp chạy xong
+            page.evaluate("() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))")
 
         page.route("**/api/office*", fail)
         page.clock.install()
@@ -672,6 +673,8 @@ class OfficeTest(AppCase):
         retry.click()  # thủ công: dựng lại hộp lỗi mới
         wait_hits(before + 2)
         self.assertEqual(page.evaluate("() => window.__alerts"), 1)
+        # hộp lỗi dựng lại do bấm: focus về nút "Thử lại" mới, không rơi về body (WCAG 2.4.3)
+        self.assertEqual(page.evaluate("() => document.activeElement && document.activeElement.textContent"), "Thử lại")
 
     def check_pan_bounds(self, page: Page, canvas2d: Any, frames: str) -> None:
         """Biên dời 2D theo cỡ cảnh đã phóng; thu nhỏ thì góc nhìn được kẹp lại (cảnh không biến khỏi khung)."""

@@ -15018,53 +15018,95 @@ def _fence_restore_asks(
     return out + [FENCE_WHY.format(f"{what} vào {s} {FENCE_NEW_TAG}") for s, h in hits if h == "fence"]
 
 
-def _tar_members(args: List[str]) -> List[str]:
+TAR_RENAMING = frozenset({"strip-components", "transform", "xform", "s"})  # đổi tên thành viên lúc ghi
+
+
+def _tar_member_paths(cur: str, member: str, renamed: bool, bare: bool) -> List[str]:
+    """Đường mà thành viên `member` có thể ghi tới: ghép với `-C` đang hiệu lực; `bare` (bsdtar không hoán vị — `-C` đứng
+    sau toán hạng đầu là mẫu tên) thêm cả tên trần; có `--strip-components`/`--transform` thì mọi hậu tố (bỏ bớt thư mục
+    đầu)."""
+    parts = member.split("/")
+    names = ["/".join(parts[k:]) for k in range(len(parts))] if renamed else [member]
+    return [p for nm in names for p in ([posixpath.join(cur, nm)] + ([nm] if bare and cur != "." else []))]
+
+
+def _tar_members(args: List[str], bare: bool = False) -> List[str]:
     """Thành viên `tar -x` nêu tên, mỗi tên ghép với thư mục `-C` đang hiệu lực lúc nó xuất hiện (`-C` cộng dồn như
-    `_tar_extract_dirs`); không giải nén hay ra stdout/`--to-command` → rỗng (AUD-SEC-990)."""
+    `_tar_extract_dirs`; GNU hoán vị đối số, `bare` = bsdtar: xét thêm tên trần); không giải nén hay ra stdout/
+    `--to-command` → rỗng (AUD-SEC-990)."""
     opts = _tar_opts(args)
     keys = _opt_keys(opts)
     if not keys & TAR_EXTRACT or keys & {"O", "to-stdout", "to-command"}:
         return []
+    renamed = bool(keys & TAR_RENAMING)
     cur, out = ".", []
     for k, v in opts:
         if k in ("C", "directory") and v:
             cur = posixpath.join(cur, v)
         elif not k and v:
-            out.append(posixpath.join(cur, v))
+            out += _tar_member_paths(cur, v, renamed, bare)
     return out
 
 
-def _unzip_members(args: List[str]) -> List[str]:
-    """Thành viên `unzip` nêu tên (sau tệp zip, trước `-x`), ghép với `-d` (vắng = `.`); `-l`/`-p`/`-t`… chỉ đọc →
-    rỗng. Cú pháp `unzip [cờ] file [thành viên…] [-x loại…] [-d D]`; `-d`/`-P`/`-O`/`-I` ăn giá trị (AUD-SEC-990)."""
-    if not _unzip_dirs(args):
-        return []
-    dest = (_unzip_parse(args)[0] or ["."])[-1]
-    pos, excl, i = [], False, 0
+def _unzip_before_zip(args: List[str]) -> Tuple[int, List[str]]:
+    """(vị trí ngay sau tệp zip, các `-d` đứng trước nó): UnZip chỉ nhận tuỳ chọn TRƯỚC tên zip (`-d`/`-P`/`-O`/`-I` ăn
+    giá trị, phần dính liền hay token kế); token đầu không phải tuỳ chọn là tệp zip (AUD-SEC-990, đo UnZip 6.00)."""
+    dirs: List[str] = []
+    i = 0
+    while i < len(args):
+        a, i = args[i], i + 1
+        if a[:1] != "-" or a == "-":
+            return i, dirs
+        cut = next((j for j, c in enumerate(a[1:], 1) if c in "dPOI"), 0)
+        if cut:
+            val = a[cut + 1 :]
+            if not val and i < len(args):
+                val, i = args[i], i + 1
+            dirs += [val] if a[cut] == "d" else []
+    return len(args), dirs
+
+
+def _unzip_after_zip(args: List[str], start: int) -> Tuple[List[str], List[str]]:
+    """(thành viên, các `-d` sau tên zip): sau tên zip chỉ `-x` (mở danh sách loại trừ) và `-d` (ăn thư mục, đóng danh
+    sách loại trừ) là đặc biệt; mọi token khác — kể cả `-P`/`-O` — là mẫu tên tệp (đo UnZip 6.00: `a.zip -P m.txt`)."""
+    pos: List[str] = []
+    dirs: List[str] = []
+    excl, i = False, start
     while i < len(args):
         a, i = args[i], i + 1
         if a == "-x":
             excl = True
-        elif a[:1] == "-" and len(a) > 1:
-            cut = next((j for j, c in enumerate(a[1:], 1) if c in "dPOI"), 0)
-            i += 1 if cut and cut == len(a) - 1 else 0  # chữ ăn giá trị cuối cụm lấy token kế
-            excl = excl and a[cut : cut + 1] != "d" if cut else excl
+        elif a[:2] == "-d":
+            val = a[2:]
+            if not val and i < len(args):
+                val, i = args[i], i + 1
+            dirs.append(val)
+            excl = False
         elif not excl:
             pos.append(a)
-    return [posixpath.join(dest, m) for m in pos[1:]]  # token đầu là tệp zip
+    return pos, dirs
 
 
-def _extract_member_asks(
-    n: List[str], argv: List[str], root: str, cwd: Optional[str], env: Optional[Dict[str, str]] = None
-) -> List[str]:
+def _unzip_members(args: List[str]) -> List[str]:
+    """Thành viên `unzip` nêu tên, ghép với thư mục đích (`-d` cuối trước tên zip, không có thì `-d` đầu sau nó, vắng =
+    `.`); `-l`/`-p`/`-t`… chỉ đọc → rỗng. Cú pháp `unzip [cờ] file [thành viên…] [-x loại…] [-d D]` (AUD-SEC-990)."""
+    if not _unzip_dirs(args):
+        return []
+    start, before = _unzip_before_zip(args)
+    pos, after = _unzip_after_zip(args, start)
+    dest = (before[-1:] or after[:1] or ["."])[0]
+    return [posixpath.join(dest, m) for m in pos]
+
+
+def _extract_member_asks(n: List[str], root: str, cwd: Optional[str]) -> List[str]:
     """AUD-SEC-990: giải nén có thành viên nêu tên phủ tệp hàng rào (`tar -xf a.tar .claude/settings.json`, `unzip -o
-    a.zip .codex/hooks.json -d .`) ghi đè hàng rào — đích `.` chỉ xét thư mục, không xét tên thành viên. Giải nén cả
-    archive không nêu tên: không đọc được ruột archive ở đây (giới hạn đã biết)."""
-    n = _with_env_opts(n, argv, env) if n else n
+    a.zip .codex/hooks.json -d .`) ghi đè hàng rào — đích `.` chỉ xét thư mục, không xét tên thành viên. `n` đã ghép
+    `TAR_OPTIONS`/`UNZIP` (`_write_asks`): không ghép lần hai. Giải nén cả archive không nêu tên: không đọc được ruột
+    archive ở đây (giới hạn đã biết)."""
     name = n[0] if n else ""
     if name not in TAR_NAMES and name != "unzip":
         return []
-    members = _unzip_members(n[1:]) if name == "unzip" else _tar_members(n[1:])
+    members = _unzip_members(n[1:]) if name == "unzip" else _tar_members(n[1:], bare=name == "bsdtar")
     return [
         FENCE_WHY.format(f"giải nén thành viên {m}")
         for m in dict.fromkeys(members)
@@ -15087,15 +15129,49 @@ def _checkout_index_targets(args: List[str]) -> List[str]:
     return ([prefix] if prefix else []) + [prefix + p for p in pos] + partial
 
 
-MERGE_FILE_VALUE_OPTS = ("-L", "--marker-size", "--diff-algorithm")
+MERGE_FILE_LONGS = ("ours", "theirs", "union", "diff3", "zdiff3", "object-id", "stdout", "quiet")
+MERGE_FILE_LONG_VALUE = ("marker-size", "diff-algorithm")
+
+
+def _merge_file_long(arg: str) -> Tuple[str, bool, bool]:
+    """(tên đầy đủ hay "" khi lạ/mơ hồ, phủ định `--no-`, có `=giá trị`) của `--tên[=v]` theo parse-options của git
+    (tiền tố duy nhất của tên dài là đủ: `--marker 9` = `--marker-size 9`, `--std` = `--stdout`)."""
+    name, eq, _ = arg[2:].partition("=")
+    neg = name.startswith("no-")
+    base = name[3:] if neg else name
+    hits = [c for c in (*MERGE_FILE_LONGS, *MERGE_FILE_LONG_VALUE) if base and c.startswith(base)]
+    return (hits[0] if len(hits) == 1 else ""), neg, bool(eq)
+
+
+def _merge_file_opt(a: str, flags: Dict[str, bool]) -> int:
+    """Áp tuỳ chọn `a` (`--…` hay cụm `-…`) lên `flags` (lần xuất hiện sau thắng); trả số token kế nó nuốt làm giá trị:
+    `-L` ăn nhãn (phần dính liền sau nó, không thì token kế — `-Lp` là nhãn `p`, không phải `-p`)."""
+    if a.startswith("--"):
+        name, neg, eq = _merge_file_long(a)
+        if name in flags:
+            flags[name] = not neg
+        return int(name in MERGE_FILE_LONG_VALUE and not eq)
+    cut = a.find("L", 1)
+    if "p" in (a[1:cut] if cut > 0 else a[1:]):
+        flags["stdout"] = True
+    return int(cut == len(a) - 1)
 
 
 def _merge_file_target(args: List[str]) -> List[str]:
     """`git merge-file <hiện tại> <gốc> <khác>` ghi kết quả trộn vào tệp ĐẦU (AUD-SEC-992); `-p`/`--stdout` in ra stdout
-    và `--object-id` ghi object, không ghi tệp. Viết tắt tuỳ chọn dài (`--std`) không nhận: coi là ghi (chiều chặt)."""
-    if "p" in _short_flags(args) or "--stdout" in args or "--object-id" in args:
-        return []
-    return _positionals(args, MERGE_FILE_VALUE_OPTS)[:1]
+    và `--object-id` ghi object, không ghi tệp. Đọc tuỳ chọn như git 2.43 (đo): viết tắt tên dài, `--no-…`, `-L` ăn nhãn."""
+    flags = {"stdout": False, "object-id": False}
+    pos, i = [], 0
+    while i < len(args):
+        a, i = args[i], i + 1
+        if a == "--":
+            pos += args[i:]
+            break
+        if a[:1] == "-" and len(a) > 1:
+            i += _merge_file_opt(a, flags)
+        else:
+            pos.append(a)
+    return [] if any(flags.values()) else pos[:1]
 
 
 GIT_WRITERS: Dict[str, Callable[[List[str]], List[str]]] = {
@@ -15478,7 +15554,7 @@ def _write_asks(
     asks += _prod_decided_asks(n, argv, targets, root, cwd)  # AUD-SEC-804
     asks += [a for a in _fence_argv_asks(n, argv, root, cwd) if a not in asks]  # T-3951 A9
     asks += _fence_restore_asks(n, argv, root, cwd, env)  # AUD-SEC-988
-    asks += _extract_member_asks(n, argv, root, cwd, env)  # AUD-SEC-990
+    asks += _extract_member_asks(n, root, cwd)  # AUD-SEC-990
     asks += _home_dotfile_asks(n, argv, targets, root, cwd)  # T-3951 A11
     return asks + [EVIDENCE_WHY.format(f"git {n[1]} {t}") for t, k in restored if k == "evidence"]
 

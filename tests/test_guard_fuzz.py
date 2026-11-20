@@ -141,6 +141,7 @@ KNOWN_RED: Dict[str, str] = {}  # biến thể AUD-SEC-202 cũ nay bị chặn b
 # án — guard cho chạy là đúng, nên bất biến deny đơn điệu không áp cho biến thể có bộ bọc `cd-tmp` của các ca này.
 # Ca chặn vì đích tuyệt đối/`~`/mạng (`rm -rf ~`, push main, merge…) vẫn bị đòi deny sau `cd /tmp`.
 CWD_RELATIVE: Dict[str, str] = {
+    "guard-sec990-env-not-merged-twice": "cd src + TAR_OPTIONS=-C.. tương đối → /tmp, không phải hàng rào dự án sau cd /tmp (AUD-SEC-990)",
     "d503-herestring-commit": "commit ở /tmp: không có xt.yaml `ai_attribution: forbid` của dự án sau cd /tmp (D-503)",
     "d503s5-deny-010": "glob `.claude/*.json` tương đối → /tmp/.claude không phải hàng rào dự án sau cd /tmp (D-503)",
     "d503-runner-heredoc-commit": "commit ở /tmp: không có xt.yaml `ai_attribution: forbid` của dự án sau cd /tmp (D-503)",

@@ -153,8 +153,10 @@ export async function render(main, { api, h, error }) {
     } catch (e) {
       const key = String((e && (e.error || e.message)) || "");
       if (ev instanceof Event || key !== errKey || !msg.firstChild) {
+        const fromRetry = ev instanceof Event && ev.target instanceof Element && msg.contains(ev.target);
         errKey = key;
         error(msg, e, load);
+        if (fromRetry) msg.querySelector("button")?.focus({ preventScroll: true }); // hộp lỗi dựng lại: trả focus về nút mới
       }
     }
   }

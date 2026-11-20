@@ -37,6 +37,16 @@ def _history_files() -> list[Path]:
     files += sorted((ROOT / "docs" / "archive").rglob("*.md"))
     files += [p for p in sorted((ROOT / "research").glob("*.md")) if _before_split(p)]
     files += [p for p in sorted((ROOT / "docs" / "ops").glob("AUDIT-REPORT-*.md")) if _before_split(p)]
+    # PLAN của X-Templates: tên không ngày (PLAN-3.12-lean) hoặc ngày trước ngày tách; PLAN mới của X-Office mang ngày sau
+    files += [
+        p
+        for p in sorted((ROOT / "docs" / "autopilot").glob("PLAN*.md"))
+        if _before_split(p) or not DATE_RE.search(p.name)
+    ]
+    files += sorted((ROOT / "docs" / "autopilot" / "upgrades").glob("*.md"))
+    files += sorted((ROOT / "docs" / "ops").glob("ARTIFACT-PILOT-*.md"))
+    files += sorted((ROOT / "docs" / "ops").glob("REMEDIATION-PLAN-*.md"))
+    files += [ROOT / "CHANGELOG-ARCHIVE.md", ROOT / "docs" / "autopilot" / "DECISIONS-2026-10.md"]
     return [p for p in files if "GO-NO-GO" not in p.name]
 
 
