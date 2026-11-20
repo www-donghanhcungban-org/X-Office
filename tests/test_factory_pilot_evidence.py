@@ -8,7 +8,8 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from tests.test_deploy_receipt import AT, HEAD, receipt
+from tests.test_deploy_receipt import AT, HEAD, STEP, receipt
+from tests_e2e.report_factory_pilot import GATES, generate
 from tests_e2e.verify_factory_pilot import verify
 
 
@@ -121,3 +122,82 @@ class FactoryPilotEvidenceTest(unittest.TestCase):
             with self.subTest(fields=fields), self.assertRaises(ValueError):
                 self.write_summary(**fields)
                 verify(self.report)
+
+    def prepare_ci(self):
+        self.output = self.proofs.parent / "artifact"
+        self.app = self.proofs.parent / "app"
+        self.started = self.app / "started"
+        self.ci_ledger = self.app / "docs/ops/DEPLOYS.json"
+        self.ci_ledger.parent.mkdir(parents=True)
+        self.idea = self.summary["idea"]
+        self.run_url = "https://github.com/example/repo/actions/runs/17"
+        self.steps = {name: {"outcome": "success", "conclusion": "success"} for name in GATES}
+        self.dev["runner"] = {"kind": "ci", "run_url": self.run_url, "run_id": "17"}
+        self.browser["run_url"] = self.run_url
+        self.ledger["events"].append(
+            receipt(
+                result="rolled_back",
+                runner=self.dev["runner"],
+                smoke={**STEP, "exit_code": 1},
+                rollback=STEP,
+                served_digest=self.digest,
+                previous_digest=self.digest,
+            )
+        )
+        self.write_json("preview-browser.json", self.browser)
+        self.ci_ledger.write_text(json.dumps(self.ledger), encoding="utf-8")
+        (self.app / "PROJECT.md").write_text(f"## Ý tưởng gốc\n\n> {self.idea}\n\n## Khung\n", encoding="utf-8")
+        self.started.write_text(self.summary["started"], encoding="utf-8")
+
+    def generate_ci(self):
+        return generate(
+            self.app,
+            self.proofs / "preview-browser.json",
+            self.started,
+            self.idea,
+            self.steps,
+            self.run_url,
+            self.output,
+        )
+
+    def test_ci_publishes_verified_notes_and_only_named_step_results(self):
+        self.prepare_ci()
+        self.steps["setup"] = {"outputs": {"credential": "private"}}
+        self.steps["static_checks"]["outputs"] = {"credential": "private"}
+        report = self.generate_ci()
+        self.assertEqual(verify(report), 10)
+        self.assertIn("**10 giây**", report.read_text())
+        captured = (self.output / "ci-steps.json").read_text()
+        self.assertNotIn("private", captured)
+        self.assertEqual(set(json.loads(captured)["steps"]), set(GATES))
+        self.assertIn(f'"tasks": {len(GATES)}', report.read_text())
+        self.assertIn('"cost_usd": null', report.read_text())
+        self.assertIn('"failed_gates": 0', report.read_text())
+
+    def test_ci_rejects_masked_failure_and_skips_even_without_files(self):
+        self.prepare_ci()
+        self.steps["unit_gate"] = {"outcome": "failure", "conclusion": "success"}
+        self.steps["browser_preview"] = {"outcome": "skipped", "conclusion": "skipped"}
+        del self.steps["restore_gate"]
+        self.started.unlink()
+        with self.assertRaisesRegex(ValueError, "cổng|Cổng"):
+            self.generate_ci()
+        diagnostic = json.loads((self.output / "ci-steps.json").read_text())
+        self.assertEqual(diagnostic["failed_gates"], 1)
+        self.assertEqual(diagnostic["steps"]["restore_gate"]["outcome"], "missing")
+        self.assertFalse((self.output / "docs").exists())
+
+    def test_ci_rejects_other_run_and_no_return_to_observed_digest(self):
+        self.prepare_ci()
+        self.write_json(
+            "preview-browser.json", {**self.browser, "run_url": "https://github.com/example/repo/actions/runs/16"}
+        )
+        with self.assertRaisesRegex(ValueError, "cùng lượt"):
+            self.generate_ci()
+        self.assertFalse((self.output / "docs").exists())
+        self.output = self.proofs.parent / "another-artifact"
+        self.write_json("preview-browser.json", self.browser)
+        self.ci_ledger.write_text(json.dumps({**self.ledger, "events": [self.dev]}))
+        with self.assertRaisesRegex(ValueError, "quay lại"):
+            self.generate_ci()
+        self.assertFalse((self.output / "docs").exists())

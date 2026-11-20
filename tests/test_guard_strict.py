@@ -1548,6 +1548,7 @@ class ReasonCodeLockTest(unittest.TestCase):
         ("BUDGET", "gh pr merge$Z 5"),  # tên lệnh/tên cờ gh có mở rộng (AUD-SEC-587)
         ("BUDGET", "git pus? --force origin main"),  # lệnh con git không đọc chắc (AUD-SEC-635)
         ("BUDGET", "sed -i s/a/b/ docs/autopilot/DECISIONS.md"),  # Bash ghi sổ quyết định (AUD-SEC-804)
+        ("BUDGET", 'git checkout HEAD~3 -- "$X"'),  # đường khôi phục từ rev khác không đọc chắc (AUD-SEC-988)
     )
 
     def test_every_marker_blocks_a_real_command(self):

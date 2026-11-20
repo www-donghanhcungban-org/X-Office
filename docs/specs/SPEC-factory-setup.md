@@ -8,6 +8,8 @@
 | Dữ kiện | [`research/2026-11-11-factory-e2e-facts.md`](../../research/2026-11-11-factory-e2e-facts.md) §3; research 2026-11-08 §6 lát S8 |
 | Kế hoạch | [`PLAN-factory-e2e.md`](../autopilot/PLAN-factory-e2e.md) T-3859 |
 
+Đã có lệnh `admin-plan` và kiểm thử các tình huống S-601…S-608. [Runbook bàn giao](../../framework/templates/RUNBOOK-FACTORY-ROLLOUT.md) mô tả đầu vào, bằng chứng và điểm cần chủ dự án quyết.
+
 ## 1. User story
 Là chủ dự án, sau khi thấy bản dev chạy, tôi muốn nhận **một** danh sách những việc chỉ tôi làm được — mỗi việc kèm lý
 do, cách làm và cách máy kiểm lại — để làm một lần rồi dây chuyền tự đi tiếp tới production, thay vì bị hỏi rải rác.

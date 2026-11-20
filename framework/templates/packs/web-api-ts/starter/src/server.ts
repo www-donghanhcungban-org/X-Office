@@ -200,6 +200,7 @@ export function loginConcurrencyFromEnv(env: NodeJS.ProcessEnv = process.env): n
 export interface AppOptions {
   loginConcurrency?: number;
   buildDigest?: string;
+  liveAssets?: boolean;
 }
 
 export function createApp(db: Db, opts: AppOptions = {}): Server {
@@ -209,7 +210,7 @@ export function createApp(db: Db, opts: AppOptions = {}): Server {
     // (`GET http://[::1 HTTP/1.1`) — lỗi lọt ra ngoài handler async là unhandled rejection, Node thoát.
     try {
       const path = parsePath(req.url);
-      if (serveNotesUi(req.method, path, res)) return;
+      if (serveNotesUi(req.method, path, res, opts.liveAssets)) return;
       if (req.method === "GET" && path === "/healthz") {
         send(res, 200, { status: "ok", ...(opts.buildDigest ? { digest: opts.buildDigest } : {}) });
         return;

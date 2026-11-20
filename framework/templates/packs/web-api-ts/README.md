@@ -1,7 +1,7 @@
 ---
 title: Gói web-api-ts — API nhiều tenant trên Node 24 + Postgres
 kind: index
-updated: 2026-11-19
+updated: 2026-11-20
 ---
 
 # Gói `web-api-ts`
@@ -27,8 +27,19 @@ Phiên bản pnpm và các gói npm nằm trong `starter/package.json` ở cây 
 | Worker | `src/worker.ts` | khoá ý định chống trùng, lease hết hạn → lấy lại, mỗi lần claim một `lease_token` (lần chạy cũ — kể cả cùng workerId — không hoàn tất/reset được lần chạy mới), crash giữa chừng → bản ghi `job_effects` đúng một lần (tác dụng phụ ra ngoài DB là at-least-once — handler phải lũy đẳng phía nhận), chết ở lần thử cuối → `failed` (không kẹt `running`), `reconcile` (`worker.test.ts`) |
 | Artifact | `scripts/build.ts` → `dist/app.tgz` + `.sha256` | cùng commit → cùng digest; `release_artifacts` của `xt.yaml` → hàng `artifacts` của `release-check` |
 
-Chạy cục bộ: `DATABASE_URL=postgres://…/postgres pnpm test` (vai trò có quyền `CREATE DATABASE`; mỗi file test tạo cơ sở
-riêng). Không có `DATABASE_URL` → test đỏ, không bỏ qua.
+Khi chạy cục bộ, đặt `DATABASE_URL=postgres://…/postgres` rồi chạy `pnpm test`. Tài khoản cần quyền
+`CREATE DATABASE` vì mỗi file test dùng một cơ sở dữ liệu riêng. Trên GitHub Actions, dự án mới tự cài Node và pnpm
+theo phiên bản đã ghim, cài phụ thuộc theo lockfile và dùng PostgreSQL 17. Nếu dự án chưa cấp `DATABASE_URL`,
+bộ test tạo container tạm trên loopback rồi xóa khi kết thúc, kể cả khi test đỏ.
+
+## Sửa và thử trong lúc viết mã
+
+Từ repo sản phẩm, đặt `DATABASE_URL` tới PostgreSQL dành cho phát triển. Chạy `pnpm install --frozen-lockfile` lần đầu và `pnpm migrate up` khi có migration mới. Mở hai terminal trong cùng môi trường:
+
+- `pnpm dev` phục vụ cây đang sửa ở <http://127.0.0.1:3000/> (đổi bằng `PORT`). Lưu TypeScript thì Node khởi động lại. Lưu HTML, CSS hoặc JavaScript của giao diện ghi chú rồi tải lại trang để thấy thay đổi.
+- `pnpm test:watch` chạy bộ test lần đầu rồi chạy lại các test chịu ảnh hưởng theo đồ thị import. Dùng `pnpm test:watch test/slice.test.ts` để tập trung vào một file. Khi đổi migration hoặc tài sản đọc từ đĩa, chạy `pnpm test` trước khi trình.
+
+Dùng tài khoản ứng dụng đã tạo trong DB phát triển để thử đăng nhập. Nếu DB mới, tạo riêng database `xt_preview` trên localhost, đặt `DATABASE_URL` tới đó và chạy migration. Đặt hai mật khẩu demo khác nhau (tối thiểu 20 ký tự) qua `XT_DEMO_OWNER_PASSWORD` và `XT_DEMO_GUEST_PASSWORD`, rồi chạy `XT_PREVIEW_BUILD=1 node ops/dev/seed.mjs`. Đăng nhập bằng `owner@example.test`. Khi trình MVP, dùng bản dev đã đóng gói và nghiệm thu dưới đây.
 
 ## Chạy thử bản dev
 

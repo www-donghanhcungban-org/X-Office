@@ -1,10 +1,11 @@
 // Giới hạn thời gian của kết nối ứng dụng (AUD-DATA-008): DB không trả lời, pool cạn, truy vấn chạy lâu → lỗi nhanh,
-// không treo request. Không cần cơ sở riêng: chỉ chạy truy vấn không đụng bảng trên cơ sở quản trị.
+// không treo request. Kiểm riêng vòng đời kết nối khi dọn cơ sở dữ liệu thử.
 import { type AddressInfo, createServer, type Server, type Socket } from "node:net";
 import { sql } from "kysely";
+import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createDb, DEFAULT_TIMEOUTS, timeoutsFromEnv } from "../src/db.ts";
-import { adminUrl } from "./helpers.ts";
+import { admin, adminUrl, dbUrl, dropDatabase, freshDatabase } from "./helpers.ts";
 
 describe("timeoutsFromEnv", () => {
   it("mặc định, ghi đè, và giá trị sai bị từ chối (kể cả 0 = tắt giới hạn của pg)", () => {
@@ -101,4 +102,20 @@ describe("kết nối ứng dụng có giới hạn thời gian", () => {
       await db.destroy();
     }
   });
+});
+
+it("dọn DB báo lỗi cho kết nối còn mở và để chính chủ đóng phiên", async () => {
+  const { name, db } = await freshDatabase();
+  const held = new pg.Client({ connectionString: dbUrl(name) });
+  const errors: Error[] = [];
+  held.on("error", (error: Error) => errors.push(error));
+  await held.connect();
+  try {
+    await expect(dropDatabase(db, name)).rejects.toMatchObject({ code: "55006" });
+    expect((await held.query("SELECT 1 AS n")).rows[0]?.n).toBe(1);
+    expect(errors).toEqual([]);
+  } finally {
+    await held.end();
+    await admin(`DROP DATABASE IF EXISTS ${name}`);
+  }
 });

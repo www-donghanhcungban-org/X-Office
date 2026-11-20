@@ -104,7 +104,11 @@ Nếu bản dev đã lên và có Playwright/Chromium, dùng `python3 tests_e2e/
 
 Từ repo khung, chạy Gate của T-3847. Gate tính thời gian từ `started` tới `dev.current.finished` (mốc deploy của bản
 đã qua trình duyệt) và tính lại digest từ các artifact trong receipt. SHA, digest phục vụ và hash archive phải khớp kết quả đăng nhập → tạo → đọc lại.
-Nghiệm thu độc lập của T-3848 vẫn được lưu cùng SPEC và repo sản phẩm.
+Trong lượt `pack-acceptance (clean)`, tải artifact `pack-preview-evidence`, giải nén rồi chạy
+`python3 tests_e2e/verify_factory_pilot.py <thư-mục-giải-nén>/factory-pilot-1/docs/ops/FACTORY-PILOT-1.md`.
+Báo cáo đếm các bước CI của starter và giữ kết quả từng cổng trong `factory-pilot-1/ci-steps.json`. Đồng hồ bắt đầu
+ngay trước `--new`; sổ sau rollback phải xác nhận lại đúng bản A đã thử qua trình duyệt. Chi phí chưa đo được ghi `null`.
+Lượt có cổng đỏ hoặc bị bỏ qua chỉ có chẩn đoán khi job còn chạy. Nghiệm thu độc lập của T-3848 lưu cùng SPEC và repo sản phẩm.
 
 ## 3. Tiêu chí chấp nhận
 

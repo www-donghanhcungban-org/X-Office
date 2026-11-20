@@ -27,11 +27,7 @@ trap 'rm -rf -- "$venv"' EXIT
 "$framework_python" -m venv "$venv"
 python="$venv/bin/python"
 "$python" -m pip install --quiet --require-hashes -r tests_e2e/requirements.txt
-if [[ -z ${XT_E2E_CHROMIUM:-} ]]; then
-  args=(--only-shell chromium)
-  if [[ ${GITHUB_ACTIONS:-} == true ]]; then args=(--with-deps "${args[@]}"); fi
-  "$python" -m playwright install "${args[@]}"
-fi
+bash tests_e2e/prepare-chromium.sh "$python"
 
 node scripts/build.ts
 "$framework_python" .xtemplates/scripts/xt.py deploy run --env dev

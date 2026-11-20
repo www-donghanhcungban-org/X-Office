@@ -90,7 +90,9 @@ class MilestoneAuditPhaseTest(core.TmpMixin, core.RealAutopilotUntouchedMixin, u
         self.phase("build")
         v = self.status_json()
         self.assertEqual((v["milestone_done"], v["milestone_audit"]), ("Lát 1 — nền", "g7"))
-        self.assertIn("pha build: audit delta ở cuối đợt (D-177), làm tiếp task kế", v["reason"])
+        self.assertIn(
+            "pha build: làm task kế, cuối đợt dùng loop next-step để chọn trình MVP hoặc audit delta", v["reason"]
+        )
         self.assertNotIn("cổng ký", v["reason"])
 
     def test_no_milestone_no_audit_field(self):

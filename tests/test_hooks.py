@@ -2317,6 +2317,502 @@ class CapabilityCodexPathsTest(unittest.TestCase):
         self.assertEqual(set(want), {"ask", ""})
 
 
+class _FenceRootsMixin:
+    """Gốc giả dự án đích (có `.xtemplates/`) và repo khung có đủ tệp hàng rào; quyết định cuối theo chính sách."""
+
+    FILES = (
+        ".claude/settings.json",
+        ".claude/hooks/guard.py",
+        ".codex/hooks.json",
+        *(".cursor/hooks.json", ".github/hooks/xt.json", ".grok/hooks/xt.json", ".opencode/plugins/xt.ts"),
+        *(".gemini/settings.json", ".github/workflows/ci.yml", ".cursor/rules/a.mdc", ".grok/settings.json"),
+        *("src/app.py", "list.txt"),
+    )
+    POLICIES = ("default", "strict")
+
+    def setUp(self):
+        self.g = _guard()
+        base = os.path.realpath(self.enterContext(tempfile.TemporaryDirectory()))
+        self.target, self.frame = os.path.join(base, "target"), os.path.join(base, "frame")
+        for root in (self.target, self.frame):
+            for rel in self.FILES:
+                os.makedirs(os.path.dirname(os.path.join(root, rel)), exist_ok=True)
+                Path(root, rel).write_text("a\n", encoding="utf-8")
+        os.makedirs(os.path.join(self.target, ".xtemplates"))
+        self.roots = (self.target, self.frame)
+        # dự án đích chưa cài adapter host khác: chỉ có hàng rào Claude/Codex
+        self.bare = os.path.join(base, "bare")
+        for rel in self.FILES:
+            if not rel.startswith((".cursor", ".github/hooks", ".grok", ".opencode", ".gemini")):
+                os.makedirs(os.path.dirname(os.path.join(self.bare, rel)), exist_ok=True)
+                Path(self.bare, rel).write_text("a\n", encoding="utf-8")
+        os.makedirs(os.path.join(self.bare, ".xtemplates"))
+
+    # Hành động THÔ ở strict theo mã (khẳng định tuyệt đối, review AUD-SEC-988 🟢-4): câu hỏi nguy hiểm → ask; deny của
+    # luật/lỗi tập con (BUDGET bị ném) → deny. Mặc định: luôn deny.
+    STRICT_ACT = {"HOOK_BYPASS": "ask", "WIPE_OUTSIDE": "ask", "RULE_DENY": "deny", "BUDGET": "deny"}
+
+    def bash(self, root: str, cmd: str, policy: str = "strict") -> tuple[str, str]:
+        with mock.patch.dict(os.environ, {"XT_GUARD_POLICY": policy}):
+            out = self.g.bash_decision(cmd, root)
+        if policy != "strict":
+            out = self.g.apply_policy(out)
+            return str(out.get("decision") or ""), str(out.get("code") or "")
+        return str(out.get("decision") or ""), self.g.decide(out).code if out.get("decision") else ""
+
+    def edit(self, root: str, path: str, tool: str = "Write", policy: str = "strict") -> tuple[str, str]:
+        payload = {"tool_name": tool, "tool_input": {"file_path": path, "content": "b"}}
+        with mock.patch.dict(os.environ, {"XT_GUARD_POLICY": policy}):
+            out = self.g._rule_decision("edit", payload, root)
+        if policy != "strict":
+            out = self.g.apply_policy(out)
+        return str(out.get("decision") or ""), str(self.g.decide(out).code if policy == "strict" else out.get("code"))
+
+    def assert_blocked(
+        self, cmd: str, codes: tuple[str, ...] = ("HOOK_BYPASS",), roots: tuple[str, ...] = (), strict: str = ""
+    ):
+        """Mặc định: deny với mã trong `codes`; strict: đúng hành động `strict` (rỗng → `STRICT_ACT` của mã)."""
+        for root, policy in itertools.product(roots or self.roots, self.POLICIES):
+            with self.subTest(root=os.path.basename(root), policy=policy, cmd=cmd):
+                act, code = self.bash(root, cmd, policy)
+                self.assertIn(code, codes)
+                self.assertEqual(act, "deny" if policy == "default" else strict or self.STRICT_ACT[code])
+
+    def assert_allowed(self, cmd: str, roots: tuple[str, ...] = ()):
+        for root, policy in itertools.product(roots or self.roots, self.POLICIES):
+            with self.subTest(root=os.path.basename(root), policy=policy, cmd=cmd):
+                self.assertEqual(self.bash(root, cmd, policy)[0], "")
+
+
+class FenceRestoreFromRevTest(_FenceRootsMixin, unittest.TestCase):
+    """AUD-SEC-988 (T-3968): git đưa nội dung từ commit/nhánh/tag/stash KHÁC chỉ mục/HEAD vào cây làm việc hay chỉ mục ở
+    đường phủ tệp hàng rào (tệp, thư mục cha, `.`, `:/`, glob pathspec) = thay hàng rào bằng bản cũ (`git checkout HEAD~3
+    -- .claude/hooks/guard.py`) hay xoá nó (`git restore --source=<rev>` no-overlay) → chặn như ghi hàng rào qua Bash
+    (HOOK_BYPASS) ở mọi chính sách. Khôi phục từ chỉ mục/HEAD (đường lùi chuẩn), từ rev cho đường khác, đổi nhánh/kéo/
+    gộp: cho chạy."""
+
+    FORMS = (
+        "git checkout HEAD~3 -- {}",
+        "git checkout HEAD~3 {}",
+        "git checkout v1.0 -- {}",
+        "git checkout stash@{{0}} -- {}",
+        "git checkout -p origin/main -- {}",
+        "git checkout --no-overlay HEAD~3 -- {}",
+        "git restore --source=HEAD~3 -- {}",
+        "git restore --source HEAD~3 {}",
+        "git restore -sHEAD~3 {}",
+        "git restore -s HEAD~3 --staged --worktree {}",
+        "git restore -SW -s HEAD~3 {}",
+        "git restore --staged --source=HEAD~3 {}",
+        "git reset HEAD~3 -- {}",
+        "git -C . --no-pager checkout HEAD~3 -- {}",
+        # review 🔴-1: `--end-of-options` chỉ dừng đọc tuỳ chọn — git vẫn tách rev/pathspec theo `--`
+        "git checkout --end-of-options HEAD~3 -- {}",
+        "git checkout --end-of-options HEAD~3 {}",
+        "git reset --end-of-options HEAD~3 -- {}",
+        "git --icase-pathspecs checkout HEAD~3 -- {}",
+    )
+    SPECS = (
+        ".claude/hooks/guard.py",
+        ".claude/settings.json",
+        ".codex/hooks.json",
+        ".claude",
+        ".codex",
+        "./.claude/hooks",
+        ":/.codex/hooks.json",
+        "':(top).claude'",
+        "'.claude/*'",
+        "'*.py'",
+        "'.cl*'",
+        ".cursor/hooks.json",
+        ".github/hooks",
+    )
+
+    def test_fence_paths_from_rev_blocked(self):
+        for form, spec in itertools.product(self.FORMS, self.SPECS):
+            self.assert_blocked(form.format(spec))
+
+    def test_whole_tree_from_rev_blocked(self):
+        """`.`/`:/`/`*` từ rev: luật vứt cả cây (RULE_DENY) chặn ở pha harden; luật hàng rào chặn cả ở pha build."""
+        for form, spec in itertools.product(self.FORMS, (".", ":/", "'*'", "':(top)'")):
+            self.assert_blocked(form.format(spec), ("HOOK_BYPASS", "RULE_DENY"))
+        with mock.patch.object(self.g, "build_phase", return_value=True):
+            for cmd in ("git checkout HEAD~3 -- .", "git restore -s HEAD~3 :/", "git checkout -p HEAD~3"):
+                self.assert_blocked(cmd)
+            for cmd in ("git checkout -- .", "git restore .", "git reset --hard origin/main", "git checkout -f main"):
+                self.assert_allowed(cmd)  # pha build nới vứt thay đổi cục bộ (ADR-0040) — không phải hàng rào
+
+    def test_never_looser_than_baseline_budget(self):
+        """Review 🔴-2: lệnh nền chặn BUDGET (lỗi tập con đọc chắc — deny ở MỌI chính sách) giữ deny; câu hỏi của luật
+        mới không thay được lỗi đó thành ask ở strict; `restore` không pathspec không bị coi là cả cây."""
+        for cmd in (
+            "git restore --source=$(git rev-parse HEAD~3) src/app.py",
+            "xargs -a list.txt git restore -s HEAD~3 --",
+            "git restore --source=$(git rev-parse HEAD~3) .codex/hooks.json",
+            "git --git-dir=/tmp/old/.git --work-tree=. restore .codex",
+        ):
+            self.assert_blocked(cmd, ("BUDGET",), strict="deny")
+        self.assert_blocked("GIT_DIR=/tmp/old/.git git checkout-index -a", ("BUDGET",), strict="deny")
+        # tách thô (`_rough_budget`): câu hỏi luật mới → BUDGET deny; câu hỏi nguy hiểm của luật cũ giữ mã
+        new = {"decision": "ask", "reason": self.g.FENCE_WHY.format(f"x {self.g.FENCE_NEW_TAG}")}
+        self.assertEqual(self.g._rough_budget(new, "c")["code"], "BUDGET")
+        old = {"decision": "ask", "reason": self.g.FENCE_WHY.format(".claude/settings.json")}
+        self.assertEqual(self.g._rough_budget(old, "c"), old)
+        self.assertNotIn(":/", str(self.g._fence_restore_asks(["git", "restore", "-s", "x"], [], self.target, None)))
+
+    def test_global_icase_worktree_and_toctou(self):
+        """Review 🟠-2: `--icase-pathspecs`/`GIT_ICASE_PATHSPECS` so không phân hoa thường; cây làm việc dời → mọi
+        pathspec phủ hàng rào; 🟢-1: "toán hạng đầu là tệp có thật → pathspec" chỉ khi cả lệnh là một lệnh đơn."""
+        Path(self.target, "x").write_text("a\n", encoding="utf-8")
+        Path(self.frame, "x").write_text("a\n", encoding="utf-8")
+        for cmd in (
+            "git --icase-pathspecs checkout HEAD~3 -- .CLAUDE/HOOKS/GUARD.PY",
+            "GIT_ICASE_PATHSPECS=1 git checkout HEAD~3 -- .CLAUDE/HOOKS/GUARD.PY",
+            "export GIT_ICASE_PATHSPECS=1; git restore -s HEAD~3 .Codex",
+            "git --work-tree=.claude checkout HEAD~3 -- hooks/guard.py",
+            "GIT_WORK_TREE=.codex git restore -s HEAD~3 hooks.json",
+            "git branch x HEAD~3 && rm x && git checkout x .claude/hooks/guard.py",
+            "touch y && git checkout x .claude/settings.json",  # chặn oan chấp nhận: viết `git checkout -- x f`
+            ": > y; git checkout x .claude/settings.json",
+            "> y; git checkout x .claude/settings.json",
+        ):
+            self.assert_blocked(cmd)
+        for cmd in (  # chỉ một lệnh đổi được tệp/ref, `x` có thật: pathspec từ chỉ mục
+            "git checkout x .claude/hooks/guard.py",
+            "true; git checkout x .claude/hooks/guard.py",
+            "cd . && git status && git checkout x .claude/hooks/guard.py",
+        ):
+            self.assert_allowed(cmd)
+        self.assert_allowed(
+            "git checkout HEAD~3 -- .CLAUDE/HOOKS/GUARD.PY"
+        )  # không icase: tệp khác (FS phân hoa thường)
+
+    def test_other_sources_and_wrappers_blocked(self):
+        for cmd in (
+            'git checkout "$REV" -- .claude/hooks/guard.py',
+            "git checkout nofile .claude/settings.json",
+            "git read-tree HEAD~3",
+            "git read-tree -u -m HEAD~3",
+            "git read-tree --empty",
+            "git read-tree --prefix=.codex/ HEAD~3:.codex",
+            "git reset -p HEAD~3",
+            "git checkout -p HEAD~3",
+            "git restore -p -s HEAD~3",
+            "GIT_INDEX_FILE=/tmp/i git checkout -- .claude/hooks/guard.py",
+            "bash -c 'git checkout HEAD~3 -- .claude'",
+            "env git restore -s HEAD~3 .codex",
+            "git checkout HEAD~3 -- src ':(top).codex'",
+            "git checkout HEAD~3 -- ':!src'",
+            "git restore -s HEAD~3 ':(exclude)src'",
+            "git restore -s HEAD~3 -- ':(icase).CLAUDE/SETTINGS.JSON'",
+            "git restore -s HEAD~3 -- ':(attr:x).claude'",
+            "git restore -s HEAD~3 -- ':(top'",
+            "git restore -s HEAD~3 -- '.c[l]aude'",
+            "git show HEAD~3:.claude/hooks/guard.py > .claude/hooks/guard.py",
+            "git show HEAD~3:.codex/hooks.json > .codex/hooks.json",
+        ):
+            self.assert_blocked(cmd)
+
+    def test_cwd_relative_pathspecs(self):
+        for cmd in (
+            "cd .claude && git checkout HEAD~3 -- hooks",
+            "cd .claude/hooks && git restore -s HEAD~3 .",
+            "cd src && git checkout HEAD~3 -- ../.codex",
+            "cd src && git restore -s HEAD~3 -- ..",
+            'cd "$X" && git checkout HEAD~3 -- hooks.json',
+            'cd "$X" && git restore -s HEAD~3 settings.json',
+            "git -C .claude checkout HEAD~3 -- hooks/guard.py",
+            "cd src && git checkout HEAD~3 -- ':/.claude'",
+        ):
+            self.assert_blocked(cmd, ("HOOK_BYPASS", "RULE_DENY"))
+        self.assert_allowed("cd src && git checkout HEAD~3 -- app.py")
+        self.assert_allowed("git -C src checkout HEAD~3 -- .claude")  # `src/.claude` không phải hàng rào gốc
+
+    def test_outside_root_icase_and_missing_hooks_dir(self):
+        """Pathspec tổ tiên của gốc (`..`, glob ra ngoài) phủ cả hàng rào; đường ngoài không phải tổ tiên thì không;
+        `:(icase)` trần = cả cây; gốc chưa có `.claude/hooks` vẫn so glob với tên mẫu."""
+        for cmd in ("git restore -s HEAD~3 -- ..", "git checkout HEAD~3 -- '../*'", "git restore -s HEAD~3 ':(icase)'"):
+            self.assert_blocked(cmd)
+        self.assert_allowed("git checkout HEAD~3 -- /srv/other/x")
+        shutil.rmtree(os.path.join(self.frame, ".claude", "hooks"))
+        self.assert_blocked("git checkout HEAD~3 -- '.claude/*/guard.py'", roots=(self.frame,))
+
+    def test_unresolved_pathspec_from_rev_budget(self):
+        """Đường không đọc chắc (biến, thay lệnh, `--pathspec-from-file`) khi nguồn là rev khác: có thể là hàng rào →
+        BUDGET (chặn oan chấp nhận: `git checkout "$REV" -- "$F"` của script — viết đường nguyên văn)."""
+        for cmd in (
+            'git checkout HEAD~3 -- "$X"',
+            'git restore -s HEAD~3 "src/$X"',
+            "git checkout HEAD~3 --pathspec-from-file=list.txt",
+            "git restore --source=HEAD~3 --pathspec-from-file list.txt",
+            "git reset HEAD~3 --pathspec-from-file=- < list.txt",
+        ):
+            self.assert_blocked(cmd, ("BUDGET",), strict="ask")  # câu hỏi BUDGET (nền cho chạy): ask ở strict
+        for cmd in ("git restore -s HEAD~3 -- $(cat list.txt)", "git restore -s HEAD~3 -- `cat list.txt`"):
+            self.assert_blocked(cmd, ("BUDGET",), strict="deny")  # lỗi tập con của nền giữ deny
+
+    def test_index_head_and_non_fence_restores_allowed(self):
+        """Đường lùi chuẩn (chỉ mục/HEAD) cho hàng rào, rev cho đường khác, đổi nhánh/kéo/gộp/stash: cho chạy."""
+        for cmd in (
+            "git restore .claude/hooks/guard.py",
+            "git restore .codex/hooks.json .cursor/hooks.json .github/hooks/xt.json",
+            "git checkout -- .claude/hooks/guard.py",
+            "git checkout .claude/hooks/guard.py",
+            "git checkout .claude/settings.json .claude/hooks/guard.py",
+            "git restore --source=HEAD .claude/hooks/guard.py",
+            "git restore -s HEAD -- .codex",
+            "git restore -s@ .claude",
+            "git checkout HEAD -- .claude/hooks/guard.py",
+            "git checkout @ -- .claude",
+            "git restore --staged .claude/settings.json",
+            "git restore -S -W .claude/settings.json",
+            "git reset -- .claude/settings.json",
+            "git reset HEAD -- .codex/hooks.json",
+            "git reset -q HEAD .codex/hooks.json",
+            "git reset HEAD~1",
+            "git reset --soft HEAD~1",
+            "git checkout --ours -- .claude/settings.json",
+            "git checkout -m .claude/settings.json",
+            "git checkout -p",
+            "git restore -p .claude",
+            "git checkout HEAD~3 -- src/app.py",
+            "git restore --source=HEAD~3 src/app.py",
+            "git checkout main -- src",
+            "git restore -s origin/main -- src ':!src/x'",
+            "git checkout HEAD~3 -- src ':(exclude).claude'",
+            "git checkout main",
+            "git checkout HEAD~3",
+            "git checkout -b feat origin/main",
+            "git checkout -B feat HEAD~3 --",
+            "git checkout --detach v1.0",
+            "git switch main",
+            "git switch -c feat origin/main",
+            "git switch --detach HEAD~3",
+            "git pull",
+            "git pull --rebase origin main",
+            "git merge origin/main",
+            "git rebase origin/main",
+            "git stash",
+            "git stash pop",
+            "git stash apply stash@{1}",
+            "git read-tree HEAD",
+            "git show HEAD~3:.claude/hooks/guard.py",
+            "git diff HEAD~3 -- .claude",
+            "git log -p HEAD~3 -- .codex/hooks.json",
+            'git checkout "$BRANCH"',
+            'git checkout "$REV" -- src/app.py',
+            'git restore -- "$X"',
+            "git restore --pathspec-from-file=list.txt",
+        ):
+            self.assert_allowed(cmd)
+
+    def test_concurrent_decisions_match_sequential(self):
+        jobs = [
+            (root, cmd)
+            for root in self.roots
+            for cmd in ("git checkout HEAD~3 -- .claude", "git restore .claude", "git restore -s HEAD~3 src")
+        ] * 6
+        with mock.patch.dict(os.environ, {"XT_GUARD_POLICY": "strict"}):
+            want = [str(self.g.bash_decision(c, r).get("decision") or "") for r, c in jobs]
+            with concurrent.futures.ThreadPoolExecutor(8) as pool:
+                got = list(pool.map(lambda j: str(self.g.bash_decision(j[1], j[0]).get("decision") or ""), jobs))
+        self.assertEqual(got, want)
+        self.assertEqual(set(want), {"ask", ""})
+
+
+class FenceAdapterFilesTest(_FenceRootsMixin, unittest.TestCase):
+    """AUD-SEC-989 (T-3969): tệp nối guard mà `install.py --harness` cài cho host khác (ADR-0064 lát B) là hàng rào như
+    `.codex/hooks.json` (AUD-SEC-987): Bash ghi/xoá/dời → HOOK_BYPASS; Edit/Write → như `.claude/settings.json`. Ranh
+    giới: `.github` chỉ rào `.github/hooks` + `xt.json`; tệp khác của người dùng trong `.cursor/`, `.grok/`, `.opencode/`
+    nêu đường cụ thể thì không bị chặn thêm."""
+
+    ADAPTERS = (".cursor/hooks.json", ".github/hooks/xt.json", ".grok/hooks/xt.json", ".opencode/plugins/xt.ts")
+    GEMINI = ".gemini/settings.json"
+    CLAUDE = ".claude/settings.json"
+    BASH = (*CapabilityCodexPathsTest.BASH, "chmod 000 {}", "ln -sf /dev/null {}", "cp /dev/null {}")
+
+    def test_bash_write_delete_blocked_like_codex_hooks(self):
+        for rel, cmd in itertools.product((*self.ADAPTERS, self.GEMINI), self.BASH):
+            for root, policy in itertools.product(self.roots, self.POLICIES):
+                with self.subTest(root=os.path.basename(root), policy=policy, cmd=cmd.format(rel)):
+                    got = self.bash(root, cmd.format(rel), policy)
+                    self.assertEqual(got, self.bash(root, cmd.format(".codex/hooks.json"), policy))
+                    self.assertEqual(got, ("ask", "HOOK_BYPASS") if policy == "strict" else ("deny", "HOOK_BYPASS"))
+
+    def test_edit_like_claude_settings(self):
+        """Edit/Write: cho chạy ở mặc định, `strict` hỏi (cổng — sửa kèm lý do, ADR-0018), như `.claude/settings.json`."""
+        for rel, root, policy in itertools.product((*self.ADAPTERS, self.GEMINI), self.roots, self.POLICIES):
+            with self.subTest(rel=rel, root=os.path.basename(root), policy=policy):
+                got = self.edit(root, rel, "Write", policy)
+                self.assertEqual(got, self.edit(root, self.CLAUDE, "Write", policy))
+                self.assertEqual(got, ("ask", "OTHER_ASK") if policy == "strict" else ("", "OTHER_ASK"))
+
+    def test_dirs_globs_xargs_unknown_cwd(self):
+        for cmd in (
+            *("rm -rf .cursor", "rm -rf .github/hooks", "rm -rf .grok", "rm -rf .grok/hooks", "rm -rf .opencode"),
+            *("rm -rf .opencode/plugins", "rm -rf .gemini", "mv .github/hooks /tmp/h", "cp -r evil/ .cursor/"),
+            *("rsync -a evil/ .github/hooks/", "tar -xf a.tar -C .opencode/plugins", "rm .cursor/hook?.json"),
+            *("rm .github/hook[s]/xt.json", "rm .gro[k]/hooks/*.json", "rm -f .opencode/*/xt.ts"),
+            *('cd "$X" && echo x > xt.json', 'cd "$X" && rm -f xt.ts', 'cd "$X" && rm -f hooks.json'),
+            *("cd .github/hooks && rm xt.json", "cd .opencode/plugins && echo > xt.ts", "cd .gemini && rm *"),
+            *("cd .cursor && ls | xargs rm -f", "cd .github/hooks && ls | xargs rm -f", "ls .grok/hooks | xargs rm"),
+            *("ls -d .github/hooks/* | xargs rm -f", "cd .github && ls -d hooks/* | xargs rm -f"),
+            *("cd .github/workflows && ls -d ../hooks/* | xargs rm", "echo .opencode/plugins/xt.ts | xargs rm"),
+            *("find .cursor -name '*.json' | xargs rm", "git ls-files .github/hooks | xargs rm"),
+            *("rm -rf .github/*", "rm -rf .github/hook?", "git rm -r .github/hooks"),
+            # review 🟠-1: glob ở đoạn sau `.github` (xargs)
+            *("ls .github/hook?/* | xargs rm -f", "cd .github && ls hook?/* | xargs rm -f"),
+            *("ls -d .github/h*/x* | xargs rm -f", "grep -rl xt .github/hooks | xargs rm -f"),
+            "ls .claude/hooks .github/workflows | xargs rm -f",  # đoạn dấu chấm cũ (`XARGS_DOT_RE`) vẫn bắt trước
+        ):
+            self.assert_blocked(cmd, ("HOOK_BYPASS", "BUDGET", "WIPE_OUTSIDE"))
+        os.makedirs(os.path.join(self.target, "pkg", ".github", "hooks"))
+        Path(self.target, "pkg", ".github", "hooks", "xt.json").write_text("{}\n", encoding="utf-8")
+        self.assert_blocked("rm -f pkg/.github/hooks/xt.json", roots=(self.target,))  # monorepo: tệp nối có thật
+
+    # Quyết định NỀN (cefba45d) ghi cứng — (mặc định, strict) ở cả dự án đích lẫn repo khung (review 🟢-4)
+    GITHUB_BASELINE = (
+        *(("rm -f .github/workflows/ci.yml", "ask"), ("mv .github/workflows/a.yml .github/workflows/b.yml", "ask")),
+        *(("rm -rf .github/workflows/old", "ask"), ("cp dependabot.yml .github/", "ask")),
+        *(
+            ("cp dependabot.yml .github/dependabot.yml", "ask"),
+            ("rm -rf .github", "ask"),
+            ("mv .github .github.b", "ask"),
+        ),
+        *(("cd .github/workflows && ls | xargs rm -f", ""), ("find .github/workflows -name '*.yml' | xargs rm -f", "")),
+        *(("ls .github/workflows/*.yml | xargs rm -f", ""), ("echo x > .cursor/rules/a.mdc", "")),
+        *(("rm -rf .cursor/rules", ""), ("rm -f .grok/settings.json", ""), ("cp x .opencode/agent/", "")),
+        *(("echo x > .github/hooks/other.json", ""), ("rm -f .opencode/plugins/mine.ts", "")),
+    )
+
+    def test_github_and_user_files_not_blocked_more(self):
+        """Ranh giới: thao tác thường trong `.github/workflows`, cả `.github` (không rào cha của `.github/hooks`), tệp khác
+        của người dùng trong `.cursor/` `.grok/` `.opencode/` — đúng quyết định nền ghi cứng."""
+        for (cmd, strict), root in itertools.product(self.GITHUB_BASELINE, self.roots):
+            with self.subTest(root=os.path.basename(root), cmd=cmd):
+                self.assertEqual(self.bash(root, cmd, "default")[0], "")
+                self.assertEqual(self.bash(root, cmd, "strict")[0], strict)
+
+    def test_not_installed_adapter_not_fenced(self):
+        """Review 🟢-2: dự án KHÔNG cài adapter host khác — thư mục/tệp của host đó không phải hàng rào (không có gì để
+        bảo vệ), như lọc theo tồn tại của glob; `.claude`/`.codex/hooks.json` vẫn rào. Không thành đường lách: xoá tệp nối
+        ở lệnh trước trong cùng lệnh ghép tự nó bị chặn (tệp có thật lúc xét)."""
+        for cmd in (
+            "git checkout main -- .github",
+            "git checkout HEAD~3 -- .cursor",
+            "rm -rf .cursor .gemini .grok .opencode .github/hooks",
+            "cp x .cursor/",
+            "rm -rf .github/* .cursor/* .opencode/*/x.ts",
+            "ls -d .github/h*/x* | xargs rm -f",
+            "cd .cursor && ls | xargs rm -f",
+        ):
+            with self.subTest(cmd=cmd):
+                self.assertEqual(self.bash(self.bare, cmd, "default"), ("", self.bash(self.bare, cmd, "default")[1]))
+                self.assertNotEqual(self.bash(self.bare, cmd, "strict")[1], "HOOK_BYPASS")
+        self.assert_blocked("rm -rf .claude/hooks", roots=(self.bare,))
+        self.assert_blocked("git checkout HEAD~3 -- .codex", roots=(self.bare,))
+        for cmd in (
+            "rm -f .cursor/hooks.json; rm -rf .cursor",
+            "rm -f .github/hooks/xt.json && git checkout main -- .github",
+            "mv .gemini/settings.json /tmp/s && rm -rf .gemini",
+        ):
+            self.assert_blocked(cmd)
+
+    def test_legit_reads_and_restores_allowed(self):
+        for cmd in (
+            "cat .cursor/hooks.json .github/hooks/xt.json .grok/hooks/xt.json .opencode/plugins/xt.ts",
+            "python3 -m json.tool .github/hooks/xt.json",
+            "grep -n xt .opencode/plugins/xt.ts",
+            "diff .cursor/hooks.json framework/templates/harness/cursor-hooks.json",
+            "git add .cursor/hooks.json .github/hooks/xt.json .grok .opencode/plugins/xt.ts .gemini/settings.json",
+            "git diff -- .cursor .github/hooks",
+            "git restore .cursor/hooks.json .github/hooks/xt.json .grok/hooks/xt.json .opencode/plugins/xt.ts",
+            "git checkout -- .gemini/settings.json",
+            "ls .cursor .github/hooks .grok/hooks .opencode/plugins",
+            "python3 .xtemplates/scripts/install.py --harness cursor,copilot,grok,opencode .",
+            "python3 scripts/install.py --harness cursor,copilot,grok,opencode,gemini /srv/app",
+            "rm -f .cursor/hooks.json.bak .github/hooks/xt.json.orig",
+        ):
+            self.assert_allowed(cmd)
+
+    def test_restore_adapter_from_rev_blocked(self):
+        for rel in (*self.ADAPTERS, self.GEMINI, ".grok", ".opencode/plugins"):
+            self.assert_blocked(f"git checkout HEAD~3 -- {rel}")
+            self.assert_blocked(f"git restore -s HEAD~3 {rel}")
+
+    def test_installer_runs_and_result_fenced(self):
+        """`install.py --harness cursor,copilot,grok,opencode` (tiến trình python của khung) cài được; tệp nó cài là hàng
+        rào ở dự án đích vừa cài."""
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import install
+
+        dst = Path(self.target) / "app"
+        dst.mkdir()
+        with contextlib.redirect_stderr(io.StringIO()):
+            rc = install.main([str(dst), "--label", "t", "--harness", "cursor,copilot,grok,opencode"])
+        self.assertEqual(rc, 0)
+        for rel in self.ADAPTERS:
+            with self.subTest(rel=rel):
+                self.assertTrue((dst / rel).is_file())
+                self.assert_blocked(f"rm -f {rel}", roots=(str(dst),))
+                self.assert_allowed(f"git restore {rel}", roots=(str(dst),))
+
+    def test_merge_gate_globs_cover_adapters(self):
+        """Hai nhà đồng bộ (AUD-HAR-021): PR đổi tệp nối guard không vào làn nhanh."""
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import xt
+
+        for rel in (*self.ADAPTERS, self.GEMINI):
+            with self.subTest(rel=rel):
+                self.assertTrue(any(fnmatch.fnmatchcase(rel, p) for p in xt.MERGE_GATE_GLOBS))
+                self.assertTrue(
+                    any(fnmatch.fnmatchcase(rel, p) for p in (*self.g.GATE_PATTERNS, *self.g.CAPABILITY_PATTERNS))
+                )
+
+    def test_adapter_core_matches_codex(self):
+        for root, policy, rel in itertools.product(self.roots, self.POLICIES, (*self.ADAPTERS, self.GEMINI)):
+            with self.subTest(root=os.path.basename(root), policy=policy, rel=rel):
+                with mock.patch.dict(os.environ, {"XT_GUARD_POLICY": policy}):
+                    raw = {"tool": "bash", "command": f"rm -f {rel}", "project_dir": root}
+                    got = self.g._core_decision(raw)
+                    want = self.g._core_decision({**raw, "command": "rm -f .codex/hooks.json"})
+                self.assertEqual(got.get("decision"), want.get("decision"))
+                self.assertIn(got.get("decision"), ("ask", "deny"))
+
+
+class FenceBaselineMonotoneTest(unittest.TestCase):
+    """Review AUD-SEC-988 🔴-2: luật hàng rào mới KHÔNG được lỏng hơn guard nền (cefba45d, trước AUD-SEC-988/989) ở bất
+    kỳ (lệnh, gốc, chính sách) nào. `tests/fixtures/autonomy/guard_fence_baseline.json`: quyết định nền ghi sẵn cho lệnh
+    của review (tấn công, lành, xargs, dự án chưa cài adapter) và mọi dạng khôi phục × pathspec mẫu; độ chặt: deny > ask >
+    cho qua (mặc định: sau `apply_policy`; strict: hành động thô)."""
+
+    FIXTURE = ROOT / "tests" / "fixtures" / "autonomy" / "guard_fence_baseline.json"
+    RANK = {"": 0, "allow": 0, "ask": 1, "deny": 2}
+
+    def test_never_looser_than_baseline(self):
+        g = _guard()
+        doc = json.loads(self.FIXTURE.read_text(encoding="utf-8"))
+        base = os.path.realpath(self.enterContext(tempfile.TemporaryDirectory()))
+        roots = {}
+        for name in ("target", "frame", "bare"):
+            roots[name] = os.path.join(base, name)
+            for rel in doc["files"]:
+                if name != "bare" or not rel.startswith(tuple(doc["adapter_dirs"])):
+                    Path(roots[name], rel).parent.mkdir(parents=True, exist_ok=True)
+                    Path(roots[name], rel).write_text("a\n", encoding="utf-8")
+            if name != "frame":
+                os.makedirs(os.path.join(roots[name], ".xtemplates"))
+        looser = []
+        for cmd, root, policy, was in doc["rows"]:
+            with mock.patch.dict(os.environ, {"XT_GUARD_POLICY": policy, "CLAUDE_PROJECT_DIR": roots[root]}):
+                out = g.bash_decision(cmd, roots[root])
+            now = str((g.apply_policy(out) if policy == "default" else out).get("decision") or "")
+            if self.RANK[now] < self.RANK[was]:
+                looser.append((cmd, root, policy, was, now))
+        self.assertGreaterEqual(len(doc["rows"]), 1000)
+        self.assertEqual(looser, [])
+
+
 @unittest.skipIf(shutil.which("bash") is None, "cần bash")
 class PreEditGuardTest(unittest.TestCase):
     def d(self, rel: str, project: Path = ROOT, via_hook: bool = False) -> str | None:
@@ -9835,11 +10331,16 @@ class GuardRemoteDeleteTest(unittest.TestCase):
             "git switch -cfix2",
             "git switch -Cfeat2",
             "git clean -e1f -n",  # mẫu loại trừ `1f`, chạy thử
-            "git restore --staged -s1W .",  # nguồn `1W`, chỉ bỏ khỏi index
+            "git restore --staged -s1W src",  # nguồn `1W`, chỉ ghi index
             "git branch -ufd2 main",  # upstream `fd2`, không xoá
         ):
             with self.subTest(cmd):
                 self.assert_allowed(cmd)
+        # `-s1W .`: nguồn `1W`, không phải `-W` — không bị đọc là vứt cả cây; chỉ mục cả cây từ rev khác HEAD là bước
+        # đệm hạ cấp hàng rào (`git restore <tệp>` sau đó lấy bản cũ — AUD-SEC-988) → HOOK_BYPASS
+        d = self.out("git restore --staged -s1W .")
+        self.assertNotIn("vứt toàn bộ", str(d.get("reason")))
+        self.assertEqual((d["decision"], d.get("code")), ("deny", "HOOK_BYPASS"))
         import concurrent.futures
 
         cases = ["git push -4d origin other", "git push -4d origin feat/me", "git push -6f origin x"] * 6

@@ -3,7 +3,7 @@ title: File harness: PLAN · PROGRESS · BLUEPRINT · evidence · state
 kind: module
 prefix: LOOP-HARNESS
 applies_to: [all]
-updated: 2026-11-19
+updated: 2026-11-20
 ---
 
 # File harness: PLAN · PROGRESS · BLUEPRINT · evidence · state
@@ -44,6 +44,13 @@ updated: 2026-11-19
 
 Hook là lớp chặn sai lầm bằng phân tích tĩnh, không phải ranh giới cách ly (D-015). Lớp đỡ cho các chỗ dưới đây là sandbox
 OS/devcontainer có egress allowlist (`LOOP-HARNESS-022`) và việc phiên chính chạy lại Gate (`loop record`):
+
+- **Hàng rào qua lịch sử git** (AUD-SEC-988): không bị chặn như ghi hàng rào — (a) lệnh dời HEAD cả cây (`checkout
+  <rev>`, `switch`, `reset [--hard|--soft] <rev>`, `symbolic-ref HEAD`, `pull`, `merge`) rồi khôi phục từ HEAD mới,
+  `git apply`/`am`/`cherry-pick`/`revert -n`, `stash apply` (cả `stash store <commit>`), `git archive <rev> | tar -x`,
+  `rm -rf .github` (cha của `.github/hooks`): lớp đỡ là diff PR (tệp cổng, không làn nhanh) và review; (b) hạ cấp chỉ ở
+  cây làm việc, không để lại diff PR — `reset <rev> && checkout -- f && reset ORIG_HEAD`, `update-index --index-info`
+  rồi `checkout -- f`: **chưa có lớp đỡ** ngoài sandbox OS (`LOOP-HARNESS-022`).
 
 - **Cơ chế kiểm không dùng được** (ADR-0054): CLI/Gate chặn mã 126 khi guard lỗi nạp hoặc fallback hỏng;
   không dùng module nạp dở; `apply_policy` hỏng không cho raw `ask` thành allow. Runtime fallback khỏe giữ ADR-0002. State thiếu `fcntl` hoặc FS không hỗ trợ

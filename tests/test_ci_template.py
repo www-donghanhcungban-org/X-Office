@@ -114,7 +114,7 @@ class CiTemplateTest(unittest.TestCase):
             body.index("actions/setup-python@"),
             step_index(body, f"{DEV_TASK} require lint test"),
             body.index(SETUP),
-            step_index(body, f"{DEV_TASK} gate-par"),
+            body.index(f"{DEV_TASK} gate-par || gate_status=$?"),
             step_index(body, f"'{FRAMEWORK_CLI} floor --run --skip e2e'"),  # AUD-XFEAT-020
             step_index(body, f"'{FRAMEWORK_CLI} doctor'"),
             step_index(body, f"'{FRAMEWORK_CLI} ci-check'"),
@@ -137,6 +137,73 @@ class CiTemplateTest(unittest.TestCase):
                 self.assertIn("FRAMEWORK_PYTHON: ${{ steps.framework-python.outputs.python-path }}", body)
                 self.assertLess(body.index("XT_FRAMEWORK_PYTHON=%s"), body.index(SETUP))
                 self.assertNotIn("GITHUB_PATH", body)
+
+    def test_lifecycle_summary_appends_only_for_initialized_targets_and_surfaces_errors(self):
+        gate = self.jobs["gate"]
+        step = "Tóm tắt vòng đời dự án"
+        condition = gate[gate.index(step) :]
+        self.assertIn("!cancelled() && steps.framework-python.outcome == 'success'", condition)
+        self.assertIn(
+            "steps.gate-checks.outcome == 'skipped' || steps.gate-checks.outputs.flow_error == 'true'", condition
+        )
+        self.assertGreater(gate.index(step), gate.index("xt.py ci-check"))
+        primary, fallback = step_run(gate, "gate-par —"), step_run(gate, step)
+        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        stage = root / "docs/autopilot/STAGE.json"
+        stage.parent.mkdir(parents=True)
+        formatter = root / ".xtemplates/scripts/xt_flow.py"
+        formatter.parent.mkdir(parents=True)
+        (formatter.parent / "dev-task.sh").write_text(
+            "[[ $1 == gate-par ]] || exit 90\n"
+            "if [[ -n ${CHECK_PARALLEL:-} ]]; then\n"
+            "  touch gate-runs\n"
+            "  for i in {1..100}; do test -f flow-runs && break; sleep .02; done\n"
+            "  test -f flow-runs || exit 91\n"
+            '  echo "Vitest" >> "$GITHUB_STEP_SUMMARY"\n'
+            'fi\nexit "${GATE_RC:-0}"\n'
+        )
+        summary = root / "summary"
+        summary.write_text("trước\n")
+        output = root / "output"
+        env = dict(
+            os.environ,
+            XT_FRAMEWORK_PYTHON=sys.executable,
+            GITHUB_STEP_SUMMARY=str(summary),
+            GITHUB_OUTPUT=str(output),
+            FLOW_ERROR="",
+        )
+
+        def run(script, **options):
+            return subprocess.run(["bash", "-eu", "-c", script], cwd=root, env={**env, **options}, capture_output=True)
+
+        stage.touch()
+        self.assertEqual(run(primary).returncode, 0)  # phiên bản đã cài chưa có formatter
+        stage.unlink()
+        formatter.write_text(
+            "import os, sys, time\nfrom pathlib import Path\n"
+            "assert sys.argv[1:] == ['--github-summary']\n"
+            "if os.environ.get('CHECK_PARALLEL'):\n"
+            "    Path('flow-runs').touch()\n"
+            "    for _ in range(100):\n"
+            "        if Path('gate-runs').exists(): break\n"
+            "        time.sleep(.02)\n"
+            "    else: sys.exit(92)\n"
+            "if not Path('docs/autopilot/STAGE.json').read_text(): sys.exit(2)\n"
+            "print('kết quả')\n"
+        )
+        self.assertEqual(run(primary).returncode, 0)  # dự án chưa khởi tạo
+        self.assertEqual(summary.read_text(), "trước\n")
+        stage.write_text("{}")
+        self.assertEqual(run(primary, CHECK_PARALLEL="1", GATE_RC="17").returncode, 17)
+        self.assertEqual(summary.read_text(), "trước\nVitest\nkết quả\n")
+        self.assertFalse(output.exists())
+        self.assertEqual(run(fallback).returncode, 0)  # require/setup hỏng trước gate
+        stage.write_text("")
+        self.assertEqual(run(primary).returncode, 0)  # cho sàn, doctor và ci-check chạy tiếp
+        self.assertEqual(output.read_text(), "flow_error=true\n")
+        self.assertEqual(run(fallback, FLOW_ERROR="true").returncode, 1)
+        self.assertEqual(run(fallback).returncode, 2)
+        self.assertEqual(summary.read_text(), "trước\nVitest\nkết quả\nkết quả\n")
 
     def test_pr_title_step(self):
         self.assertNotIn("pull_request.title", self.text)  # không còn ở CI nặng (T-2401)
@@ -180,10 +247,36 @@ class CiTemplateTest(unittest.TestCase):
         self.assertIn(f'mode="$({DEV_TASK} e2e-mode)"\n', e2e)  # gán riêng: lỗi dev-task → bước đỏ (set -e)
         self.assertIn("set -euo pipefail", e2e)
         self.assertLess(e2e.index("actions/setup-python@"), e2e.index("e2e-mode"))
+        for header in ("id: framework-python", "name: Runtime của khung"):
+            self.assertIn(f"- {header}\n        if: steps.config.outputs.empty != 'true'\n", e2e)
         self.assertLess(e2e.index("e2e-mode"), e2e.index(SETUP))
         self.assertIn(f'run: {DEV_TASK} e2e "$SHARD" "$TOTAL"\n', e2e)
         self.assertIn("fail-fast: false", e2e)
         self.assertIn("steps.mode.outputs.mode == 'whole' && matrix.shard == 1", e2e)
+
+    def test_only_explicit_empty_e2e_skips_runtime_install(self):
+        script = step_run(self.jobs["e2e"], "Nhận diện cấu hình E2E")
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            output = root / "output"
+            template = (ROOT / "framework/templates/xt.yaml").read_text()
+            for config, skip in [
+                (None, False),
+                (template, True),
+                ("e2e: command", False),
+                ('e2e: ""\ne2e: command', False),
+                ("other: 1", False),
+            ]:
+                if config is not None:
+                    (root / "xt.yaml").write_text(config)
+                output.write_text("")
+                subprocess.run(
+                    ["bash", "-eu", "-c", script],
+                    cwd=root,
+                    check=True,
+                    env={**os.environ, "GITHUB_OUTPUT": str(output)},
+                )
+                self.assertEqual(output.read_text() == "empty=true\n", skip)
 
     def test_hardening_kept(self):
         """Ghim SHA, quyền tối thiểu, timeout mỗi job, concurrency theo PR, persist-credentials: false, không
@@ -200,7 +293,21 @@ class CiTemplateTest(unittest.TestCase):
                 self.assertEqual(n, 1)
                 self.assertEqual(body.count("persist-credentials: false"), n)
         for ref in re.findall(r"uses: (\S+)", self.text):
-            self.assertRegex(ref, r"@[0-9a-f]{40}$")
+            if ref != "./.github/actions/xt-ci-tools":
+                self.assertRegex(ref, r"@[0-9a-f]{40}$")
+
+    def test_project_toolchain_is_optional_and_only_runs_on_an_active_e2e_shard(self):
+        local_action = "uses: ./.github/actions/xt-ci-tools"
+        for name in ("gate", "e2e"):
+            body = self.jobs[name]
+            self.assertEqual(body.count(local_action), 1)
+            start = body.index("      - name: Toolchain của dự án")
+            step = body[start : body.index(local_action, start)]
+            self.assertIn("hashFiles('.github/actions/xt-ci-tools/action.yml') != ''", step)
+            self.assertLess(body.index(local_action), body.index(SETUP))
+            if name == "e2e":
+                self.assertIn("steps.mode.outputs.mode == 'shard'", step)
+                self.assertIn("steps.mode.outputs.mode == 'whole' && matrix.shard == 1", step)
 
     def test_protection_guard_step_reads_ruleset(self):
         body = self.jobs["quality"]

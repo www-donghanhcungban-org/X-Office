@@ -854,9 +854,11 @@ def install_framework(xt_dir: Path, label: str | None, office_3d: bool = False) 
         copy_files_replace(SRC / "research", linked_research(SRC), xt_dir / "research")
     drop_symlink(xt_dir / "scripts")
     (xt_dir / "scripts").mkdir(exist_ok=True)
-    for f in ("xt.py", "dev-task.sh", "check-links.py", "xt_adapter.py"):
+    optional_scripts = ("xt_adapter.py", "xt_flow.py", "xt_acceptance.py", "xt_ops_setup.py", "xt_release_ops.py")
+    for f in ("xt.py", "dev-task.sh", "check-links.py", *optional_scripts):
         drop_symlink(xt_dir / "scripts" / f)
-        if f == "xt_adapter.py" and not (SRC / "scripts" / f).is_file():  # khung tối giản/bản cũ: không có adapter
+        if f in optional_scripts and not (SRC / "scripts" / f).is_file():  # khung tối giản/bản cũ
+            (xt_dir / "scripts" / f).unlink(missing_ok=True)
             continue
         shutil.copy2(SRC / "scripts" / f, xt_dir / "scripts" / f)
     (xt_dir / "scripts" / "dev-task.sh").chmod(0o755)
@@ -2848,6 +2850,7 @@ def new_bootstrap(
     scale: str,
     identity: dict[str, str] | None = None,
     root_check: Callable[[], None] | None = None,
+    adapters: list[str] | None = None,
 ) -> int:
     """D-452: một commit trước hook; manifest dự kiến giống hệt manifest sau khi hook thực sự có mặt."""
     check = root_check or (lambda: None)
@@ -2859,7 +2862,15 @@ def new_bootstrap(
     new_identity(target, identity or {})
     check()
     code = install(
-        target, False, False, None, with_github=True, no_git_hooks=True, pack=pack, _new_cwd=root_check is not None
+        target,
+        False,
+        False,
+        None,
+        with_github=True,
+        adapters=adapters,
+        no_git_hooks=True,
+        pack=pack,
+        _new_cwd=root_check is not None,
     )
     if code:
         return code
@@ -2913,7 +2924,9 @@ def new_current_directory(destination: Path) -> Iterator[None]:
                 os.close(descriptor)
 
 
-def new_inplace_bootstrap(destination: Path, pack: dict[str, Any], name: str, idea: str, scale: str) -> int:
+def new_inplace_bootstrap(
+    destination: Path, pack: dict[str, Any], name: str, idea: str, scale: str, adapters: list[str] | None = None
+) -> int:
     """D-455/D-460: giữ inode của đích; chỉ tiến trình mkdir .git thành công được bootstrap, không xoá dữ liệu khi hỏng."""
     expected = new_root_identity(destination)
     with new_current_directory(destination):
@@ -2936,7 +2949,7 @@ def new_inplace_bootstrap(destination: Path, pack: dict[str, Any], name: str, id
                     raise OSError("--new: gốc hoặc claim đã bị thay trong lúc bootstrap")
 
             with new_project_environment() as identity:
-                code = new_bootstrap(Path("."), pack, name, idea, scale, identity, check)
+                code = new_bootstrap(Path("."), pack, name, idea, scale, identity, check, adapters)
             complete = code == 0
             return code
         finally:
@@ -2948,7 +2961,9 @@ def new_inplace_bootstrap(destination: Path, pack: dict[str, Any], name: str, id
                 log(f"⚠ --new chưa hoàn tất; giữ nguyên output dở và dữ liệu đang có tại {retained}; không tự xoá")
 
 
-def install_new(target: Path, pack: dict[str, Any], idea: str, name: str | None, scale: str) -> int:
+def install_new(
+    target: Path, pack: dict[str, Any], idea: str, name: str | None, scale: str, adapters: list[str] | None = None
+) -> int:
     """F-111/D-460: mkdir độc quyền cho đích thiếu, rồi bootstrap neo vào inode; mọi lỗi giữ output dở, không rename đích."""
     idea = "".join(char for char in idea if char in "\n\t" or unicodedata.category(char) != "Cc")
     profiles = pack.get("profiles")
@@ -2976,7 +2991,7 @@ def install_new(target: Path, pack: dict[str, Any], idea: str, name: str | None,
         if missing:
             # Thua mkdir là exit 2, không đổi sang nhánh "đích rỗng đã có" và không thay inode của bên thắng (D-460).
             destination.mkdir()
-        code = new_inplace_bootstrap(destination, pack, slug, idea, scale)
+        code = new_inplace_bootstrap(destination, pack, slug, idea, scale, adapters)
         if code:
             return code
     except (OSError, subprocess.SubprocessError) as exc:
@@ -3005,10 +3020,9 @@ def new_flags_error(args: argparse.Namespace) -> str | None:
         args.no_git_hooks,
         args.preset is not None,
         args.stage_init,
-        bool(args.harness),
         args.with_office_3d,
     )
-    return "--new chỉ nhận --pack/--idea/--name/--scale" if any(incompatible) else None
+    return "--new chỉ nhận --pack/--idea/--name/--scale/--harness" if any(incompatible) else None
 
 
 def sync_flags_error(args: argparse.Namespace) -> bool:
@@ -3100,7 +3114,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     if a.new:
         assert pack is not None  # new_flags_error đã đòi --pack; load_pack đã kiểm gói
-        return install_new(Path(a.target), pack, a.idea, a.name, a.scale or "S")
+        return install_new(Path(a.target), pack, a.idea, a.name, a.scale or "S", hosts)
     if a.plan:
         return install_plan(
             Path(a.target),

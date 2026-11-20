@@ -11,8 +11,10 @@
   "scripts": {
     "lint": "biome ci --error-on-warnings .",
     "format": "biome format --write .",
+    "dev": "node --watch scripts/dev.ts",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run",
+    "test": "bash scripts/test-with-postgres.sh",
+    "test:watch": "vitest watch",
     "build": "node scripts/build.ts",
     "audit:exceptions": "node scripts/check-audit-exceptions.ts",
     "migrate": "node src/migrate.ts",
