@@ -3,8 +3,8 @@
 > G8 Vận hành & tiến hoá (3.34.0, `harden`, D-136) · 2026-11-20
 
 ## Đang làm
-- 2026-11-19 **3.34.0 đã phát hành** (tag `v3.34.0` của X-Templates, agent ký GO-NO-GO §5 ở #674): harden ADR-0080 xong 14 đợt (D-494…D-509; guard mặc định chặn D-503; giới hạn đã biết ở `harness-files.md`, có hạn 2027-01-21). Audit delta 13 nhóm ở `fe5f1e8e` (SEC/TEST/DOC/HAR `rút gọn` — phần chưa rà ghi ở bảng nhóm của sổ); 🔴/🟠 mở 0; 🟠 chấp nhận AUD-DEP-037 (D-514).
-- ADR-0081 (D-511, #673): `compose` giữ quy mô cũ (lỗi đọc → dừng, AUD-HAR-437), mặc định mới S; `doctor` ở build không cảnh báo chậm MINOR/PATCH ([đo dự án đích](research/2026-11-19-target-project-speed.md)). Nâng khung kèm `actions/setup-python` 3.15.2 ở CI dự án gọi `xt.py` (ADR-0078).
+- 2026-11-20 audit delta `fe5f1e8..1c99073` ở #17 (draft, đã gộp #18/#19): 0 🔴, 🟠 đã sửa AUD-SEC-999 (`git merge-file`), AUD-DOC-309/310 (chữ lịch sử 84 tệp, dải D-9001+); giải nén/A11Y-004 theo bản của main; 🟢 mới ở sổ; chưa quét: gitleaks/semgrep/zizmor, đo thật. Trước đó **3.34.0 phát hành** (tag `v3.34.0` của X-Templates; giới hạn guard ở `harness-files.md`, hạn 2027-01-21); 🟠 chấp nhận AUD-DEP-037 (D-514).
+- ADR-0081 (D-511, #673): `compose` giữ quy mô cũ, mặc định mới S; `doctor` ở build không cảnh báo chậm MINOR/PATCH ([đo dự án đích](research/2026-11-19-target-project-speed.md)). Nâng khung kèm `actions/setup-python` 3.15.2 ở CI dự án gọi `xt.py` (ADR-0078).
 - D-522/523: trình MVP sau smoke. [Vòng sửa–thử nhanh](docs/adr/0085-fast-development-feedback.md) cho gói web, PLAN và CI.
 - **Factory** ([ADR-0083](docs/adr/0083-factory-lifecycle-flow.md), X-Templates D-521): ba giai đoạn, nghiệm thu trên repo mới, receipt vào release/registry, diễn tập bàn giao và kiểm SLO. Nợ và điều kiện lên production ở [PLAN](docs/autopilot/PLAN-factory-e2e.md).
 - Dự án đích ([registry](docs/ops/registry.json)): X-Company #114, xboss #747, dhcb #1506 đã nâng 3.34.0; hotel-manager #159 mở, chờ chủ dự án xử lý check đỏ có từ trước (`dep-audit` Next 16.x, ngoại lệ zod quá hạn, test `expected 410 to be 200`, `schema-compat`). Còn mở: AUD-TEST-061 (CodeQL); fixture host Codex/Gemini.
@@ -34,5 +34,5 @@
 - Coverage cục bộ < 100 % khi `coverage` cài ở site người dùng: hook chạy `python3 -I` nên tiến trình con không được đo — CI là cổng coverage (đo 2026-11-05).
 
 ## Bàn giao phiên
-- Mốc X-Office: `0f7860c` (#19); đồng bộ X-Templates #691. Mở `python3 scripts/xt.py app` để thử Văn phòng; chạy `python3 -m unittest tests.test_app_office` và `python3 scripts/xt.py app --smoke` trước khi trình.
+- Mốc X-Office: `ce0e3c8` (#17); đồng bộ X-Templates #691. Mở `python3 scripts/xt.py app` để thử Văn phòng; chạy `python3 -m unittest tests.test_app_office` và `python3 scripts/xt.py app --smoke` trước khi trình.
 - Container mới: `scripts/dev-task.sh setup`; trước khi đẩy `gate-fast`, CI là cổng đầy đủ. Subagent dùng scratch riêng dưới `/home/liend` (không `/tmp`: tmpfs, mất khi khởi động lại). Gate cục bộ: `coverage` và `pip` phải ở site-packages của `python3` (hook chạy `python3 -I`) — venv 3.15 đầu PATH; G7 cần `fetch --unshallow --tags`; `release-check` chạy ở worktree sạch (`.agents/`, `.codex/` chưa commit làm hàng `tree` đỏ).

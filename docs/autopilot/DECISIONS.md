@@ -310,7 +310,7 @@
 - Chọn: Dùng cặp nhỏ/lớn từ cùng lần đo lại
 - Lý do (tiêu chí chất lượng cuối): Nếu cả hai lượt đều vượt ngưỡng, phép kiểm phải đỏ; đối chiếu trong cùng lượt giữ tỷ lệ, sàn, độ dư và một lần retry
 - Đường lùi: Revert thay đổi helper và ca đồng hồ giả nếu cần
-### D-485 · 2026-11-14T07:23:00+00:00 · Chọn chính sách runtime cho X-Office khi chuyển Python 3.15?
+### D-485 · 2026-11-14T07:23:00+00:00 · Chọn chính sách runtime cho X-Templates khi chuyển Python 3.15?
 
 - Phương án: (1) Chỉ hỗ trợ dòng Python 3.15, ghim 3.15.2 trong repo và CI · (2) Dùng Python 3.15 mặc định, giữ cổng hỗ trợ 3.11 và 3.14
 - Chọn: Chỉ hỗ trợ dòng Python 3.15, ghim 3.15.2 trong repo và CI
@@ -560,7 +560,9 @@
 - Lý do (tiêu chí chất lượng cuối): Đúng: gương là bản sao byte của nguồn; khi người dùng chủ động --force-harness thay .claude/skills/<tên> thì gương giữ bản cũ sẽ LỆCH nguồn (test gương trùng byte của dự án như dhcb đỏ) — đi theo nguồn mới là hành vi nhất quán với mô hình 'tệp trùng bản khung ghi là của khung' mà install.py dùng cho mọi tệp harness. Phương án (a) thêm một ngoại lệ nữa vào luật sở hữu, để lại gương lệch nguồn, và nội dung cũ vẫn còn trong git. Lần cài ĐẦU với --force-harness vẫn giữ gương và để .xtemplates-new (chưa có ghi nhận) — đã sửa ở lượt 2.
 - Đường lùi: Áp phương án (a) trong install.py + test cài hai lượt
 
-### D-521 · 2026-11-20T00:01:37+00:00 · Đồng bộ X-Templates #684 mang ADR-0082 (harness Codex) trùng số với ADR-0082 riêng của X-Office (màn Văn phòng). Đánh số thế nào?
+### D-9001 · 2026-11-20T00:01:37+00:00 · Đồng bộ X-Templates #684 mang ADR-0082 (harness Codex) trùng số với ADR-0082 riêng của X-Office (màn Văn phòng). Đánh số thế nào?
+
+- Đính chính số (AUD-DOC-310): ghi lúc đầu là D-521, trùng D-521 của X-Templates (factory, ADR-0083). Quyết định riêng của X-Office dùng dải `D-9001+` như ADR `9001+` (`docs/adr/README.md`); nội dung không đổi.
 
 - Phương án: (1) Giữ cả hai tệp 0082-* (khác slug), để ID ADR-0082 trỏ hai quyết định · (2) Đổi ADR riêng của X-Office sang dải số dành riêng cho bản phái sinh (ADR-9001+), cập nhật mọi chỗ nhắc ở X-Office; ADR của X-Templates giữ nguyên số · (3) Đổi số ADR Codex của upstream khi đồng bộ
 - Chọn: Đổi ADR riêng của X-Office sang dải số dành riêng cho bản phái sinh (ADR-9001+), cập nhật mọi chỗ nhắc ở X-Office; ADR của X-Templates giữ nguyên số
@@ -599,12 +601,12 @@
 
 - Phương án: (1) A: chấp nhận có hạn 2026-12-31, ghi nợ, gửi phản hồi về X-Templates · (2) B: sửa cục bộ compose.yaml/migrate.ts/dev-preview.mjs
 - Chọn: A: chấp nhận có hạn 2026-12-31, ghi nợ, gửi phản hồi về X-Templates
-- Lý do (tiêu chí chất lượng cuối): Tiêu chí 2+3: gói là mẫu đồng bộ từ X-Templates (D-521), registry không có dự án đích dùng gói (pack: null); sửa cục bộ gây lệch upstream và cần e2e Docker không có ở đây; không ảnh hưởng dữ liệu thật
+- Lý do (tiêu chí chất lượng cuối): Tiêu chí 2+3: gói là mẫu đồng bộ từ X-Templates (D-9001), registry không có dự án đích dùng gói (pack: null); sửa cục bộ gây lệch upstream và cần e2e Docker không có ở đây; không ảnh hưởng dữ liệu thật
 - Đường lùi: Làm B hoặc nhận bản sửa upstream qua đồng bộ
 
 ### D-9005 · 2026-11-20T15:02:46+00:00 · 3 🟠 a11y audit delta: sửa hay chấp nhận
 
 - Phương án: (1) A: sửa office.js tại X-Office; chấp nhận có hạn 2 lỗi UI mẫu notes-ui của gói web-api-ts · (2) B: sửa cả 3 tại X-Office
 - Chọn: A: sửa office.js tại X-Office; chấp nhận có hạn 2 lỗi UI mẫu notes-ui của gói web-api-ts
-- Lý do (tiêu chí chất lượng cuối): Tiêu chí 2+3: office.js là mã của X-Office, sửa gọn có test; notes-ui là mẫu đồng bộ từ X-Templates (D-521/D-9004), sửa cục bộ gây lệch upstream và e2e gói cần Docker; gửi phản hồi upstream
+- Lý do (tiêu chí chất lượng cuối): Tiêu chí 2+3: office.js là mã của X-Office, sửa gọn có test; notes-ui là mẫu đồng bộ từ X-Templates (D-9001/D-9004), sửa cục bộ gây lệch upstream và e2e gói cần Docker; gửi phản hồi upstream
 - Đường lùi: Làm B hoặc nhận bản sửa upstream

@@ -69,7 +69,7 @@ Bản < 3.20.0: [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md) (T-3651; `changel
 ### Changed
 
 - ADR riêng của X-Office (bản phái sinh) dùng dải số **9001+** để không va với số tăng dần của X-Templates: ADR màn
-  Văn phòng đổi `ADR-0082` → [ADR-9001](docs/adr/9001-office-view-renderers.md) (nội dung không đổi; D-521) vì đồng bộ
+  Văn phòng đổi `ADR-0082` → [ADR-9001](docs/adr/9001-office-view-renderers.md) (nội dung không đổi; D-9001, trước ghi nhầm D-521) vì đồng bộ
   X-Templates mang `ADR-0082` của chính nó (harness Codex). Đồng bộ X-Templates tới `9a65104b` (#684–#686).
 - `xt.py test-select --unittest` (cổng commit `gate-fast`, khoá `test_fast`) chọn test theo **lớp** thay vì theo tệp: lớp
   chạy khi thân lớp nhắc tên tệp đổi, có glob khớp tên đó (`GO-NO-GO*.md` không còn khớp mọi `.md`), hoặc nhắc tên một
@@ -95,10 +95,17 @@ Bản < 3.20.0: [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md) (T-3651; `changel
   (`.claude/settings.json`, `.codex/hooks.json`, `.cursor/hooks.json`, thư mục cha, glob) bị chặn; giải nén cả tệp nén
   không nêu thành viên giữ như cũ. Nợ AUD-SEC-992 (tệp nén dựng sẵn chứa hàng rào). Audit delta (T-4003): chặn thêm
   `tar --no-anchored`, `7z -r0`, `--strip-components` bóc hết đường, `jar xf`/`pax -r` nêu thành viên và nguồn
-  xargs/grep ở thư mục cha của thư mục rào (`.github`).
+  xargs/grep ở thư mục cha của thư mục rào (`.github`). Đổi guard của khung (`.claude/hooks/`) — dự án đích nhận khi chạy
+  lại `install.py`; giới hạn đã biết ở `harness-files.md`.
+- Guard chặn `git merge-file <tệp hàng rào> …` (ghi đè tệp đầu; `-p`/`--stdout`/`--object-id` vẫn cho chạy): AUD-SEC-999
+  (T-3971). Đổi guard của khung — dự án đích nhận khi chạy lại `install.py`.
 - Skill gate/autopilot/complete: `description` đặt trong nháy (YAML hợp lệ cho Codex); `render_skill` từ chối
   frontmatter hỏng kèm lý do (AUD-HAR-447, T-4004). README.md:73 trỏ đúng `/tmp/x-office`; tên lịch sử "X-Templates"
   được trả lại ở ADR-0006/0007/0068/0078 và mục [3.34.0] (T-4005).
+- Tài liệu lịch sử (ADR `0xxx`, `docs/archive/`, research, báo cáo audit, PLAN đã xong; 84 tệp) trở lại chữ X-Templates
+  của lúc sự kiện xảy ra — đổi chữ hàng loạt khi tách repo làm sai lịch sử và gây xung đột đồng bộ (AUD-DOC-309, rộng hơn
+  T-4005; `tests/test_docs_history.py`). Quyết định riêng của X-Office dùng dải `D-9001+` (mục D-521 cục bộ → D-9001,
+  trùng D-521 của X-Templates — AUD-DOC-310). README thêm cờ `--with-office-3d`, `CLAUDE.md` thêm `/factory`.
 
 - Màn Văn phòng 3D: nhãn phòng ẩn/hiện theo chỗ nhãn đứng có còn là sàn hay tường của **chính** phòng đó (tia từ
   camera, không theo hộp nhãn) — phóng to ở toàn cảnh, phòng còn trên hình vẫn giữ nhãn: thử điểm neo đã kẹp rồi các điểm trên sàn phòng (lưới 3×3)

@@ -15209,7 +15209,53 @@ def _checkout_index_targets(args: List[str]) -> List[str]:
     return ([prefix] if prefix else []) + [prefix + p for p in pos] + partial
 
 
+MERGE_FILE_LONGS = ("ours", "theirs", "union", "diff3", "zdiff3", "object-id", "stdout", "quiet")
+MERGE_FILE_LONG_VALUE = ("marker-size", "diff-algorithm")
+
+
+def _merge_file_long(arg: str) -> Tuple[str, bool, bool]:
+    """(tên đầy đủ hay "" khi lạ/mơ hồ, phủ định `--no-`, có `=giá trị`) của `--tên[=v]` theo parse-options của git
+    (tiền tố duy nhất của tên dài là đủ: `--marker 9` = `--marker-size 9`, `--std` = `--stdout`)."""
+    name, eq, _ = arg[2:].partition("=")
+    neg = name.startswith("no-")
+    base = name[3:] if neg else name
+    hits = [c for c in (*MERGE_FILE_LONGS, *MERGE_FILE_LONG_VALUE) if base and c.startswith(base)]
+    return (hits[0] if len(hits) == 1 else ""), neg, bool(eq)
+
+
+def _merge_file_opt(a: str, flags: Dict[str, bool]) -> int:
+    """Áp tuỳ chọn `a` (`--…` hay cụm `-…`) lên `flags` (lần xuất hiện sau thắng); trả số token kế nó nuốt làm giá trị:
+    `-L` ăn nhãn (phần dính liền sau nó, không thì token kế — `-Lp` là nhãn `p`, không phải `-p`)."""
+    if a.startswith("--"):
+        name, neg, eq = _merge_file_long(a)
+        if name in flags:
+            flags[name] = not neg
+        return int(name in MERGE_FILE_LONG_VALUE and not eq)
+    cut = a.find("L", 1)
+    if "p" in (a[1:cut] if cut > 0 else a[1:]):
+        flags["stdout"] = True
+    return int(cut == len(a) - 1)
+
+
+def _merge_file_target(args: List[str]) -> List[str]:
+    """`git merge-file <hiện tại> <gốc> <khác>` ghi kết quả trộn vào tệp ĐẦU (AUD-SEC-999); `-p`/`--stdout` in ra stdout
+    và `--object-id` ghi object, không ghi tệp. Đọc tuỳ chọn như git 2.43 (đo): viết tắt tên dài, `--no-…`, `-L` ăn nhãn."""
+    flags = {"stdout": False, "object-id": False}
+    pos, i = [], 0
+    while i < len(args):
+        a, i = args[i], i + 1
+        if a == "--":
+            pos += args[i:]
+            break
+        if a[:1] == "-" and len(a) > 1:
+            i += _merge_file_opt(a, flags)
+        else:
+            pos.append(a)
+    return [] if any(flags.values()) else pos[:1]
+
+
 GIT_WRITERS: Dict[str, Callable[[List[str]], List[str]]] = {
+    "merge-file": _merge_file_target,
     "rm": _positionals,
     "mv": _positionals,
     "checkout-index": _checkout_index_targets,
