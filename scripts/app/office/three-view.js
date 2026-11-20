@@ -190,16 +190,18 @@ export function createThreeView(stage) {
     // Hộp các nhãn đã đặt: nhãn agent/trạng thái (bám người) đặt trước, nhãn phòng chồng lên chúng hay lên nhãn phòng đặt
     // trước thì nhường (compose phát phòng đang xem trước).
     const placed = [];
+    // Đủ phần tử TRƯỚC khi xử lý theo thứ tự đổi chỗ: phần tử thứ i luôn là nhãn thứ i của danh sách (tạo lười trong vòng
+    // lặp sẽ đẩy phần tử của nhãn agent vào chỉ mục của nhãn phòng ở khung hình đầu).
+    while (tagEls.length < list.length) {
+      const el = document.createElement("span");
+      el.className = "office-tag";
+      labels.append(el);
+      tagEls.push(el);
+    }
     const order = list.map((_, i) => i).sort((a, b) => (list[a].kind === "room") - (list[b].kind === "room"));
     order.forEach((i) => {
       const t = list[i];
-      let el = tagEls[i];
-      if (!el) {
-        el = document.createElement("span");
-        el.className = "office-tag";
-        labels.append(el);
-        tagEls.push(el);
-      }
+      const el = tagEls[i];
       const p = new THREE.Vector3(t.x, t.z, t.y).project(camera);
       el.textContent = t.text;
       el.dataset.kind = t.kind; // agent | state | room — test và CSS phân biệt nhãn agent với nhãn phòng

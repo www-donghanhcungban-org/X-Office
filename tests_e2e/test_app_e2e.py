@@ -372,6 +372,15 @@ class OfficeTest(AppCase):
         canvas3d = page.locator("canvas.office-3d")
         canvas3d.wait_for()
         self.assertTrue(page.locator("canvas.office-canvas:not(.office-3d)").is_hidden())
+        # Ngay khung hình 3D đầu (chuyển động tắt: không vẽ lại khi không đổi gì): phần tử nhãn thứ i là nhãn thứ i — nhãn
+        # agent không bị nhãn phòng ghi đè.
+        page.wait_for_function("() => document.querySelectorAll('.office-labels .office-tag').length > 0")
+        self.assertEqual(
+            page.evaluate(
+                "() => document.querySelectorAll('.office-labels .office-tag[data-kind=agent]:not([hidden])').length"
+            ),
+            5,
+        )
         page.wait_for_function(  # đúng 5 nhãn tên agent hiện, bám nhân vật (nhãn phòng/trạng thái là loại khác)
             "() => document.querySelectorAll('.office-labels .office-tag[data-kind=agent]:not([hidden])').length === 5"
         )
@@ -725,8 +734,12 @@ class OfficeTest(AppCase):
                 self.assertFalse(a[2] < b[4] and b[2] < a[4] and a[3] < b[5] and b[3] < a[5], (a[1], b[1]))
         # Phóng tối đa + xoay sát biên rồi "Tới phòng": chỗ nhãn kẹp vào không còn trên tường/sàn của phòng (luật ẩn) —
         # phòng đang xem vẫn giữ nhãn, trọn trong khung.
-        while page.evaluate("() => JSON.parse(localStorage.getItem('xt-office') || '{}').zoom || 1") < 4:
+        zoom = "() => JSON.parse(localStorage.getItem('xt-office') || '{}').zoom || 1"
+        for _ in range(10):  # có trần: mức phóng tối đa đổi hay không còn lưu → đỏ ở assert dưới, không treo
+            if page.evaluate(zoom) >= 4:
+                break
             page.click("button[aria-label='Phóng to']")
+        self.assertGreaterEqual(page.evaluate(zoom), 4)
         page.locator("canvas.office-3d").focus()
         for _ in range(8):
             page.keyboard.press("ArrowLeft")
@@ -743,16 +756,36 @@ class OfficeTest(AppCase):
             " 'Nghiên cứu'].map(label => ({label, state: 'work', task: {id: 'T-1'}})); const out = [];"
             " for (const [w, h, zoom] of [[1118, 680, 1], [1118, 680, 2.44], [358, 302, 1]]) {"
             " const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');"
-            " const boxes = []; const orig = iso.Iso.prototype.tag;"
+            " const boxes = [], texts = []; const orig = iso.Iso.prototype.tag;"
             " iso.Iso.prototype.tag = function (x, y, z, text, ...r) { boxes.push([String(text).startsWith('▸ '),"
-            " this.tagBox(x, y, z, text)]); return orig.call(this, x, y, z, text, ...r); };"
+            " this.tagBox(x, y, z, text)]); texts.push(String(text)); return orig.call(this, x, y, z, text, ...r); };"
             " try { sc.drawScene(g, w, h, {theme: th.themeById('night'), scale: 'company', layout: 'open', seats,"
             " names: true, npc: true, motion: false, t: 0, zoom, pan: {x: 0, y: 0}, quality: 'high'}); }"
             " finally { iso.Iso.prototype.tag = orig; }"
             " for (const [ra, a] of boxes) for (const [rb, b] of boxes) if (ra && !rb && iso.overlaps(a, b, 0))"
-            " out.push([w, zoom]); } return out; }"
+            " out.push(['chồng', w, zoom]);"
+            " out.push(['vẽ', w, zoom, texts.filter(t => t.startsWith('▸ ')).length, texts.filter(t => !t.startsWith('▸ ')).length,"
+            " texts.includes('▸ Khu làm việc')]); } return out; }"
         )
-        self.assertEqual(hits, [])
+        self.assertEqual([h for h in hits if h[0] == "chồng"], [])
+        drawn2d = [h[1:] for h in hits if h[0] == "vẽ"]
+        # Không rỗng mà vẫn qua: có nhãn phòng và nhãn bám người được vẽ; khung hẹp vẫn còn nhãn phòng lớn nhất
+        # (Khu làm việc — dịch tránh nhãn agent thay vì bị bỏ).
+        self.assertTrue(all(rooms >= 4 and people >= 5 for _, _, rooms, people, _ in drawn2d), drawn2d)
+        self.assertTrue(all(work for *_, work in drawn2d), drawn2d)
+        # Hết chỗ (mọi hộp nhãn phủ cả khung): nhãn phòng khác nhường, nhãn của phòng đang xem vẫn được vẽ.
+        crowded = page.evaluate(
+            "async () => { const sc = await import('/office/scene.js'), th = await import('/office/themes.js'),"
+            " iso = await import('/office/iso.js'); const orig = iso.Iso.prototype.tagBox, seen = [];"
+            " iso.Iso.prototype.tagBox = function (...a) { return {...orig.apply(this, a), l: -1e6, r: 1e6, t: -1e6, b: 1e6}; };"
+            " const c = document.createElement('canvas'); c.width = 600; c.height = 400; const g = c.getContext('2d');"
+            " const f = g.fillText.bind(g); g.fillText = (t, ...r) => { seen.push(String(t)); return f(t, ...r); };"
+            " try { sc.drawScene(g, 600, 400, {theme: th.themeById('night'), scale: 'company', layout: 'open',"
+            " seats: [{label: 'Điều phối', state: 'idle'}], names: true, npc: true, motion: false, t: 0, zoom: 1,"
+            " pan: {x: 0, y: 0}, quality: 'high', focus: 'server'}); } finally { iso.Iso.prototype.tagBox = orig; }"
+            " return seen.filter(t => t.startsWith('▸ ')); }"
+        )
+        self.assertEqual(crowded, ["▸ Server"])
         self.assertEqual(watch.take(), [])
 
     # Hộp các nhãn phòng đang hiện, theo toạ độ của sân khấu: [chữ, x0, y0, x1, y1, rộng, cao].
