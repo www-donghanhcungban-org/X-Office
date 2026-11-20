@@ -624,15 +624,27 @@ export function drawScene(ctx, cw, ch, opts) {
   iso.tag = (...a) => tags.push(a);
   compose(iso, opts);
   if (opts.motion) particles(ctx, opts.season === "noel" ? "snow" : th.ambient, cw, ch, opts.t || 0);
-  // Nhãn phòng chồng lên nhãn phòng đã đặt (khung hẹp: các phòng hàng sau sát nhau trên màn) → bỏ, giữ nhãn đầu.
-  const placed = [];
+  // Nhãn phòng chồng lên nhãn agent/trạng thái hay lên nhãn phòng đã đặt (khung hẹp: các phòng hàng sau sát nhau trên
+  // màn) → bỏ. Thứ tự vẽ giữ nguyên: nhãn phòng trước, nhãn bám người đè lên sau.
+  // Nhãn phòng chỉ bị nhãn bám người đè thì dịch lên/xuống (±1, ±2 chiều cao nhãn) tìm chỗ trống; đè nhãn phòng khác thì
+  // nhường (2D không kiểm được chỗ dịch tới còn trên phòng đó không — dịch tránh phòng bên cạnh dễ đặt nhầm phòng).
+  // Không còn chỗ thì bỏ — trừ phòng đang xem.
+  const people = tags.filter((a) => a[7] !== "room").map((a) => iso.tagBox(a[0], a[1], a[2], a[3]));
+  const roomsPlaced = [];
+  const taken = (box) => people.some((o) => overlaps(o, box)) || roomsPlaced.some((o) => overlaps(o, box));
   for (const a of tags) {
+    let args = a;
     if (a[7] === "room") {
-      const box = iso.tagBox(a[0], a[1], a[2], a[3]);
-      if (placed.some((o) => overlaps(o, box))) continue;
-      placed.push(box);
+      const at = (d) => iso.tagBox(a[0], a[1], a[2] + d, a[3]);
+      const base = at(0);
+      const k = (base.b - base.t + 2) / iso.view.scale;
+      const tries = roomsPlaced.some((o) => overlaps(o, base)) ? [0] : [0, k, -k, 2 * k, -2 * k];
+      const dz = tries.find((d) => !taken(at(d)));
+      if (dz === undefined && a[8] !== opts.focus) continue;
+      args = [a[0], a[1], a[2] + (dz || 0), ...a.slice(3)];
+      roomsPlaced.push(at(dz || 0));
     }
-    tag(...a);
+    tag(...args);
   }
 }
 

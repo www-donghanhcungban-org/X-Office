@@ -164,40 +164,80 @@ export function createThreeView(stage) {
     setMat(m.material, f.color, f.glow, glowOn);
   }
 
-  function syncTags(list, focus) {
+  // Điểm màn (px trong khung) có nằm trên sàn hay tường neo của CHÍNH phòng `r` không: tia từ camera qua điểm đó cắt
+  // sàn tầng (y = zb) trong mặt bằng phòng, hoặc tường ngoài nơi nhãn neo (sau: z = 0; trái: x = 0) trong bề rộng phòng.
+  const ray = new THREE.Raycaster();
+  const ndc = new THREE.Vector2();
+  function onOwnRoom(left, top, rect, r, zb, H) {
+    ndc.set((left / rect.w) * 2 - 1, 1 - (top / rect.h) * 2);
+    ray.setFromCamera(ndc, camera);
+    const { origin: o, direction: d } = ray.ray;
+    const at = (t) => (t > 0 ? { x: o.x + d.x * t, y: o.y + d.y * t, z: o.z + d.z * t } : null);
+    const inX = (q) => q.x >= r.x && q.x <= r.x + r.w, inY = (q) => q.z >= r.y && q.z <= r.y + r.d;
+    const inH = (q) => q.y >= zb && q.y <= zb + H;
+    const floor = d.y ? at((zb - o.y) / d.y) : null;
+    if (floor && inX(floor) && inY(floor)) return true;
+    const back = r.y === 0 && d.z ? at(-o.z / d.z) : null;
+    if (back && inX(back) && inH(back)) return true;
+    const side = r.x === 0 && d.x ? at(-o.x / d.x) : null;
+    return Boolean(side && inY(side) && inH(side));
+  }
+
+  function syncTags(list, focus, plan) {
     const rect = { w: view.w, h: view.h };
-    const placed = []; // hộp các nhãn phòng đã đặt — nhãn phòng sau chồng lên thì nhường (compose phát phòng đang xem trước)
-    list.forEach((t, i) => {
-      let el = tagEls[i];
-      if (!el) {
-        el = document.createElement("span");
-        el.className = "office-tag";
-        labels.append(el);
-        tagEls.push(el);
-      }
+    const rooms = new Map(plan.rooms.map((r) => [r.id, r]));
+    const zb = plan.levels ? plan.levels * plan.levelH : 0;
+    // Hộp các nhãn đã đặt: nhãn agent/trạng thái (bám người) đặt trước, nhãn phòng chồng lên chúng hay lên nhãn phòng đặt
+    // trước thì nhường (compose phát phòng đang xem trước).
+    const placed = [];
+    // Đủ phần tử TRƯỚC khi xử lý theo thứ tự đổi chỗ: phần tử thứ i luôn là nhãn thứ i của danh sách (tạo lười trong vòng
+    // lặp sẽ đẩy phần tử của nhãn agent vào chỉ mục của nhãn phòng ở khung hình đầu).
+    while (tagEls.length < list.length) {
+      const el = document.createElement("span");
+      el.className = "office-tag";
+      labels.append(el);
+      tagEls.push(el);
+    }
+    const order = list.map((_, i) => i).sort((a, b) => (list[a].kind === "room") - (list[b].kind === "room"));
+    order.forEach((i) => {
+      const t = list[i];
+      const el = tagEls[i];
       const p = new THREE.Vector3(t.x, t.z, t.y).project(camera);
       el.textContent = t.text;
       el.dataset.kind = t.kind; // agent | state | room — test và CSS phân biệt nhãn agent với nhãn phòng
       el.hidden = false;
+      el.dataset.why = "";
       let left = ((p.x + 1) / 2) * rect.w, top = ((1 - p.y) / 2) * rect.h;
       if (t.kind === "room") {
-        // Nhãn phòng là biển chỉ dẫn: nhãn ra hẳn ngoài khung (tới bàn/tới phòng khác, phóng to) → ẩn, không ghim mép
-        // đè lên phòng khác; nhãn chỉ chạm mép (khung hẹp, xoay sát biên) → kẹp trọn để không cắt chữ. Phòng đang xem
-        // ("Tới phòng") luôn giữ nhãn, kẹp vào khung — kể cả khi phóng to khiến điểm neo ra ngoài hình.
+        // Nhãn phòng là biển chỉ dẫn: kẹp trọn vào khung (khung hẹp, xoay sát biên không cắt chữ), rồi chỉ giữ khi chỗ
+        // nhãn đứng vẫn là sàn/tường của CHÍNH phòng đó — phòng ra ngoài hình (tới bàn, tới phòng khác, phóng to) thì
+        // nhãn bị kẹp sang phòng khác → ẩn. Bị nhãn khác đè → dịch lên/xuống tìm chỗ trống vẫn trên phòng đó; không có
+        // thì nhường. Phòng đang xem ("Tới phòng") luôn có nhãn. `data-why` ghi lý do ẩn (off-room | overlap).
         const hw = el.offsetWidth / 2 + 2;
-        const out = left < -hw || left > rect.w + hw || top < 0 || top - el.offsetHeight > rect.h;
-        if (out && t.id !== focus) {
-          el.hidden = true;
-          return;
-        }
+        const raw = [left, top];
         left = Math.min(rect.w - hw, Math.max(hw, left));
         top = Math.min(rect.h - 2, Math.max(el.offsetHeight + 2, top));
-        const box = { l: left - hw + 2, r: left + hw - 2, t: top - el.offsetHeight, b: top };
-        if (placed.some((o) => overlaps(o, box))) {
+        el.dataset.clamped = Math.abs(left - raw[0]) > 1 || Math.abs(top - raw[1]) > 1 ? "1" : ""; // điểm neo ngoài khung
+        const room = rooms.get(t.id);
+        const own = (y) => t.id === focus || Boolean(room && onOwnRoom(left, y, rect, room, zb, plan.H));
+        const hide = (why) => {
           el.hidden = true;
-          return;
+          el.dataset.why = why;
+        };
+        if (!own(top)) return hide("off-room");
+        const h = el.offsetHeight + 2;
+        const boxAt = (y) => ({ l: left - hw + 2, r: left + hw - 2, t: y - el.offsetHeight, b: y });
+        const free = (y) => y >= h && y <= rect.h - 2 && !placed.some((o) => overlaps(o, boxAt(y)));
+        if (!free(top)) {
+          const alt = [top - h, top + h, top - 2 * h, top + 2 * h].find((y) => free(y) && own(y));
+          if (alt !== undefined) top = alt;
+          else if (t.id !== focus) return hide("overlap");
         }
-        placed.push(box);
+        placed.push(boxAt(top));
+      }
+      if (t.kind !== "room") {
+        const w = el.offsetWidth / 2;
+        placed.push({ l: left - w, r: left + w, t: top - el.offsetHeight, b: top });
       }
       el.style.setProperty("left", left + "px");
       el.style.setProperty("top", top + "px");
@@ -307,7 +347,7 @@ export function createThreeView(stage) {
       for (const p of [boxes, panels, dots, rings]) p.finish();
       place(opts.zoom, viewCorners(opts).box, plan);
       renderer.render(scene, camera);
-      syncTags(sink.tags, opts.focus);
+      syncTags(sink.tags, opts.focus, plan);
       api.dirty = false;
     },
     dispose() {
