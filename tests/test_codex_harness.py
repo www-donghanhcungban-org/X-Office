@@ -221,6 +221,10 @@ class SkillFrontmatterTest(unittest.TestCase):
         self.assertIn("frontmatter dòng 3", str(out))
         self.assertIn("`: `", str(out))
 
+    def test_render_skill_rejects_missing_or_unclosed_frontmatter(self):
+        self.assertIn("không mở bằng", str(install.render_skill("thân không có frontmatter\n".encode(), "s")))
+        self.assertIn("không có dòng `---` đóng", str(install.render_skill(b"---\nname: x\ndescription: y\n", "s")))
+
     def test_render_skill_keeps_valid_bytes_and_rejects_non_utf8(self):
         ok = "---\nname: x\ndescription: 'Chạy (có CI: gate)'\n---\nthân\n".encode()
         self.assertEqual(install.render_skill(ok, "s"), ok)

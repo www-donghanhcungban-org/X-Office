@@ -3004,6 +3004,8 @@ class FenceExtractMembersMoreTest(_FenceRootsMixin, unittest.TestCase):
         # quyết định nền giữ nguyên (không chặn oan)
         "tar -xzf a.tar -C src",
         "unzip -o a.zip 'dist/*'",
+        "unzip -o",
+        "unzip -qo -",
         "git checkout main -- src/app.py",
         "tar -xf a.tar",
     )

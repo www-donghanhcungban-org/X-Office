@@ -1504,10 +1504,10 @@ def render_skill(raw: bytes, source: str) -> bytes | str:
         return "không phải UTF-8"
     except ValueError as exc:
         return str(exc)
-    for n, line in enumerate(text.split("\n")[1:], 2):
-        if line.rstrip("\r") == "---":
-            break
-        m = FM_LINE_RE.fullmatch(line.rstrip("\r"))
+    lines = [ln.rstrip("\r") for ln in text.split("\n")]
+    end = lines.index("---", 1)  # agent_frontmatter đã bảo đảm có dòng `---` đóng
+    for n, line in enumerate(lines[1:end], 2):
+        m = FM_LINE_RE.fullmatch(line)
         if m and m[2] and m[2].strip(" \t")[:1] not in ('"', "'") and re.search(r":(?:[ \t]|$)", m[2]):
             return f"frontmatter dòng {n}: giá trị trơn chứa `: ` (YAML đọc thành ánh xạ lồng) — đặt trong nháy"
     return raw
