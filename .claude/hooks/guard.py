@@ -15018,6 +15018,60 @@ def _fence_restore_asks(
     return out + [FENCE_WHY.format(f"{what} vào {s} {FENCE_NEW_TAG}") for s, h in hits if h == "fence"]
 
 
+def _tar_members(args: List[str]) -> List[str]:
+    """Thành viên `tar -x` nêu tên, mỗi tên ghép với thư mục `-C` đang hiệu lực lúc nó xuất hiện (`-C` cộng dồn như
+    `_tar_extract_dirs`); không giải nén hay ra stdout/`--to-command` → rỗng (AUD-SEC-990)."""
+    opts = _tar_opts(args)
+    keys = _opt_keys(opts)
+    if not keys & TAR_EXTRACT or keys & {"O", "to-stdout", "to-command"}:
+        return []
+    cur, out = ".", []
+    for k, v in opts:
+        if k in ("C", "directory") and v:
+            cur = posixpath.join(cur, v)
+        elif not k and v:
+            out.append(posixpath.join(cur, v))
+    return out
+
+
+def _unzip_members(args: List[str]) -> List[str]:
+    """Thành viên `unzip` nêu tên (sau tệp zip, trước `-x`), ghép với `-d` (vắng = `.`); `-l`/`-p`/`-t`… chỉ đọc →
+    rỗng. Cú pháp `unzip [cờ] file [thành viên…] [-x loại…] [-d D]`; `-d`/`-P`/`-O`/`-I` ăn giá trị (AUD-SEC-990)."""
+    if not _unzip_dirs(args):
+        return []
+    dest = (_unzip_parse(args)[0] or ["."])[-1]
+    pos, excl, i = [], False, 0
+    while i < len(args):
+        a, i = args[i], i + 1
+        if a == "-x":
+            excl = True
+        elif a[:1] == "-" and len(a) > 1:
+            cut = next((j for j, c in enumerate(a[1:], 1) if c in "dPOI"), 0)
+            i += 1 if cut and cut == len(a) - 1 else 0  # chữ ăn giá trị cuối cụm lấy token kế
+            excl = excl and a[cut : cut + 1] != "d" if cut else excl
+        elif not excl:
+            pos.append(a)
+    return [posixpath.join(dest, m) for m in pos[1:]]  # token đầu là tệp zip
+
+
+def _extract_member_asks(
+    n: List[str], argv: List[str], root: str, cwd: Optional[str], env: Optional[Dict[str, str]] = None
+) -> List[str]:
+    """AUD-SEC-990: giải nén có thành viên nêu tên phủ tệp hàng rào (`tar -xf a.tar .claude/settings.json`, `unzip -o
+    a.zip .codex/hooks.json -d .`) ghi đè hàng rào — đích `.` chỉ xét thư mục, không xét tên thành viên. Giải nén cả
+    archive không nêu tên: không đọc được ruột archive ở đây (giới hạn đã biết)."""
+    n = _with_env_opts(n, argv, env) if n else n
+    name = n[0] if n else ""
+    if name not in TAR_NAMES and name != "unzip":
+        return []
+    members = _unzip_members(n[1:]) if name == "unzip" else _tar_members(n[1:])
+    return [
+        FENCE_WHY.format(f"giải nén thành viên {m}")
+        for m in dict.fromkeys(members)
+        if any(_is_fence(x, root) for x in [*_where(m, root, cwd), *_glob_targets([m], root, cwd)])
+    ]
+
+
 PYCACHE_ENV_RE = re.compile(r"PYTHONPYCACHEPREFIX=(.+)")
 
 
@@ -15412,6 +15466,7 @@ def _write_asks(
     asks += _prod_decided_asks(n, argv, targets, root, cwd)  # AUD-SEC-804
     asks += [a for a in _fence_argv_asks(n, argv, root, cwd) if a not in asks]  # T-3951 A9
     asks += _fence_restore_asks(n, argv, root, cwd, env)  # AUD-SEC-988
+    asks += _extract_member_asks(n, argv, root, cwd, env)  # AUD-SEC-990
     asks += _home_dotfile_asks(n, argv, targets, root, cwd)  # T-3951 A11
     return asks + [EVIDENCE_WHY.format(f"git {n[1]} {t}") for t, k in restored if k == "evidence"]
 

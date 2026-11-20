@@ -2780,6 +2780,73 @@ class FenceAdapterFilesTest(_FenceRootsMixin, unittest.TestCase):
                 self.assertIn(got.get("decision"), ("ask", "deny"))
 
 
+class FenceExtractMembersTest(_FenceRootsMixin, unittest.TestCase):
+    """AUD-SEC-990 (T-3970): giải nén có thành viên nêu tên phủ tệp hàng rào (`tar -xf a.tar .claude/settings.json`,
+    `unzip -o a.zip .codex/hooks.json`) = ghi đè hàng rào — chặn như ghi qua Bash (HOOK_BYPASS). Thành viên tính từ
+    thư mục đích (`-C`, `-d`); thành viên khác, đọc/liệt kê/ra stdout, đích ngoài gốc: cho chạy. Giải nén cả archive
+    không nêu tên thành viên: giới hạn đã biết (`harness-files.md`)."""
+
+    TAR = (
+        "tar -xf a.tar {}",
+        "tar xf a.tar {}",
+        "tar -xzf a.tgz {}",
+        "tar --extract --file=a.tar {}",
+        "tar -xf a.tar --wildcards {}",
+        "tar -xf a.tar src/app.py {}",
+        "bsdtar -xf a.tar {}",
+        "tar -xf a.tar -C . {}",
+    )
+    ZIP = ("unzip -o a.zip {}", "unzip a.zip src/app.py {}", "unzip -qo a.zip {} -d .", "unzip -j a.zip {}")
+    NAMES = (
+        ".claude/settings.json",
+        ".claude/hooks/guard.py",
+        "./.claude/settings.json",
+        ".codex/hooks.json",
+        ".cursor/hooks.json",
+        ".claude",
+        "'.claude/*'",
+        "'.claude/hooks/*'",
+    )
+
+    def test_member_named_fence_blocked(self):
+        for form, name in itertools.product((*self.TAR, *self.ZIP), self.NAMES):
+            self.assert_blocked(form.format(name))
+
+    def test_member_relative_to_directory(self):
+        for cmd in (
+            "tar -xf a.tar -C .claude settings.json",
+            "tar -xf a.tar -C .claude hooks/guard.py",
+            "unzip -o a.zip settings.json -d .claude",
+            "unzip -o a.zip hooks/guard.py -d .claude",
+        ):
+            self.assert_blocked(cmd)
+
+    def test_other_members_and_reads_allowed(self):
+        for cmd in (
+            "tar -xf a.tar src/app.py",
+            "tar -xf a.tar -C src app.py",
+            "tar -xzf a.tgz list.txt",
+            "tar -tf a.tar .claude/settings.json",
+            "tar -xOf a.tar .claude/settings.json",
+            "tar -xf a.tar --to-stdout .claude/settings.json",
+            "tar -cf a.tar .claude/settings.json",
+            "tar -xf a.tar -C /tmp/out src/app.py",
+            "unzip -l a.zip .claude/settings.json",
+            "unzip -p a.zip .claude/settings.json",
+            "unzip -o a.zip src/app.py -x .claude/settings.json",
+            "unzip -o a.zip src/app.py -d /tmp/out",
+        ):
+            self.assert_allowed(cmd)
+
+    def test_outside_root_stays_strict_like_cp(self):
+        """Đích ngoài gốc nhưng đuôi là đường hàng rào: giữ chiều chặt như `cp x /tmp/out/.claude/settings.json`."""
+        for cmd in (
+            "tar -xf a.tar -C /tmp/out .claude/settings.json",
+            "unzip -o a.zip .claude/settings.json -d /tmp/out",
+        ):
+            self.assert_blocked(cmd)
+
+
 class FenceBaselineMonotoneTest(unittest.TestCase):
     """Review AUD-SEC-988 🔴-2: luật hàng rào mới KHÔNG được lỏng hơn guard nền (cefba45d, trước AUD-SEC-988/989) ở bất
     kỳ (lệnh, gốc, chính sách) nào. `tests/fixtures/autonomy/guard_fence_baseline.json`: quyết định nền ghi sẵn cho lệnh

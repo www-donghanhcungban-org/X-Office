@@ -89,6 +89,8 @@ Bản < 3.20.0: [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md) (T-3651; `changel
 
 ### Fixed
 
+- Guard chặn giải nén có thành viên nêu tên phủ tệp hàng rào (`tar -xf a.tar <tệp hàng rào>`, `unzip -o a.zip …`, tính theo `-C`/`-d`): AUD-SEC-990 (T-3970). Đổi guard của khung (`.claude/hooks/`) — dự án đích nhận khi chạy lại `install.py`; không đổi ID checklist. Giới hạn đã biết ở `harness-files.md`.
+
 - Màn Văn phòng 3D: nhãn phòng ẩn/hiện theo chỗ nhãn đứng có còn là sàn hay tường của **chính** phòng đó (tia từ
   camera, không theo hộp nhãn) — phóng to ở toàn cảnh, phòng còn trên hình vẫn giữ nhãn: thử điểm neo đã kẹp rồi các điểm trên sàn phòng (lưới 3×3)
   nằm trọn trong khung — ở 390 px "Khu làm việc" có nhãn ở mọi mức phóng; giữ chỗ đã chọn ở khung trước (trễ chống

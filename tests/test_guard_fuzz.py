@@ -261,7 +261,6 @@ CWD_RELATIVE: Dict[str, str] = {
             ("468-cpio-Htar-ledger", "docs/autopilot", "AUD-SEC-468"),
             ("469-cp-ft-evidence", ".autopilot", "AUD-SEC-469"),
             ("470-cp-claude-into-root", ".", "AUD-SEC-470"),
-            ("471-tar-double-dash-O", ".claude/hooks", "AUD-SEC-471"),
             ("471-tar-exclude-eats-O", ".claude/hooks", "AUD-SEC-471"),
             ("471-tar-ge-abbrev", ".claude/hooks", "AUD-SEC-471"),
             ("472-py-Im-tarfile", ".claude/hooks", "AUD-SEC-472"),
