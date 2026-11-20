@@ -624,8 +624,9 @@ export function drawScene(ctx, cw, ch, opts) {
   iso.tag = (...a) => tags.push(a);
   compose(iso, opts);
   if (opts.motion) particles(ctx, opts.season === "noel" ? "snow" : th.ambient, cw, ch, opts.t || 0);
-  // Nhãn phòng chồng lên nhãn phòng đã đặt (khung hẹp: các phòng hàng sau sát nhau trên màn) → bỏ, giữ nhãn đầu.
-  const placed = [];
+  // Nhãn phòng chồng lên nhãn agent/trạng thái hay lên nhãn phòng đã đặt (khung hẹp: các phòng hàng sau sát nhau trên
+  // màn) → bỏ. Thứ tự vẽ giữ nguyên: nhãn phòng trước, nhãn bám người đè lên sau.
+  const placed = tags.filter((a) => a[7] !== "room").map((a) => iso.tagBox(a[0], a[1], a[2], a[3]));
   for (const a of tags) {
     if (a[7] === "room") {
       const box = iso.tagBox(a[0], a[1], a[2], a[3]);

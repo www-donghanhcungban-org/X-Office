@@ -164,10 +164,35 @@ export function createThreeView(stage) {
     setMat(m.material, f.color, f.glow, glowOn);
   }
 
-  function syncTags(list, focus) {
+  // Điểm màn (px trong khung) có nằm trên sàn hay tường neo của CHÍNH phòng `r` không: tia từ camera qua điểm đó cắt
+  // sàn tầng (y = zb) trong mặt bằng phòng, hoặc tường ngoài nơi nhãn neo (sau: z = 0; trái: x = 0) trong bề rộng phòng.
+  const ray = new THREE.Raycaster();
+  const ndc = new THREE.Vector2();
+  function onOwnRoom(left, top, rect, r, zb, H) {
+    ndc.set((left / rect.w) * 2 - 1, 1 - (top / rect.h) * 2);
+    ray.setFromCamera(ndc, camera);
+    const { origin: o, direction: d } = ray.ray;
+    const at = (t) => (t > 0 ? { x: o.x + d.x * t, y: o.y + d.y * t, z: o.z + d.z * t } : null);
+    const inX = (q) => q.x >= r.x && q.x <= r.x + r.w, inY = (q) => q.z >= r.y && q.z <= r.y + r.d;
+    const inH = (q) => q.y >= zb && q.y <= zb + H;
+    const floor = d.y ? at((zb - o.y) / d.y) : null;
+    if (floor && inX(floor) && inY(floor)) return true;
+    const back = r.y === 0 && d.z ? at(-o.z / d.z) : null;
+    if (back && inX(back) && inH(back)) return true;
+    const side = r.x === 0 && d.x ? at(-o.x / d.x) : null;
+    return Boolean(side && inY(side) && inH(side));
+  }
+
+  function syncTags(list, focus, plan) {
     const rect = { w: view.w, h: view.h };
-    const placed = []; // hộp các nhãn phòng đã đặt — nhãn phòng sau chồng lên thì nhường (compose phát phòng đang xem trước)
-    list.forEach((t, i) => {
+    const rooms = new Map(plan.rooms.map((r) => [r.id, r]));
+    const zb = plan.levels ? plan.levels * plan.levelH : 0;
+    // Hộp các nhãn đã đặt: nhãn agent/trạng thái (bám người) đặt trước, nhãn phòng chồng lên chúng hay lên nhãn phòng đặt
+    // trước thì nhường (compose phát phòng đang xem trước).
+    const placed = [];
+    const order = list.map((_, i) => i).sort((a, b) => (list[a].kind === "room") - (list[b].kind === "room"));
+    order.forEach((i) => {
+      const t = list[i];
       let el = tagEls[i];
       if (!el) {
         el = document.createElement("span");
@@ -181,23 +206,33 @@ export function createThreeView(stage) {
       el.hidden = false;
       let left = ((p.x + 1) / 2) * rect.w, top = ((1 - p.y) / 2) * rect.h;
       if (t.kind === "room") {
-        // Nhãn phòng là biển chỉ dẫn: nhãn ra hẳn ngoài khung (tới bàn/tới phòng khác, phóng to) → ẩn, không ghim mép
-        // đè lên phòng khác; nhãn chỉ chạm mép (khung hẹp, xoay sát biên) → kẹp trọn để không cắt chữ. Phòng đang xem
-        // ("Tới phòng") luôn giữ nhãn, kẹp vào khung — kể cả khi phóng to khiến điểm neo ra ngoài hình.
+        // Nhãn phòng là biển chỉ dẫn: kẹp trọn vào khung (khung hẹp, xoay sát biên không cắt chữ), rồi chỉ giữ khi chỗ
+        // nhãn đứng vẫn là sàn/tường của CHÍNH phòng đó — phòng ra ngoài hình (tới bàn, tới phòng khác, phóng to) thì
+        // nhãn bị kẹp sang phòng khác → ẩn. Phòng đang xem ("Tới phòng") luôn giữ nhãn.
         const hw = el.offsetWidth / 2 + 2;
-        const out = left < -hw || left > rect.w + hw || top < 0 || top - el.offsetHeight > rect.h;
-        if (out && t.id !== focus) {
-          el.hidden = true;
-          return;
-        }
         left = Math.min(rect.w - hw, Math.max(hw, left));
         top = Math.min(rect.h - 2, Math.max(el.offsetHeight + 2, top));
-        const box = { l: left - hw + 2, r: left + hw - 2, t: top - el.offsetHeight, b: top };
-        if (placed.some((o) => overlaps(o, box))) {
+        const room = rooms.get(t.id);
+        if (t.id !== focus && !(room && onOwnRoom(left, top, rect, room, zb, plan.H))) {
           el.hidden = true;
           return;
         }
-        placed.push(box);
+        const h = el.offsetHeight + 2;
+        const boxAt = (y) => ({ l: left - hw + 2, r: left + hw - 2, t: y - el.offsetHeight, b: y });
+        const free = (y) => y >= h && y <= rect.h - 2 && !placed.some((o) => overlaps(o, boxAt(y)));
+        if (!free(top)) {
+          // Phòng đang xem luôn có nhãn: dịch lên/xuống tìm chỗ trống; không có thì vẫn đặt ở chỗ cũ. Phòng khác nhường.
+          if (t.id !== focus) {
+            el.hidden = true;
+            return;
+          }
+          top = [top - h, top + h, top - 2 * h, top + 2 * h].find(free) ?? top;
+        }
+        placed.push(boxAt(top));
+      }
+      if (t.kind !== "room") {
+        const w = el.offsetWidth / 2;
+        placed.push({ l: left - w, r: left + w, t: top - el.offsetHeight, b: top });
       }
       el.style.setProperty("left", left + "px");
       el.style.setProperty("top", top + "px");
@@ -307,7 +342,7 @@ export function createThreeView(stage) {
       for (const p of [boxes, panels, dots, rings]) p.finish();
       place(opts.zoom, viewCorners(opts).box, plan);
       renderer.render(scene, camera);
-      syncTags(sink.tags, opts.focus);
+      syncTags(sink.tags, opts.focus, plan);
       api.dirty = false;
     },
     dispose() {

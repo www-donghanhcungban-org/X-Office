@@ -664,6 +664,76 @@ class OfficeTest(AppCase):
         for _ in range(3):
             page.click("button[aria-label='Thu nhỏ']")
 
+    # Hộp mọi nhãn đang hiện: [loại, chữ, x0, y0, x1, y1].
+    ALL_BOXES = (
+        "() => [...document.querySelectorAll('.office-labels .office-tag')].filter(e => !e.hidden).map(e => {"
+        " const r = e.getBoundingClientRect(); return [e.dataset.kind, e.textContent, r.left, r.top, r.right, r.bottom]; })"
+    )
+
+    def test_office_room_labels_when_zoomed(self) -> None:
+        """Nợ review PR #11: nhãn phòng ẩn/hiện theo chỗ nhãn đứng có còn là sàn/tường của CHÍNH phòng (không theo hộp
+        nhãn) — phóng to ở toàn cảnh, phòng còn trong hình vẫn giữ nhãn; nhãn phòng không đè nhãn agent/trạng thái (3D
+        lẫn 2D)."""
+        ctx = self.new_context("desktop")
+        ctx.add_init_script(
+            "try { localStorage.setItem('xt-office', JSON.stringify({scale: 'company', renderer: '3d',"
+            " motion: false, season: 'off'})); } catch (e) {}"
+        )
+        page, watch = self.open_app(ctx)
+        go(page, "office", "Văn phòng")
+        page.locator("canvas.office-3d").wait_for()
+        page.wait_for_function(
+            "() => document.querySelectorAll('.office-labels .office-tag[data-kind=room]:not([hidden])').length === 8"
+        )
+        frames = "() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))"
+        for _ in range(3):
+            page.click("button[aria-label='Phóng to']")
+        page.evaluate(frames)
+        names = [b[0] for b in page.evaluate(self.ROOM_BOXES)]
+        # Phóng 1,95×: các phòng hàng sau giữa hình vẫn còn — nhãn của chúng không bị ẩn chỉ vì điểm neo ra ngoài khung.
+        self.assertLessEqual({"▸ Giám đốc", "▸ Phòng họp", "▸ Server"}, set(names), names)
+        for _ in range(2):
+            page.click("button[aria-label='Phóng to']")
+        page.evaluate(frames)
+        boxes = page.evaluate(self.ALL_BOXES)
+        rooms = [b for b in boxes if b[0] == "room"]
+        others = [b for b in boxes if b[0] != "room"]
+        self.assertTrue(rooms and others, boxes)
+        for a in rooms:
+            for b in others:
+                self.assertFalse(a[2] < b[4] and b[2] < a[4] and a[3] < b[5] and b[3] < a[5], (a[1], b[1]))
+        # Phóng tối đa + xoay sát biên rồi "Tới phòng": chỗ nhãn kẹp vào không còn trên tường/sàn của phòng (luật ẩn) —
+        # phòng đang xem vẫn giữ nhãn, trọn trong khung.
+        while page.evaluate("() => JSON.parse(localStorage.getItem('xt-office') || '{}').zoom || 1") < 4:
+            page.click("button[aria-label='Phóng to']")
+        page.locator("canvas.office-3d").focus()
+        for _ in range(8):
+            page.keyboard.press("ArrowLeft")
+        for rid, name in (("director", "▸ Giám đốc"), ("nap", "▸ Ngủ trưa")):
+            page.click(f".office-rooms button[data-room='{rid}']")
+            page.evaluate(frames)
+            focused = page.evaluate(self.ROOM_BOXES)
+            self.assertIn(name, [b[0] for b in focused])
+            self.assert_labels_apart(focused)
+        # 2D cùng luật: chặn fillText, ghi hộp từng nhãn (tagBox) — nhãn phòng không chồng nhãn bám người.
+        hits = page.evaluate(
+            "async () => { const sc = await import('/office/scene.js'), th = await import('/office/themes.js'),"
+            " iso = await import('/office/iso.js'); const seats = ['Điều phối', 'Thực thi', 'Thực thi sâu', 'Review',"
+            " 'Nghiên cứu'].map(label => ({label, state: 'work', task: {id: 'T-1'}})); const out = [];"
+            " for (const [w, h, zoom] of [[1118, 680, 1], [1118, 680, 2.44], [358, 302, 1]]) {"
+            " const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');"
+            " const boxes = []; const orig = iso.Iso.prototype.tag;"
+            " iso.Iso.prototype.tag = function (x, y, z, text, ...r) { boxes.push([String(text).startsWith('▸ '),"
+            " this.tagBox(x, y, z, text)]); return orig.call(this, x, y, z, text, ...r); };"
+            " try { sc.drawScene(g, w, h, {theme: th.themeById('night'), scale: 'company', layout: 'open', seats,"
+            " names: true, npc: true, motion: false, t: 0, zoom, pan: {x: 0, y: 0}, quality: 'high'}); }"
+            " finally { iso.Iso.prototype.tag = orig; }"
+            " for (const [ra, a] of boxes) for (const [rb, b] of boxes) if (ra && !rb && iso.overlaps(a, b, 0))"
+            " out.push([w, zoom]); } return out; }"
+        )
+        self.assertEqual(hits, [])
+        self.assertEqual(watch.take(), [])
+
     # Hộp các nhãn phòng đang hiện, theo toạ độ của sân khấu: [chữ, x0, y0, x1, y1, rộng, cao].
     ROOM_BOXES = (
         "() => { const s = document.querySelector('.office-stage').getBoundingClientRect();"
@@ -715,6 +785,17 @@ class OfficeTest(AppCase):
         boxes = page.evaluate(self.ROOM_BOXES)
         self.assertIn("▸ Server", [b[0] for b in boxes], hidden_before)
         self.assert_labels_apart(boxes)
+        # "Tới phòng" Khu làm việc ở 390 px: điểm nhãn bị kẹp không còn trên tường trái của phòng — vẫn giữ nhãn vì là
+        # phòng đang xem.
+        page.click(".office-rooms button[data-room='work']")
+        page.evaluate(frames)
+        boxes = page.evaluate(self.ROOM_BOXES)
+        self.assertIn("▸ Khu làm việc", [b[0] for b in boxes])
+        self.assert_labels_apart(boxes)
+        everyone = page.evaluate(self.ALL_BOXES)  # nhãn phòng đang xem dịch tránh nhãn bám người, không đè lên
+        work = [b for b in everyone if b[1] == "▸ Khu làm việc"][0]
+        for o in (b for b in everyone if b[0] != "room"):
+            self.assertFalse(work[2] < o[4] and o[2] < work[4] and work[3] < o[5] and o[3] < work[5], o[1])
         self.assertEqual(watch.take(), [])
 
 
