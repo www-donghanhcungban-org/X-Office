@@ -183,6 +183,7 @@ export function createThreeView(stage) {
     return Boolean(side && inY(side) && inH(side));
   }
 
+  const lastSpot = new Map(); // phòng → chỉ số chỗ đặt nhãn ở khung trước (trễ chống nhảy)
   function syncTags(list, focus, plan) {
     const rect = { w: view.w, h: view.h };
     const rooms = new Map(plan.rooms.map((r) => [r.id, r]));
@@ -224,7 +225,8 @@ export function createThreeView(stage) {
         const own = (x, y) => Boolean(room && onOwnRoom(x, y, rect, room, zb, plan.H));
         const boxAt = (x, y) => ({ l: x - hw + 2, r: x + hw - 2, t: y - el.offsetHeight, b: y });
         const fits = (x, y) => x >= hw && x <= rect.w - hw && y >= h && y <= rect.h - 2;
-        const ok = (x, y) => fits(x, y) && !placed.some((o) => overlaps(o, boxAt(x, y))) && (t.id === focus || own(x, y));
+        const ok = (x, y, gap) =>
+          fits(x, y) && !placed.some((o) => overlaps(o, boxAt(x, y), gap)) && (t.id === focus || own(x, y));
         const spots = [top, top - h, top + h, top - 2 * h, top + 2 * h].map((y) => [left, y]);
         if (room) {
           for (const u of [0.5, 0.25, 0.75]) {
@@ -234,9 +236,16 @@ export function createThreeView(stage) {
             }
           }
         }
-        const spot = spots.find(([x, y]) => ok(x, y));
-        if (spot) [left, top] = spot;
-        else if (t.id !== focus) {
+        // Trễ chống nhảy: nhân vật nhún (chuyển động bật) làm nhãn bám người xê dịch từng khung — giữ chỗ đã chọn ở khung
+        // trước khi nó còn dùng được (khe 2 px); chỉ đổi sang chỗ khác hay hiện lại sau khi ẩn khi có khe rộng (8 px).
+        const prev = lastSpot.get(t.id);
+        const keep = prev !== undefined && prev < spots.length && ok(...spots[prev], 2) ? prev : -1;
+        const pick = keep >= 0 ? keep : spots.findIndex(([x, y]) => ok(x, y, 8));
+        if (pick >= 0) {
+          [left, top] = spots[pick];
+          lastSpot.set(t.id, pick);
+        } else if (t.id !== focus) {
+          lastSpot.delete(t.id);
           el.hidden = true;
           el.dataset.why = own(left, top) ? "overlap" : "off-room";
           return;
