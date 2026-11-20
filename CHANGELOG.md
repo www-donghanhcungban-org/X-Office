@@ -89,6 +89,8 @@ Bản < 3.20.0: [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md) (T-3651; `changel
 
 ### Fixed
 
+- Màn Văn phòng: lỗi `/api/office` lặp lại không dựng lại hộp `role="alert"` mỗi lượt poll và giữ focus ở nút "Thử
+  lại" (AUD-A11Y-004, T-4006).
 - Guard hàng rào (AUD-SEC-990, T-4001): giải nén (`tar -x`, `unzip`, `7z x`, `cpio -i`) nêu tên thành viên phủ tệp hàng rào
   (`.claude/settings.json`, `.codex/hooks.json`, `.cursor/hooks.json`, thư mục cha, glob) bị chặn; giải nén cả tệp nén
   không nêu thành viên giữ như cũ. Nợ AUD-SEC-992 (tệp nén dựng sẵn chứa hàng rào). Audit delta (T-4003): chặn thêm
