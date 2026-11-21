@@ -1,6 +1,6 @@
 # PROGRESS.md — X-Office (văn phòng online 3D)
 
-> G8 Vận hành & tiến hoá (1.0.0, `harden`, D-136) · 2026-11-21
+> G8 Vận hành & tiến hoá (1.0.0, `harden`, D-136) · 2026-11-22
 
 ## Đang làm
 - 2026-11-20 `/complete` xong tới gói nghiệm thu: audit delta `fe5f1e8..ce0e3c8` (#17–#19, 0 🔴, 🟠 mở 0), `release-check` **GO** ở `dcccb48`; **1.0.0** là bản đầu của dòng phát hành riêng (ADR-9002/9003, D-9008; kế thừa X-Templates dừng ở 3.34.0), tag `v1.0.0` ở `d1de193` (#27), GO-NO-GO đã ký §5 (agent, ADR-0074); chưa quét gitleaks/semgrep/zizmor. Trước đó 3.34.0 (tag `v3.34.0`; giới hạn guard ở `harness-files.md`, hạn 2027-01-21).
@@ -33,5 +33,5 @@
 - Coverage cục bộ < 100 % khi `coverage` cài ở site người dùng: hook chạy `python3 -I` nên tiến trình con không được đo — CI là cổng coverage (đo 2026-11-05).
 
 ## Bàn giao phiên
-- Mốc X-Office: `732dcc2` (#36; còn 🟢 AUD-HAR-455). Mở `python3 scripts/xt.py app` để thử Văn phòng; chạy `python3 -m unittest tests.test_app_office` và `python3 scripts/xt.py app --smoke` trước khi trình.
+- Mốc X-Office: `e979e76` (#38–#43: 3D Studio Ultra HDRI/PBR CC0, giao thông, khu phố 4 hướng; còn 🟢 AUD-HAR-455). Mở `python3 scripts/xt.py app` để thử Văn phòng; chạy `python3 -m unittest tests.test_app_office` và `python3 scripts/xt.py app --smoke` trước khi trình.
 - Container mới: `scripts/dev-task.sh setup`; trước khi đẩy `gate-fast`, CI là cổng đầy đủ. Subagent dùng scratch riêng dưới `/home/liend` (không `/tmp`: tmpfs, mất khi khởi động lại). Gate cục bộ: `coverage` và `pip` phải ở site-packages của `python3` (hook chạy `python3 -I`) — venv 3.15 đầu PATH; G7 cần `fetch --unshallow --tags`; `release-check` chạy ở worktree sạch (`.agents/`, `.codex/` chưa commit làm hàng `tree` đỏ).
