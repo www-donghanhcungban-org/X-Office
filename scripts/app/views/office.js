@@ -353,6 +353,8 @@ export async function render(main, { api, h, error }) {
     prefs.layout = layoutSel.value;
     prefs.npc = npcBox.checked;
     if (rescale) {
+      if (three) three.resetFreeZoom?.();
+      zoomVal.textContent = Math.round(prefs.zoom * 100) + "%";
       setFocus(null, null);
       roomButtons();
     }
