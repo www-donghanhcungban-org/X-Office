@@ -76,9 +76,6 @@ Lệnh:
   feedback list [DIR] [--json]  Liệt kê phản hồi.
   feedback aggregate --from DỰ_ÁN=GỐC_REPO|THƯ_MỤC ... [--json]
                                 Repo khung: gộp phản hồi nhiều dự án theo (loại, ID), đánh dấu đủ ngưỡng sửa.
-  registry [--file F] [--json] [--today D] [--strict]
-                                Registry sản phẩm đích (docs/ops/registry.json): lệch core/gói so với VERSION khung,
-                                ngoại lệ hết hạn; schema sai → exit 2; --strict: còn lệch/hết hạn → exit 1.
   release-sign --note TEXT [--file F]
                                 Agent ký §5 GO-NO-GO khi xt.yaml (cây và nhánh chính) khai `release_signoff: agent`,
                                 release-check không FAIL và chỉ còn chữ ký (ADR-0074); ô tên ghi `agent`.
@@ -5719,8 +5716,7 @@ FRAMEWORK_REPO = "www-donghanhcungban-org/X-Office"
 # Đầu nhãn `.xtemplates/VERSION`: "3.0.0 (abc1234)"; đuôi pre-release ("3.0.0-rc1") nhỏ hơn bản cùng số (SemVer §11).
 SEMVER_PREFIX_RE = re.compile(r"v?(\d+)\.(\d+)\.(\d+)(-[0-9A-Za-z.-]+)?")
 RELEASE_TAG_RE = re.compile(r"v(\d+)\.(\d+)\.(\d+)")  # tag phát hành (release-tag.yml); pre-release không tính
-# Tag của dòng X-Templates kế thừa (ADR-9002): X-Office có dòng riêng từ 1.0.0 — bỏ khi tìm bản mới nhất, registry báo
-# `legacy-line` cho lõi ở tag này.
+# Tag của dòng X-Templates kế thừa (ADR-9002): X-Office có dòng riêng từ 1.0.0 — bỏ khi tìm bản mới nhất.
 LEGACY_RELEASE_TAGS: FrozenSet[Tuple[int, int, int]] = frozenset({(3, 34, 0)})
 VERSION_CHECK_TIMEOUT = 10
 
@@ -12251,203 +12247,8 @@ def cmd_merge_check(args: argparse.Namespace) -> int:
     return 0 if d["verdict"] == "merge" else 1
 
 
-# --------------------------------------------------------------------------- registry (lát E, ADR-0068)
-REGISTRY_FILE = "docs/ops/registry.json"  # sản phẩm đích: core/gói/release/ngoại lệ — mở rộng TARGETS.md
-REGISTRY_REPO_RE = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
-# Chữ số ASCII, không 0 đứng đầu, ≤ 9 chữ số mỗi phần: số rất dài từng làm `int()` văng (giới hạn 4300 chữ số) —
-# exit 1 thay vì 2, API trả 500 (review lát E).
-_REG_NUM = r"(?:0|[1-9][0-9]{0,8})"
-REGISTRY_SEMVER_RE = re.compile(rf"{_REG_NUM}\.{_REG_NUM}\.{_REG_NUM}")
-REGISTRY_SLUG_RE = re.compile(r"[a-z0-9][a-z0-9-]*")  # id gói = tên thư mục: không `/`, không `..`
-REGISTRY_EXC_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]*")  # in ra terminal: không ký tự điều khiển
-RegSpec = Dict[str, Tuple[Callable[[Any], bool], str]]
-
-
-def _reg_text(v: Any) -> bool:
-    """Chuỗi khác rỗng, in được (không ký tự điều khiển, không surrogate lẻ — từng làm API trả 500 khi mã hoá UTF-8)."""
-    return isinstance(v, str) and bool(v.strip()) and v.isprintable()
-
-
-def _reg_date(v: Any) -> Optional[_dt.date]:
-    """`YYYY-MM-DD` có thật → date; dạng khác (cả `20261105` mà `fromisoformat` 3.11 nhận) → None."""
-    return _iso_date(v) if isinstance(v, str) and DATE_RE.match(v) else None
-
-
-def _reg_match(rx: "re.Pattern[str]") -> Callable[[Any], bool]:
-    return lambda v: isinstance(v, str) and rx.fullmatch(v) is not None
-
-
-def _reg_or_null(ok: Callable[[Any], bool]) -> Callable[[Any], bool]:
-    return lambda v: v is None or ok(v)
-
-
-_REG_PRODUCT: RegSpec = {
-    "repo": (_reg_match(REGISTRY_REPO_RE), "phải là owner/name"),
-    "owner": (_reg_text, "phải là chuỗi không rỗng"),
-    "type": (_reg_or_null(_reg_text), "phải là chuỗi không rỗng hoặc null"),
-    "risk": (_reg_or_null(lambda v: v in ("low", "medium", "high")), "phải là low|medium|high hoặc null"),
-    "core": (_reg_or_null(_reg_match(REGISTRY_SEMVER_RE)), "phải là X.Y.Z hoặc null"),
-    "pack": (_reg_or_null(lambda v: isinstance(v, dict)), "phải là object {id, version} hoặc null"),
-    "environments": (lambda v: isinstance(v, list) and all(map(_reg_text, v)), "phải là mảng chuỗi không rỗng"),
-    "slo": (lambda v: isinstance(v, str), "phải là chuỗi (rỗng = chưa có)"),
-    "release": (_reg_or_null(lambda v: isinstance(v, dict)), "phải là object {version, date, digest} hoặc null"),
-    "exceptions": (
-        lambda v: isinstance(v, list) and all(isinstance(x, dict) for x in v),
-        "phải là mảng object {id, until, why}",
-    ),
-}
-_REG_PACK: RegSpec = {
-    "id": (_reg_match(REGISTRY_SLUG_RE), "phải là tên thư mục gói (a-z, 0-9, -)"),
-    "version": (_reg_match(REGISTRY_SEMVER_RE), "phải là X.Y.Z"),
-}
-_REG_RELEASE: RegSpec = {
-    "version": (_reg_text, "phải là chuỗi không rỗng"),
-    "date": (lambda v: _reg_date(v) is not None, "phải là YYYY-MM-DD có thật"),
-    "digest": (_reg_or_null(_reg_text), "phải là chuỗi không rỗng hoặc null"),
-}
-_REG_EXCEPTION: RegSpec = {
-    "id": (_reg_match(REGISTRY_EXC_ID_RE), "phải là ID (chữ, số, . _ : -)"),
-    "until": (lambda v: _reg_date(v) is not None, "phải là YYYY-MM-DD có thật"),
-    "why": (_reg_text, "phải là chuỗi không rỗng"),
-}
-
-
-def _reg_fields(obj: Any, where: str, spec: RegSpec) -> List[str]:
-    """Object đúng tập khoá của `spec` (thiếu/lạ đều là lỗi), mỗi giá trị qua kiểm của nó."""
-    if not isinstance(obj, dict):
-        return [f"{where}: phải là object"]
-    errs = [f"{where}: thiếu khoá {k}" for k in spec if k not in obj]
-    errs += [f"{where}: khoá lạ {k!r}" for k in obj if k not in spec]
-    return errs + [f"{where}.{k}: {msg}" for k, (ok, msg) in spec.items() if k in obj and not ok(obj[k])]
-
-
-def _reg_product_errors(p: Any, where: str) -> List[str]:
-    errs = _reg_fields(p, where, _REG_PRODUCT)
-    if errs:  # khoá/kiểu lớp ngoài sai: chưa kiểm lớp trong
-        return errs
-    nested = [(p["pack"], ".pack", _REG_PACK), (p["release"], ".release", _REG_RELEASE)]
-    nested += [(e, f".exceptions[{i}]", _REG_EXCEPTION) for i, e in enumerate(p["exceptions"])]
-    errs = [m for obj, suf, spec in nested if obj is not None for m in _reg_fields(obj, where + suf, spec)]
-    # id ngoại lệ trùng trong một sản phẩm: màn Registry đánh dấu hết hạn theo id → dòng còn hạn hiện hết hạn (AUD-HAR-228)
-    return errs or [f"{where}.exceptions: id trùng {i!r}" for i in _reg_dups(e["id"] for e in p["exceptions"])]
-
-
-def _reg_dups(values: Iterable[Any]) -> List[str]:
-    """Chuỗi xuất hiện ≥ 2 lần, sắp xếp — đếm bằng `Counter` (O(n); `list.count` từng O(n²) — AUD-CODE-050)."""
-    return sorted(v for v, n in Counter(v for v in values if isinstance(v, str)).items() if n > 1)
-
-
-def registry_errors(data: Any) -> List[str]:
-    """Lỗi schema 1 của registry (rỗng = hợp lệ): gốc `{schema: 1, products: [...]}`, mỗi sản phẩm đủ khoá, repo không trùng."""
-    schema = data.get("schema") if isinstance(data, dict) else None
-    if type(schema) is not int or schema != 1:  # `true`/`1.0` không phải schema 1
-        return ['gốc phải là object có "schema": 1']
-    products = data.get("products")
-    if not isinstance(products, list):
-        return ["products: phải là mảng"]
-    errs = [f"khoá lạ ở gốc {k!r}" for k in data if k not in ("schema", "products")]
-    errs += [m for i, p in enumerate(products) for m in _reg_product_errors(p, f"products[{i}]")]
-    return errs + [f"repo trùng {r!r}" for r in _reg_dups(p.get("repo") for p in products if isinstance(p, dict))]
-
-
-def _reg_pack_errors(products: List[Dict[str, Any]], packs: Path) -> List[str]:
-    """Đã có `framework/templates/packs/` thì id gói phải có `<id>/pack.json`; chưa có thư mục → không kiểm (lệch `unknown`)."""
-    if not packs.is_dir():
-        return []
-    return [
-        # đường tương đối của khung — không lộ đường tuyệt đối qua API `xt.py app` (review lát E)
-        f"products[{i}].pack.id: không có gói {p['pack']['id']!r} (cần templates/packs/{p['pack']['id']}/pack.json)"
-        for i, p in enumerate(products)
-        if p["pack"] is not None and not (packs / p["pack"]["id"] / "pack.json").is_file()
-    ]
-
-
-def registry_load(path: Path, framework: Path) -> Tuple[Optional[Dict[str, Any]], List[str]]:
-    """(registry hợp lệ, []) hoặc (None, lỗi): file đọc được, JSON, schema 1, id gói có thật khi thư mục gói đã có."""
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError) as exc:  # UnicodeDecodeError là ValueError: bắt trước JSON hỏng
-        return None, [f"không đọc được registry {path}: {exc}"]
-    except (ValueError, RecursionError) as exc:
-        return None, [f"{path}: JSON hỏng ({exc})"]
-    errs = registry_errors(data) or _reg_pack_errors(data["products"], framework / "templates" / "packs")
-    return (None, errs) if errs else (data, [])
-
-
-def _reg_version(framework: Path) -> Optional[Tuple[str, Tuple[int, int, int], bool]]:
-    """VERSION của khung (cạnh `framework/`): (chuỗi SemVer, số, có đuôi pre-release); không đọc được/không SemVer → None."""
-    try:
-        m = SEMVER_PREFIX_RE.match((framework.parent / "VERSION").read_text(encoding="utf-8").strip())
-    except (OSError, ValueError):
-        return None
-    return (m[0], (int(m[1]), int(m[2]), int(m[3])), bool(m[4])) if m else None
-
-
-REG_DRIFT_OK = ("current",)  # trạng thái không tính là lệch (`--strict` không đỏ); `legacy-line` vẫn là lệch (ADR-9002)
-
-
-def _reg_drift(have: Optional[str], ver: Optional[Tuple[str, Tuple[int, int, int], bool]]) -> str:
-    """Lệch của bản `have` (X.Y.Z) so với VERSION khung: current · patch · minor · major · ahead · legacy-line ·
-    unknown. `legacy-line` (ADR-9002): `have` là tag dòng kế thừa, khung đã sang dòng mới (số nhỏ hơn) — vẫn là lệch: cần chạy lại install.py."""
-    if have is None or ver is None:
-        return "unknown"
-    h, v = tuple(int(x) for x in have.split(".")), ver[1]
-    if h == v:
-        return "ahead" if ver[2] else "current"  # 3.30.0 > 3.30.0-rc1 (SemVer §11)
-    if h > v:
-        return "legacy-line" if h in LEGACY_RELEASE_TAGS and v not in LEGACY_RELEASE_TAGS else "ahead"
-    return "major" if h[0] != v[0] else "minor" if h[1] != v[1] else "patch"
-
-
-def registry_report(data: Dict[str, Any], framework: Path, today: _dt.date) -> Dict[str, Any]:
-    """Lệch core/gói từng sản phẩm so với VERSION khung (gói theo VERSION — ADR-0068) và ngoại lệ hết hạn (until < today)."""
-    ver = _reg_version(framework)
-    packs_known = (framework / "templates" / "packs").is_dir()
-    rows = []
-    for p in data["products"]:
-        pack = p["pack"]
-        pack_drift = None if pack is None else _reg_drift(pack["version"], ver) if packs_known else "unknown"
-        expired = [e["id"] for e in p["exceptions"] if e["until"] < today.isoformat()]  # ISO: so chuỗi = so ngày
-        rows.append({"repo": p["repo"], "core": p["core"], "core_drift": _reg_drift(p["core"], ver)})
-        rows[-1].update({"pack": pack, "pack_drift": pack_drift, "expired": expired})
-    drift = sum(1 for r in rows if r["core_drift"] not in REG_DRIFT_OK or r["pack_drift"] not in (None, *REG_DRIFT_OK))
-    return {
-        "schema": 1,
-        "version": ver[0] if ver else None,
-        "products": rows,
-        "drift": drift,
-        "expired": sum(len(r["expired"]) for r in rows),
-    }
-
-
-def _registry_text(out: Dict[str, Any], file: str) -> str:
-    lines = [f"registry {file} — khung {out['version'] or 'không rõ VERSION'}"]
-    lines.append(f"  {'repo':<32} {'core':<8} {'lệch':<11} {'gói':<24} {'lệch':<11} ngoại lệ hết hạn")
-    for r in out["products"]:
-        pack = f"{r['pack']['id']}@{r['pack']['version']}" if r["pack"] else "—"
-        expired = ", ".join(r["expired"]) or "—"
-        lines.append(
-            f"  {r['repo']:<32} {r['core'] or '—':<8} {r['core_drift']:<11} {pack:<24} {r['pack_drift'] or '—':<11} {expired}"
-        )
-    n = len(out["products"])
-    lines.append(f"{n} sản phẩm · lệch {out['drift']} · ngoại lệ hết hạn {out['expired']}")
-    return "\n".join(lines)
-
-
-def cmd_registry(args: argparse.Namespace) -> int:
-    """`xt.py registry`: kiểm schema (lỗi → exit 2), in lệch core/gói và ngoại lệ hết hạn; `--strict` → exit 1 khi còn."""
-    today = _reg_date(args.today) if args.today else _dt.date.today()
-    if today is None:
-        print(f"✗ --today phải là YYYY-MM-DD có thật: {args.today!r}", file=sys.stderr)
-        return 2
-    data, errors = registry_load(project_dir() / args.file, args.framework)
-    if data is None:
-        for e in errors:
-            print(f"✗ {e}", file=sys.stderr)
-        return 2
-    out = registry_report(data, args.framework, today)
-    print(json.dumps(out, ensure_ascii=False) if args.json else _registry_text(out, args.file))
-    return 1 if args.strict and (out["drift"] or out["expired"]) else 0
+# --------------------------------------------------------------------------- GitHub origin (admin-plan)
+GITHUB_SLUG_RE = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 
 
 def github_origin_slug(origin: str) -> str:
@@ -12465,76 +12266,9 @@ def github_origin_slug(origin: str) -> str:
             return ""
         path = url.path.removeprefix("/")
     path = path.removesuffix("/").removesuffix(".git")
-    if not REGISTRY_REPO_RE.fullmatch(path) or any(part in (".", "..") for part in path.split("/")):
+    if not GITHUB_SLUG_RE.fullmatch(path) or any(part in (".", "..") for part in path.split("/")):
         return ""
     return path
-
-
-def _registry_clones(source: Path, repos: set[str]) -> dict[str, Path]:
-    """Nhận một clone hoặc thư mục chứa clone ở một/hai cấp. Đối chiếu origin, không đoán theo tên thư mục."""
-    root = source.resolve(strict=True)
-    markers = [root / ".git"] if (root / ".git").exists() else [*root.glob("*/.git"), *root.glob("*/*/.git")]
-    clones: dict[str, Path] = {}
-    for marker in markers:
-        clone = marker.parent.resolve()
-        if not clone.is_relative_to(root):
-            continue
-        url = _git(
-            clone, "config", "--local", "--no-includes", "--get", "remote.origin.url", env=_go_git_env()
-        ).stdout.strip()
-        name = github_origin_slug(url).lower()
-        if name in repos:
-            if name in clones:
-                raise DeployError(f"nhiều clone cùng trỏ tới {name}")
-            clones[name] = clone
-    if not clones:
-        raise DeployError("không thấy clone có GitHub origin khớp sản phẩm trong registry")
-    return clones
-
-
-def _reg_pull_product(product: dict[str, Any], clone: Path) -> str:
-    if not os.path.lexists(clone / DEPLOY_LEDGER):
-        return f"{product['repo']}: chưa có {DEPLOY_LEDGER}, giữ nguyên dữ liệu"
-    envs = read_deploy_ledger(clone)["envs"]
-    product["environments"] = sorted(name for name, slot in envs.items() if slot["current"] is not None)
-    prod = envs.get("prod", {}).get("current")
-    if prod is not None:
-        if product["release"] is None:
-            return f"{product['repo']}: có bản production nhưng registry chưa có release.version"
-        product["release"].update(
-            digest=prod["served_digest"], date=_dt.datetime.fromisoformat(prod["finished"]).date().isoformat()
-        )
-    return ""
-
-
-def cmd_registry_pull(args: argparse.Namespace) -> int:
-    base = project_dir()
-    path = base / args.file
-    try:
-        if path.resolve() != path or not path.is_relative_to(base):
-            raise DeployError("file registry phải nằm trong dự án và không đi qua symlink")
-        with _state_lock(base):
-            data, errors = registry_load(path, args.framework)
-            if data is None:
-                raise DeployError("\n".join(errors))
-            products = data["products"]
-            clones = _registry_clones(args.source, {p["repo"].lower() for p in products})
-            before = json.dumps(data, ensure_ascii=False, indent=2)
-            warnings = []
-            for product in products:
-                clone = clones.get(product["repo"].lower())
-                if clone and (warning := _reg_pull_product(product, clone)):
-                    warnings.append(warning)
-            after = json.dumps(data, ensure_ascii=False, indent=2)
-            if before != after:
-                write_atomic(path, after + "\n", keep_mode=True)
-    except (DeployError, OSError, ValueError) as exc:
-        print(f"✗ registry pull: {exc}", file=sys.stderr)
-        return 2
-    for warning in warnings:
-        print(warning, file=sys.stderr)
-    print(f"Đã đối chiếu {len(clones)}/{len(products)} sản phẩm trong {args.file}")
-    return 0
 
 
 # --------------------------------------------------------------------------- release-check (G7 máy đọc, ADR-0029)
@@ -21523,23 +21257,6 @@ def build_parser() -> argparse.ArgumentParser:
         action.add_argument("--env", required=True, help="dev")
         action.add_argument("--json", action="store_true", help="in receipt schema 1")
         action.set_defaults(fn=cmd_deploy_dev)
-    prg = sub.add_parser(
-        "registry",
-        help="registry sản phẩm đích: lệch core/gói so với VERSION khung, ngoại lệ hết hạn (ADR-0068 lát E)",
-    )
-    prg.add_argument("--file", default=REGISTRY_FILE, help=f"registry JSON schema 1 (mặc định {REGISTRY_FILE})")
-    prg.add_argument("--json", action="store_true", help="in JSON {schema, version, products, drift, expired}")
-    prg.add_argument("--today", default="", help="ngày so hạn ngoại lệ (YYYY-MM-DD; mặc định hôm nay)")
-    prg.add_argument("--strict", action="store_true", help="exit 1 khi còn sản phẩm lệch hoặc ngoại lệ hết hạn")
-    prg.set_defaults(fn=cmd_registry)
-    pull = prg.add_subparsers(dest="registry_cmd").add_parser(
-        "pull", help="đồng bộ registry từ sổ triển khai của các clone cục bộ"
-    )
-    pull.add_argument(
-        "--from", dest="source", type=Path, required=True, help="clone hoặc thư mục chứa các clone sản phẩm"
-    )
-    pull.add_argument("--file", default=argparse.SUPPRESS, help="file registry trong dự án")
-    pull.set_defaults(fn=cmd_registry_pull)
     pab = sub.add_parser(
         "autonomy-bench",
         help="corpus PR/rollup/review/guard/log CI/harness qua hàm thật — exit 1 khi có false-green (AUTO-07)",

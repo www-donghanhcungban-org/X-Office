@@ -2182,7 +2182,8 @@ class InstallUpgradeTest(unittest.TestCase):
         }
         plan = self.plan()
         self.assertEqual({name: plan[name]["action"] for name in install.ROOT_TEMPLATES}, expected)
-        _, err = self.install_quiet()
+        with mock.patch.object(install, "source_version", return_value="3.34.0"):  # khung giả cùng dòng 3.x với 3.7.1
+            _, err = self.install_quiet()
         self.assertEqual(agents.read_bytes(), self.template("AGENTS.md"))
         self.assertIn("AGENTS.md: updated", err)
         self.assertIn("PROGRESS.md: kept-own", err)
@@ -2195,7 +2196,8 @@ class InstallUpgradeTest(unittest.TestCase):
         files = self.files()
         for name in install.ROOT_TEMPLATES:
             self.assertEqual(files[name], stored(self.template(name)), name)
-        self.assertIn("[install] Bước làm tay từ CHANGELOG (3.7.1 (9433792) → t):\n", err)
+        # chỉ kiểm tiêu đề: có bước hay "không có" tuỳ nội dung [Unreleased] thật, không được làm test đỏ khi cắt bản
+        self.assertIn("[install] Bước làm tay từ CHANGELOG (3.7.1 (9433792) → t):", err)
 
     def test_infer_root_hashes_skips_missing_symlink_and_unreadable(self):
         old = self.target / ".xtemplates" / "framework" / "templates"
@@ -2208,22 +2210,31 @@ class InstallUpgradeTest(unittest.TestCase):
         self.assertEqual(install.infer_root_hashes(self.target), {"AGENTS.md": install.sha256(b"# a\n")})
 
     def test_upgrade_steps_from_real_changelog(self):
-        """Nâng từ 3.5.0 (nhãn kèm SHA): CHANGELOG thật của khung → mỗi mục bản > 3.5.0 có bước in `[bản]` MỘT lần, rồi
-        mỗi bước là MỘT dòng `- Dự án đích …` (mệnh đề tới hết câu, D-114), trước dòng "Xong."; mục ≤ 3.5.0 không in."""
+        """Cài lại khung thật trên dự án ở 1.0.0: không in mục 3.x nào (CHANGELOG chỉ đọc tới ranh giới dòng kế thừa —
+        ADR-9004); bước (nếu có) đứng trước "Xong.". Định dạng trên dữ liệu thật: CHANGELOG thật bỏ tiêu đề ranh giới + lưu
+        trữ thật, nâng 3.5.0 → 3.34.0 — mỗi mục bản > 3.5.0 có bước in `[bản]` MỘT lần, rồi mỗi bước là MỘT dòng
+        `- Dự án đích …` (mệnh đề tới hết câu, D-114); mục ≤ 3.5.0 (cả mục 1.0.0) không in. Khung thật (dòng 1.x) trên dự
+        án ở 3.34.0 → hạ bản."""
         (self.target / ".xtemplates").mkdir()
-        (self.target / ".xtemplates" / "VERSION").write_text("3.5.0 (abc)\n", encoding="utf-8")
+        (self.target / ".xtemplates" / "VERSION").write_text("1.0.0 (abc)\n", encoding="utf-8")
         _, err = self.install_quiet()
-        head = "[install] Bước làm tay từ CHANGELOG (3.5.0 (abc) → t):\n"
-        self.assertIn(head, err)
-        self.assertNotIn("Xong.", err.split(head, 1)[0])
-        lines = err.split(head, 1)[1].split("[install] Xong.", 1)[0].splitlines()
+        self.assertNotIn("[install]   [3.", err)
+        self.assertNotIn("Bước làm tay", err.split("[install] Xong.", 1)[1])
+        main = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        self.assertTrue(install.LEGACY_HEAD_RE.search(main))
+        main = install.LEGACY_HEAD_RE.sub("", main)
+        archive = (ROOT / install.CHANGELOG_ARCHIVE).read_bytes()
+        out = self.report("3.5.0 (abc)", "3.34.0", main.encode(), archive)
+        head = "[install] Bước làm tay từ CHANGELOG (3.5.0 (abc) → mới):\n"
+        self.assertTrue(out.startswith(head), out[:200])
+        lines = out[len(head) :].splitlines()
         sections = [ln[len("[install]   [") : -1] for ln in lines if ln.startswith("[install]   [")]
         self.assertTrue(all(re.fullmatch(r"\[install\]   (\[[^]]+\]|- Dự án đích.*)", ln) for ln in lines), lines)
         self.assertEqual(len(sections), len(set(sections)))  # mỗi mục in [bản] một lần
         released = [s for s in sections if s != "Unreleased"]
         self.assertEqual(released[-7:], ["3.10.0", "3.9.0", "3.8.0", "3.7.1", "3.7.0", "3.6.0", "3.5.1"])
-        self.assertIn("1.0.0", released)  # nâng từ dòng kế thừa sang dòng riêng (ADR-9002): mục dòng mới là bước mới
-        self.assertTrue(all(tuple(map(int, s.split("."))) > (3, 5, 0) for s in released if s != "1.0.0"))
+        self.assertNotIn("1.0.0", released)
+        self.assertTrue(all(tuple(map(int, s.split("."))) > (3, 5, 0) for s in released))
         # trích dẫn nhiều dòng của 3.8.0 → một dòng: bỏ `>` và `**` (ngoài mã), tới dấu chấm hết câu
         self.assertIn(
             "[install]   - Dự án đích khi nâng từ 3.7.x: chạy lại `install.py` (guard, `_lib.sh`, `pre-mcp-guard.sh`, "
@@ -2239,6 +2250,11 @@ class InstallUpgradeTest(unittest.TestCase):
             else:
                 current.append(ln)
         self.assertTrue(all(len(v) == len(set(v)) for v in per_section.values()))  # trùng hệt trong mục in một lần
+        down = io.StringIO()
+        with redirect_stderr(down):  # khung thật (dòng 1.x) trên dự án ở 3.34.0: hạ bản theo số
+            install.report_upgrade_steps("3.34.0 (abc)", "t")
+        self.assertRegex(down.getvalue(), r"^\[install\] Bước làm tay từ CHANGELOG \(3\.34\.0 \(abc\) → t\): bỏ qua — ")
+        self.assertTrue(down.getvalue().endswith("cũ hơn bản đã cài (hạ bản)\n"), down.getvalue())
 
     def test_upgrade_steps_clauses_versions_and_unicode(self):
         """Mệnh đề = từ "Dự án đích" tới hết câu (dấu chấm + khoảng trắng/hết khối; `1.` của danh sách không phải hết câu),
@@ -2425,37 +2441,39 @@ class InstallUpgradeTest(unittest.TestCase):
             self.assertEqual(len(out.splitlines()), 1, out)
             self.assertIn("(3.5.0 → mới): không đọc được CHANGELOG.md của khung", out)
 
-    def test_upgrade_steps_cross_release_line(self):
-        """ADR-9002: nâng từ dòng kế thừa X-Templates sang dòng riêng (số nhỏ hơn) không phải hạ bản — in bước của mọi mục
-        dòng mới và mục kế thừa > bản cũ; nâng trong dòng mới và hạ bản trong dòng mới vẫn theo số."""
+    def test_upgrade_steps_stop_at_legacy_boundary(self):
+        """ADR-9004: CHANGELOG chỉ đọc tới tiêu đề ranh giới dòng kế thừa — nâng 1.0.0 → 1.0.1 và cài lại 1.0.0 không in
+        bước nào của mục 3.x (kể cả mục trong lưu trữ) dù số lớn hơn; 3.34.0 → 1.x là hạ bản (không còn nâng qua ranh
+        giới); không có ranh giới thì đọc cả file như cũ."""
         log = (
-            "## [Unreleased]\n## [1.1.0]\n- a Dự án đích: bước mới\n## [1.0.0]\n- b Dự án đích: bước đầu\n"
-            "## Dòng kế thừa X-Templates (đến 3.6.0)\n## [3.6.0]\n- c Dự án đích: bước cũ\n"
-            "## [3.5.0]\n- d Dự án đích: đã làm\n"
-        )
-        out = self.report("3.5.0", "1.1.0", log.encode())
+            "## [Unreleased]\n## [1.0.1]\n- a Dự án đích: bước vá\n## [1.0.0]\n- b Dự án đích: bước đầu\n"
+            "## Dòng kế thừa X-Templates (đến 3.34.0)\n## [3.34.0]\n- c Dự án đích: bước 3.34\n"
+        ).encode()
+        archive = "# lưu trữ\n## [3.19.0]\n- d Dự án đích: bước lưu trữ\n".encode()
         self.assertEqual(
-            out.splitlines()[1:],
+            self.report("1.0.0 (abc)", "1.0.1", log, archive).splitlines(),
             [
-                "[install]   [1.1.0]",
-                "[install]   - Dự án đích: bước mới",
-                "[install]   [1.0.0]",
-                "[install]   - Dự án đích: bước đầu",
-                "[install]   [3.6.0]",
-                "[install]   - Dự án đích: bước cũ",
+                "[install] Bước làm tay từ CHANGELOG (1.0.0 (abc) → mới):",
+                "[install]   [1.0.1]",
+                "[install]   - Dự án đích: bước vá",
             ],
         )
-        out = self.report("1.0.0", "1.1.0", log.encode())  # trong dòng mới: chỉ bản > 1.0.0
-        self.assertEqual(out.splitlines()[1:], ["[install]   [1.1.0]", "[install]   - Dự án đích: bước mới"])
-        no_new = log.replace("## [1.1.0]\n- a Dự án đích: bước mới\n", "")  # nguồn thật 1.0.0: không có mục 1.1.0
-        out = self.report("1.1.0", "1.0.0", no_new.encode())  # hạ bản trong dòng mới (since không có ở hai dòng)
-        self.assertIn("(hạ bản)", out)
-        self.assertEqual(len(out.splitlines()), 1, out)
-        dup = (
-            log + "## [1.0.0]\n- e Dự án đích: bước kế thừa trùng số\n"
-        )  # số trùng giữa hai dòng: phân loại theo vị trí
-        out = self.report("3.5.0", "1.1.0", dup.encode())
-        self.assertNotIn("bước kế thừa trùng số", out)  # mục kế thừa 1.0.0 ≤ 3.5.0
+        released = log.replace("## [1.0.1]\n- a Dự án đích: bước vá\n".encode(), b"")
+        self.assertEqual(self.report("1.0.0 (abc)", "1.0.0", released, archive), "")  # cài lại: im lặng
+        pending = released.replace(b"## [Unreleased]\n", "## [Unreleased]\n- u Dự án đích: chạy lại.\n".encode())
+        self.assertEqual(
+            self.report("1.0.0 (abc)", "1.0.0", pending, archive).splitlines()[1:],
+            ["[install]   [Unreleased]", "[install]   - Dự án đích: chạy lại."],
+        )
+        self.assertEqual(
+            self.report("3.34.0 (abc)", "1.0.1", log, archive),
+            "[install] Bước làm tay từ CHANGELOG (3.34.0 (abc) → mới): bỏ qua — bản khung 1.0.1 cũ hơn bản đã cài"
+            " (hạ bản)\n",
+        )
+        text = log.decode() + "\n" + archive.decode()
+        self.assertEqual([n for n, _ in install.upgrade_steps(text, (0, 0, 0))], ["1.0.1", "1.0.0"])
+        flat = install.LEGACY_HEAD_RE.sub("", text)
+        self.assertEqual([n for n, _ in install.upgrade_steps(flat, (1, 0, 0))], ["1.0.1", "3.34.0", "3.19.0"])
 
     def test_upgrade_steps_prerelease_older_than_release(self):
         """AUD-HAR-453 (3), SemVer §11: nhãn `1.0.0-rc1 (sha)` cũ hơn 1.0.0 — nâng lên 1.0.0 in bước của mục [1.0.0] (trước
@@ -2464,10 +2482,7 @@ class InstallUpgradeTest(unittest.TestCase):
             [install.version_key(s) for s in ("1.0.0-rc1 (abc)", "v1.2.3-beta.2", "3.7.1 (9433792)", "1.0.0+b", "x")],
             [(1, 0, 0, 0), (1, 2, 3, 0), (3, 7, 1, 1), (1, 0, 0, 1), None],
         )
-        log = (
-            "## [Unreleased]\n## [1.0.0]\n- b Dự án đích: bước đầu\n"
-            "## Dòng kế thừa X-Templates (đến 3.6.0)\n## [3.6.0]\n- c Dự án đích: bước cũ\n"
-        )
+        log = "## [Unreleased]\n## [1.0.0]\n- b Dự án đích: bước đầu\n## [0.9.0]\n- c Dự án đích: bước cũ\n"
         self.assertEqual(install.upgrade_steps(log, (1, 0, 0)), [])
         self.assertEqual(install.upgrade_steps(log, (1, 0, 0), pre=True), [("1.0.0", ["Dự án đích: bước đầu"])])
         out = self.report("1.0.0-rc1 (abc)", "1.0.0", log.encode())
@@ -2487,32 +2502,31 @@ class InstallUpgradeTest(unittest.TestCase):
         )
         self.assertEqual(self.report("1.0.0-rc1", "1.0.0-rc2", b"## [Unreleased]\n- a\n"), "")
 
-    def test_prerelease_upgrade_without_steps_and_across_release_line(self):
+    def test_prerelease_upgrade_without_steps_and_older_sections(self):
         """AUD-HAR-453 (review): `1.0.0-rc1` → `1.0.0` không có bước vẫn là nâng bản → "không có", không im lặng như cài
-        lại (đột biến so `now[:3] == since` phải đỏ); `3.34.0-rc1` (dòng kế thừa) → 1.0.0 gồm cả mục [3.34.0] — bản
-        chính của rc đã cài — nhưng không gồm mục cũ hơn; `3.34.0` → 1.0.0 thì không gồm [3.34.0]."""
+        lại (đột biến so `now[:3] == since` phải đỏ); `1.1.0-rc1` → 1.2.0 gồm cả mục [1.1.0] — bản chính của rc đã cài —
+        nhưng không gồm mục cũ hơn; `1.1.0` → 1.2.0 thì không gồm [1.1.0]."""
         self.assertEqual(
             self.report("1.0.0-rc1", "1.0.0", b"## [Unreleased]\n## [1.0.0]\n- a\n"),
             "[install] Bước làm tay từ CHANGELOG (1.0.0-rc1 → mới): không có\n",
         )
         log = (
-            "## [Unreleased]\n## [1.0.0]\n- b Dự án đích: bước đầu\n"
-            "## Dòng kế thừa X-Templates (đến 3.34.0)\n## [3.34.0]\n- c Dự án đích: bước 3.34\n"
-            "## [3.33.0]\n- d Dự án đích: bước 3.33\n"
+            "## [Unreleased]\n## [1.2.0]\n- b Dự án đích: bước 1.2\n"
+            "## [1.1.0]\n- c Dự án đích: bước 1.1\n## [1.0.0]\n- d Dự án đích: bước 1.0\n"
         ).encode()
-        head = ["[install]   [1.0.0]", "[install]   - Dự án đích: bước đầu"]
+        head = ["[install]   [1.2.0]", "[install]   - Dự án đích: bước 1.2"]
         self.assertEqual(
-            self.report("3.34.0-rc1 (abc)", "1.0.0", log).splitlines(),
+            self.report("1.1.0-rc1 (abc)", "1.2.0", log).splitlines(),
             [
-                "[install] Bước làm tay từ CHANGELOG (3.34.0-rc1 (abc) → mới):",
+                "[install] Bước làm tay từ CHANGELOG (1.1.0-rc1 (abc) → mới):",
                 *head,
-                "[install]   [3.34.0]",
-                "[install]   - Dự án đích: bước 3.34",
+                "[install]   [1.1.0]",
+                "[install]   - Dự án đích: bước 1.1",
             ],
         )
         self.assertEqual(
-            self.report("3.34.0 (abc)", "1.0.0", log).splitlines(),
-            ["[install] Bước làm tay từ CHANGELOG (3.34.0 (abc) → mới):", *head],
+            self.report("1.1.0 (abc)", "1.2.0", log).splitlines(),
+            ["[install] Bước làm tay từ CHANGELOG (1.1.0 (abc) → mới):", *head],
         )
 
     def test_git_describe_label_is_release_not_prerelease(self):

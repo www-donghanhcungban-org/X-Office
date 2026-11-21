@@ -3,7 +3,8 @@
 - **Trạng thái:** **Đã chấp nhận 2026-11-04** — chủ dự án trả lời bốn câu hỏi ở
   [`research/2026-11-04-software-factory-direction.md`](../../research/2026-11-04-software-factory-direction.md) §9:
   **1a · 2a hotel-manager · 3a · 4a** (tiền lệ ADR-0064: nháp cùng PR, chấp nhận cùng ngày; **D-353**). Bản nháp cùng ngày
-  chỉ khác ở trạng thái và đoạn "Bốn câu hỏi" ở §Quyết định.
+  chỉ khác ở trạng thái và đoạn "Bốn câu hỏi" ở §Quyết định. **Thay một phần bởi
+  [ADR-9004](9004-remove-target-registry.md)** (2026-11-21): lát E (registry nhiều sản phẩm) đã gỡ.
 - **Trạng thái triển khai:** lát A đã làm 2026-11-05 trên nhánh, chưa merge (D-355,
   [`PLAN-factory-A.md`](../archive/autopilot/PLAN-factory-A.md) T-3675…3679: `report_result`, `<khoá>_report`, `release_artifacts`,
   `subject`/`promotion`, `schema: 3`; test `tests/test_release_contract.py`); evidence v2 của `loop record` giữ nguyên.

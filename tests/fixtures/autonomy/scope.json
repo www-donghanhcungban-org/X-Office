@@ -528,7 +528,7 @@
    ]
   },
   {
-   "reason": "Registry sản phẩm (`xt.py registry`, `GET /api/registry` của `xt.py app` — ADR-0068 lát E): kiểm schema và thông điệp lỗi của lệnh đọc, không phải guard/PR/CI/harness. Kiểm bằng tests.test_registry.",
+   "reason": "Registry sản phẩm (ADR-0068 lát E) đã gỡ ở ADR-9004 cùng lệnh, API và test của nó: phát hiện cũ về schema và thông điệp lỗi của lệnh đọc, không phải guard/PR/CI/harness; không còn mã để có ca.",
    "ids": [
     "AUD-CODE-049",
     "AUD-SEC-503"

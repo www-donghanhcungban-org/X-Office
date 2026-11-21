@@ -61,7 +61,7 @@ và dữ liệu gốc cho cổng T-3847. `xt_flow.py` ghi rõ phần số liệu
 
 ### Lát 1 — Bản dev có receipt
 - [ ] `T-3842` xt.py: lệnh triển khai đọc khoá `xt.yaml`, ghi receipt (môi trường · digest · thời điểm · smoke), smoke đỏ thì quay lui; fixture âm sai digest, smoke đỏ, receipt cũ (sau: T-3841; topo: review) — Gate: `python3 -m unittest tests.test_deploy_receipt tests.test_deploy_run`
-- [x] `T-3843` `release-check` đối chiếu digest ở receipt với `subject.digest`; `registry` đọc receipt vào `environments`/`release` (sau: T-3842; topo: review) — Gate: `python3 -m unittest tests.test_deploy_release_row`
+- [x] `T-3843` `release-check` đối chiếu digest ở receipt với `subject.digest`; `registry` đọc receipt vào `environments`/`release` (phần `registry` đã gỡ ở ADR-9004) (sau: T-3842; topo: review) — Gate: `python3 -m unittest tests.test_deploy_release_row`
 - [x] `T-3844` Gói `web-api-ts`: ảnh + compose dev (app + Postgres), khoá triển khai dev ở `pack.json`; workflow gói: repo sạch → bản dev → receipt → quay lui, ca sai cố ý đỏ (sau: T-3842) — Gate: `python3 -m unittest tests.test_deploy_run tests.test_pack_ui` · CI `pack-acceptance (clean)`
 
 ### Lát 2 — Ý tưởng tới repo đang chạy
@@ -77,7 +77,7 @@ và dữ liệu gốc cho cổng T-3847. `xt_flow.py` ghi rõ phần số liệu
 - [ ] `T-3850` ADR song song theo file và worker ngoài phiên — thay một phần D-142; đối chiếu `LOOP-STOP-014`, ADR-0009 §4, `LOOP-ORCH-006/007/020/024` ở mục Thay/Giữ; thử trên git/GitHub thật năm điểm [chặn] của đặc tả parallel §10 rồi chuyển F-131/F-133 sang Approved (sau: T-3866) — Gate: `git grep --untracked -qiE '^# ADR-[0-9]+: .*worker ngoài phiên' -- docs/adr`
 - [ ] `T-3851` xt.py: diff thật của task nằm trong `files:` đã khai, ra ngoài thì `loop record` đỏ; đợt ≥ 2 task không giao thì `loop status` trả `parallel` mặc định; khoá lùi về `self` (sau: T-3850, T-3847; topo: review) — Gate: `python3 -m unittest tests.test_parallel_scope`
 - [ ] `T-3852` File nhiều PR cùng chạm: mảnh `changelog.d/` + `changelog compile`; worktree song song không sửa PLAN (xong = bằng chứng; tick sau merge bằng Gate chạy trên nhánh chính); PROGRESS, sổ quyết định, sổ audit, sổ do lệnh ghi chỉ phiên điều phối ghi (sau: T-3850; topo: review) — Gate: `python3 -m unittest tests.test_shared_files`
-- [ ] `T-3853` Worker ngoài phiên trên `loop run` sẵn có: mỗi lát một worktree, một nhánh, một PR; worktree do `xt.py` tạo; nhận việc bằng API tạo ref; nhánh quá hạn chỉ báo, giao lại bằng lệnh có D-NNN; trần chi phí đọc ở nhánh chính, cộng dồn theo lát qua mọi lượt; hàng đợi nhiều dự án đọc `registry.json` (sau: T-3851, T-3852; topo: review) — Gate: `python3 -m unittest tests.test_worker_queue`
+- [ ] `T-3853` Worker ngoài phiên trên `loop run` sẵn có: mỗi lát một worktree, một nhánh, một PR; worktree do `xt.py` tạo; nhận việc bằng API tạo ref; nhánh quá hạn chỉ báo, giao lại bằng lệnh có D-NNN; trần chi phí đọc ở nhánh chính, cộng dồn theo lát qua mọi lượt; hàng đợi nhiều dự án (từng đọc `registry.json` — đã gỡ ở ADR-9004, không còn nguồn danh sách dự án) (sau: T-3851, T-3852; topo: review) — Gate: `python3 -m unittest tests.test_worker_queue`
 - [ ] `T-3854` Số đo: xung đột tích hợp, lead time song song so tuần tự, lỗi lọt sau merge, thời gian chờ người, chi phí mỗi lát (sau: T-3851) — Gate: `python3 -m unittest tests.test_factory_metrics`
 
 ### Lát 5 — Mọi quy mô

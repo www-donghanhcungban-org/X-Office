@@ -2481,60 +2481,26 @@ def step_clauses(block: list[str]) -> list[str]:
 LEGACY_HEAD_RE = re.compile(r"^## Dòng kế thừa X-Templates \(đến \d+\.\d+\.\d+\)\s*$", re.M)  # ADR-9002
 
 
-def split_release_line(text: str) -> tuple[list[tuple[str, list[str]]], list[tuple[str, list[str]]]]:
-    """(mục dòng phát hành riêng, mục dòng kế thừa) theo VỊ TRÍ so với tiêu đề ranh giới (ADR-9002); không có ranh giới →
-    mọi mục thuộc dòng kế thừa (hành vi cũ). Phân loại theo vị trí, không theo tên: số bản có thể trùng giữa hai dòng."""
-    m = LEGACY_HEAD_RE.search(text)
-    if not m:
-        return [], changelog_sections(text)
-    return changelog_sections(text[: m.start()]), changelog_sections(text[m.end() :])
-
-
-def _names(sections: list[tuple[str, list[str]]]) -> set[str]:
-    return {name for name, _ in sections if name and name != "Unreleased"}
-
-
-def crosses_release_line(text: str, since: tuple[int, int, int], now: tuple[int, int, int]) -> bool:
-    """Nâng từ dòng kế thừa (`since` là mục sau ranh giới, không phải mục dòng mới) sang dòng phát hành riêng (`now` là
-    mục dòng mới): số bản nhỏ hơn nhưng không phải hạ bản. `since` không có ở cả hai dòng (vd. 1.0.1 khi nguồn là
-    1.0.0) → so số như thường, tức hạ bản (ADR-9002)."""
-    new, old = split_release_line(text)
-    label = ".".join(map(str, since))
-    return label in _names(old) and label not in _names(new) and ".".join(map(str, now)) in _names(new)
-
-
-def upgrade_steps(
-    text: str, since: tuple[int, int, int], crossing: bool = False, pre: bool = False
-) -> list[tuple[str, list[str]]]:
+def upgrade_steps(text: str, since: tuple[int, int, int], pre: bool = False) -> list[tuple[str, list[str]]]:
     """(tên mục, mệnh đề "Dự án đích …") của mục `[Unreleased]` và mọi mục `[X.Y.Z]` có bản > `since`, thứ tự CHANGELOG;
     mệnh đề trùng hệt in một lần — giữ lần đầu theo thứ tự CHANGELOG (bản mới nhất), mục hết mệnh đề thì bỏ (D-159).
-    `crossing` (sang dòng phát hành riêng): mọi mục của dòng mới tính là mới hơn `since` dù số nhỏ hơn. `pre`: bản đã
-    cài là tiền phát hành của `since` (`1.0.0-rc1`) — mục `[since]` là bản chính, mới hơn nên vẫn là bước (SemVer §11)."""
+    Chỉ đọc tới tiêu đề ranh giới dòng kế thừa (ADR-9002, ADR-9004): mục 3.x sau nó số lớn hơn 1.x nhưng không phải bước
+    của dòng mới. `pre`: bản đã cài là tiền phát hành của `since` (`1.0.0-rc1`) — mục `[since]` là bản chính, mới hơn nên
+    vẫn là bước (SemVer §11)."""
     out: list[tuple[str, list[str]]] = []
     seen: set[str] = set()
-    new, old = split_release_line(text)
-    since_in_new = ".".join(map(str, since)) in _names(new)
     bound = (*since, 0 if pre else 1)  # mục CHANGELOG luôn là bản chính: khoá (X, Y, Z, 1)
-    for in_new, sections in ((True, new), (False, old)):
-        for name, lines in sections:
-            version = parse_version(name)
-            older = version is None or (*version, 1) <= bound
-            if name == "Unreleased":
-                skip = False
-            elif in_new:
-                skip = older and not crossing
-            else:
-                skip = older or since_in_new  # đang ở dòng mới: mục kế thừa không phải bước của họ
-            if skip:
-                continue
-            clauses = [
-                c
-                for c in dict.fromkeys(c for block in text_blocks(lines) for c in step_clauses(block))
-                if c not in seen
-            ]
-            seen.update(clauses)
-            if clauses:
-                out.append((name, clauses))
+    head = LEGACY_HEAD_RE.search(text)
+    for name, lines in changelog_sections(text[: head.start()] if head else text):
+        version = parse_version(name)
+        if name != "Unreleased" and (version is None or (*version, 1) <= bound):
+            continue
+        clauses = [
+            c for c in dict.fromkeys(c for block in text_blocks(lines) for c in step_clauses(block)) if c not in seen
+        ]
+        seen.update(clauses)
+        if clauses:
+            out.append((name, clauses))
     return out
 
 
@@ -2565,19 +2531,15 @@ def report_upgrade_steps(previous: str | None, label: str) -> None:
     title = f"Bước làm tay từ CHANGELOG ({previous} → {label}):"
     source = source_version()
     now = version_key(source)
-    try:
-        text: str | None = read_changelog(SRC)
-        error: Exception | None = None
-    except (OSError, UnicodeDecodeError) as exc:
-        text, error = None, exc
-    crossing = text is not None and now is not None and crosses_release_line(text, since, now[:3])
-    if now is not None and now < key and not crossing:
+    if now is not None and now < key:
         log(f"{title} bỏ qua — bản khung {source} cũ hơn bản đã cài (hạ bản)")
         return
-    if text is None:
-        log(f"{title} không đọc được CHANGELOG.md của khung ({error}) — xem mục 'Dự án đích' ở CHANGELOG bản mới")
+    try:
+        text = read_changelog(SRC)
+    except (OSError, UnicodeDecodeError) as exc:
+        log(f"{title} không đọc được CHANGELOG.md của khung ({exc}) — xem mục 'Dự án đích' ở CHANGELOG bản mới")
         return
-    steps = upgrade_steps(text, since, crossing, pre)
+    steps = upgrade_steps(text, since, pre)
     if not steps and now == key:  # cài lại cùng bản: im lặng (review #191)
         return
     log(title if steps else f"{title} không có")

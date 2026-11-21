@@ -9,7 +9,6 @@ const ROUTES = {
   loop: ["loop", "Vòng tự động"],
   office: ["office", "Văn phòng"],
   pr: ["pr", "PR"],
-  registry: ["registry", "Registry sản phẩm"],
 };
 
 export function h(tag, attrs, ...children) {

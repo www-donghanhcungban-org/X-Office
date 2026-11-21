@@ -72,7 +72,6 @@ khoá `(method, path)`; `Ctx` có `base` (gốc dự án), `framework` (thư m�
 | `GET /api/adrs` | — | `adrs: [{number, title, status, path}]` | — | T-1961 |
 | `GET /api/prs` | — | `available: true`, `prs: [{number, title, head_sha, lane, action, reasons}]`; không có `gh`/chưa đăng nhập/hết giờ → `available: false`, `reason` | — (luôn 200) | T-1971 |
 | `GET /api/pr-stats` | `days` (1–90, mặc định 7) | như `pr stats --json`, thêm `available` | 400 `days` sai | T-1971 |
-| `GET /api/registry` | — | như `registry --json` + `available`, `path`, mỗi sản phẩm thêm owner/type/risk/environments/slo/release/exceptions; chưa có hoặc sai → `available: false`, `reason`, `errors` (≤ 50) | — (luôn 200) | T-3691 |
 | `GET /api/office` | — | `project`, `loop: {verdict, reason}`, `seats: [{key, label, state, task: {id, title} \| null}]` (bàn theo thứ tự `main`, `executor`, `executor-deep`, `reviewer`, `researcher`; `state` ∈ `work`, `fail`, `wait`, `done`, `idle`, `untracked` — suy từ verdict vòng và lần chạy cuối của mỗi agent trong `.autopilot/runs.jsonl`; lần chạy cũ hơn 30 phút không còn tính là đang làm; bàn không có nguồn bằng chứng (reviewer, researcher) là `untracked`), `tasks: {open, done, skipped}`, `pending_human: [{id, reason}]`, `feed: [{at, agent, task, ok}]` (≤ 15, mới nhất trước) | — (luôn 200; dữ liệu hỏng → bàn rảnh, danh sách rỗng) | F-008 |
 
 Đọc file mới mỗi request (hoặc cache theo `mtime`); không ghi gì ngoài `POST /api/blueprint`. `GET /api/prs` chỉ gọi REST

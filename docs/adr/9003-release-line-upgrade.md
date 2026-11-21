@@ -1,6 +1,7 @@
 # ADR-9003: Nâng bản qua ranh giới dòng phát hành, `legacy-line` vẫn là lệch
 
 - **Trạng thái:** Đã chấp nhận ngày 2026-11-21 (phiên chính tự duyệt theo ADR-0008; review độc lập trước khi cắt 1.0.0).
+  **Bị thay bởi [ADR-9004](9004-remove-target-registry.md)** (2026-11-21).
 - **Làm rõ:** ADR-9002 (dòng phát hành riêng) — điều chỉnh hai điểm, ADR-9002 giữ nguyên.
 
 ## Bối cảnh

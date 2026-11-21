@@ -75,9 +75,8 @@ Worker lát:
   phối đóng khi mở PR lượt mới.
 - **Chi phí cộng dồn đi theo nhánh:** mỗi commit worker đẩy mang trailer chi phí cộng dồn của lát; lượt giao lại đọc
   trailer cuối và chỉ được tiêu **phần còn lại** của `worker_budget_usd` — giao lại không cấp trần mới.
-- `xt.py worker next [--json]`: lát kế tiếp chưa có ref lượt nào của PLAN đang mở (theo `sau:` và `files:`). Ở repo khung
-  thêm `--registry`: liệt kê sản phẩm còn việc — mỗi repo một worker cho mỗi lát; giữa các repo không có trần chung ngoài
-  chi phí. `xt.py worker status`: lát đang có chủ, lượt, tuổi, nhánh quá hạn.
+- `xt.py worker next [--json]`: lát kế tiếp chưa có ref lượt nào của PLAN đang mở (theo `sau:` và `files:`). Cờ
+  `--registry` (sản phẩm còn việc ở repo khung) ngừng dùng — registry đã gỡ (ADR-9004). `xt.py worker status`: lát đang có chủ, lượt, tuổi, nhánh quá hạn.
 - **Trần bắt buộc, đọc từ nhánh chính:** `worker_budget_usd` (mỗi lát, qua mọi lượt), `worker_max_turns`,
   `worker_max_parallel`, `worker_max_reassign` chỉ đọc ở bản `xt.yaml` đã commit trên nhánh chính của remote và thuộc
   `HARD_GATED_KEYS` (PR đổi khoá do người merge). Thiếu một trong hai khoá đầu → `loop run --worktree` exit 2, không tạo
