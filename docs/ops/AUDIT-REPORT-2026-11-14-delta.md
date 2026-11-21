@@ -1,7 +1,7 @@
 # AUDIT-REPORT — X-Office · 2026-11-14 (delta DOC)
 
 > Snapshot `2bf2e1cfdd5f99bc5568f7036a5061c134316061` trên `main`. Tiếp phần DOC còn trống của
-> [audit 2026-11-11](AUDIT-REPORT-2026-11-11-delta.md) trên phạm vi `454d146..2bf2e1cf`.
+> [audit 2026-11-11](../archive/ops/AUDIT-REPORT-2026-11-11-delta.md) trên phạm vi `454d146..2bf2e1cf`.
 > Phát hiện mới: **1 🟢 mở** (`AUD-DOC-293`). Giữ `AUD-DOC-291` mở. TEST và HAR chưa quét đủ phạm vi.
 
 ## 1. Phạm vi

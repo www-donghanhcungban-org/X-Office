@@ -4,7 +4,7 @@
 
 > 2026-11-14 · [Audit delta DOC](AUDIT-REPORT-2026-11-14-delta.md) `454d146..2bf2e1cf`: DOC đã quét phần tài liệu trong repo, URL ngoài chưa kiểm lại. TEST và HAR còn `chưa quét`.
 
-> 2026-11-11 · [Audit delta](AUDIT-REPORT-2026-11-11-delta.md) `454d146..7ca87a6` (D-416): 10 nhóm lên `7ca87a6`; TEST, DOC, HAR `chưa quét` (cụm INCONCLUSIVE/rỗng); mới 🔴 AUD-SEC-614/615/616 · 🟠 AUD-HAR-377, AUD-CODE-064, AUD-DEP-021, AUD-DATA-011, AUD-SEC-541 (nâng) · 🟢 AUD-SEC-617/618, AUD-XFEAT-048, AUD-TEST-100, AUD-PERF-027…031.
+> 2026-11-11 · [Audit delta](../archive/ops/AUDIT-REPORT-2026-11-11-delta.md) `454d146..7ca87a6` (D-416): 10 nhóm lên `7ca87a6`; TEST, DOC, HAR `chưa quét` (cụm INCONCLUSIVE/rỗng); mới 🔴 AUD-SEC-614/615/616 · 🟠 AUD-HAR-377, AUD-CODE-064, AUD-DEP-021, AUD-DATA-011, AUD-SEC-541 (nâng) · 🟢 AUD-SEC-617/618, AUD-XFEAT-048, AUD-TEST-100, AUD-PERF-027…031.
 
 > 2026-11-05 · 11 nhóm `0a2583f` → `454d146`: #448 (cắt 3.30.0) phủ bởi review sạch #448 (ADR-0057). Trước đó · [Audit delta](../archive/ops/AUDIT-REPORT-2026-11-05-delta.md) `23447d8..6086e69` + PR sửa #446/#447 (T-3557, D-371/D-372): 10 nhóm lên `0a2583f`; ARCH lên `0a2583f` sau (`9f123b1..0a2583f`, D-373: AUD-ARCH-009 sửa bằng ADR-0072 ở #448); A11Y giữ SHA cũ. Trước đó 2026-11-04 · [delta](../archive/ops/AUDIT-REPORT-2026-11-04-delta.md) Git guard tại `23447d8` (D-340).
 
