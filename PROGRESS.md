@@ -33,5 +33,5 @@
 - Coverage cục bộ < 100 % khi `coverage` cài ở site người dùng: hook chạy `python3 -I` nên tiến trình con không được đo — CI là cổng coverage (đo 2026-11-05).
 
 ## Bàn giao phiên
-- Mốc X-Office: `84f32d0` (#34; còn 🟢 AUD-HAR-455). Mở `python3 scripts/xt.py app` để thử Văn phòng; chạy `python3 -m unittest tests.test_app_office` và `python3 scripts/xt.py app --smoke` trước khi trình.
+- Mốc X-Office: `732dcc2` (#36; còn 🟢 AUD-HAR-455). Mở `python3 scripts/xt.py app` để thử Văn phòng; chạy `python3 -m unittest tests.test_app_office` và `python3 scripts/xt.py app --smoke` trước khi trình.
 - Container mới: `scripts/dev-task.sh setup`; trước khi đẩy `gate-fast`, CI là cổng đầy đủ. Subagent dùng scratch riêng dưới `/home/liend` (không `/tmp`: tmpfs, mất khi khởi động lại). Gate cục bộ: `coverage` và `pip` phải ở site-packages của `python3` (hook chạy `python3 -I`) — venv 3.15 đầu PATH; G7 cần `fetch --unshallow --tags`; `release-check` chạy ở worktree sạch (`.agents/`, `.codex/` chưa commit làm hàng `tree` đỏ).
