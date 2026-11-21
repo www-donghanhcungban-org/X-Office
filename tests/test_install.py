@@ -2222,7 +2222,8 @@ class InstallUpgradeTest(unittest.TestCase):
         self.assertEqual(len(sections), len(set(sections)))  # mỗi mục in [bản] một lần
         released = [s for s in sections if s != "Unreleased"]
         self.assertEqual(released[-7:], ["3.10.0", "3.9.0", "3.8.0", "3.7.1", "3.7.0", "3.6.0", "3.5.1"])
-        self.assertTrue(all(tuple(map(int, s.split("."))) > (3, 5, 0) for s in released))
+        self.assertIn("1.0.0", released)  # nâng từ dòng kế thừa sang dòng riêng (ADR-9002): mục dòng mới là bước mới
+        self.assertTrue(all(tuple(map(int, s.split("."))) > (3, 5, 0) for s in released if s != "1.0.0"))
         # trích dẫn nhiều dòng của 3.8.0 → một dòng: bỏ `>` và `**` (ngoài mã), tới dấu chấm hết câu
         self.assertIn(
             "[install]   - Dự án đích khi nâng từ 3.7.x: chạy lại `install.py` (guard, `_lib.sh`, `pre-mcp-guard.sh`, "
@@ -2423,6 +2424,31 @@ class InstallUpgradeTest(unittest.TestCase):
             out = self.report("3.5.0", "3.6.0", changelog)
             self.assertEqual(len(out.splitlines()), 1, out)
             self.assertIn("(3.5.0 → mới): không đọc được CHANGELOG.md của khung", out)
+
+    def test_upgrade_steps_cross_release_line(self):
+        """ADR-9002: nâng từ dòng kế thừa X-Templates sang dòng riêng (số nhỏ hơn) không phải hạ bản — in bước của mọi mục
+        dòng mới và mục kế thừa > bản cũ; nâng trong dòng mới và hạ bản trong dòng mới vẫn theo số."""
+        log = (
+            "## [Unreleased]\n## [1.1.0]\n- a Dự án đích: bước mới\n## [1.0.0]\n- b Dự án đích: bước đầu\n"
+            "## Dòng kế thừa X-Templates (đến 3.6.0)\n## [3.6.0]\n- c Dự án đích: bước cũ\n"
+            "## [3.5.0]\n- d Dự án đích: đã làm\n"
+        )
+        out = self.report("3.5.0", "1.1.0", log.encode())
+        self.assertEqual(
+            out.splitlines()[1:],
+            [
+                "[install]   [1.1.0]",
+                "[install]   - Dự án đích: bước mới",
+                "[install]   [1.0.0]",
+                "[install]   - Dự án đích: bước đầu",
+                "[install]   [3.6.0]",
+                "[install]   - Dự án đích: bước cũ",
+            ],
+        )
+        out = self.report("1.0.0", "1.1.0", log.encode())  # trong dòng mới: chỉ bản > 1.0.0
+        self.assertEqual(out.splitlines()[1:], ["[install]   [1.1.0]", "[install]   - Dự án đích: bước mới"])
+        out = self.report("1.1.0", "1.0.0", log.encode())  # hạ bản trong dòng mới
+        self.assertIn("(hạ bản)", out)
 
     def test_xt_yaml_new_keys_appended_as_comments_idempotent(self):
         """xt.yaml của dự án (`kept-own`): khoá của mẫu mà dự án chưa có (`khoá:` lẫn `# khoá:`) nối cuối file dạng chú

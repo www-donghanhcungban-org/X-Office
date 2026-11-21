@@ -470,9 +470,12 @@ class RealRegistryTest(unittest.TestCase):
         # số lệch tính độc lập từ registry.json + VERSION: core hoặc gói khác VERSION khung (dữ kiện thật đổi theo dự án
         # đích — không giả định "mọi dự án đều cũ"; review #461)
         data = json.loads((ROOT / "docs" / "ops" / "registry.json").read_text(encoding="utf-8"))
+
+        def lagging(version: str) -> bool:  # tag dòng kế thừa (ADR-9002) không tính lệch khi khung đã sang dòng mới
+            return version != got["version"] and tuple(map(int, version.split("."))) not in xt.LEGACY_RELEASE_TAGS
+
         want = sum(
-            p["core"] != got["version"] or (p["pack"] is not None and p["pack"]["version"] != got["version"])
-            for p in data["products"]
+            lagging(p["core"]) or (p["pack"] is not None and lagging(p["pack"]["version"])) for p in data["products"]
         )
         self.assertEqual(want, got["drift"])
 
