@@ -10,8 +10,7 @@ import { createTextureBank } from "./textures.js";
 // Mặt phẳng chồng nhau (cửa sổ trên tường, thảm trên sàn) nằm đúng toạ độ; thứ tự phát (như painter của 2D) được giữ
 // bằng polygonOffset — dịch độ sâu, không dịch hình — nên toạ độ lớn (mặt tiền toà nhà) không bị đẩy lệch.
 const MAX_OFFSET_UNITS = 4000;
-const AZ = [0.17, 1.4]; // giới hạn góc xoay ngang (rad): luôn nhìn từ phía hai bức tường mở
-const EL = [0.35, 1.1];
+const EL = [0.06, 1.48]; // xoay ngang 360° tự do; nghiêng dọc từ ngang mắt (~3.5°) tới nhìn thẳng xuống (~85°)
 
 // Màu đã phân tích, dùng lại giữa các khung hình (quy mô lớn có hàng nghìn lệnh mỗi khung — không cấp phát lại).
 const COLORS = new Map();
@@ -109,7 +108,7 @@ class Pool {
   }
 }
 
-export function createThreeView(stage, onTagClick) {
+export function createThreeView(stage, onTagClick, onHover, onZoom) {
   const canvas = document.createElement("canvas");
   canvas.className = "office-canvas office-3d";
   canvas.setAttribute("role", "img");
@@ -134,7 +133,7 @@ export function createThreeView(stage, onTagClick) {
   const scene = new THREE.Scene();
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 200);
   const target = new THREE.Vector3(8, 1.3, 6);
-  const view = { az: Math.PI / 4, el: Math.atan(1 / Math.SQRT2), w: 800, h: 540 };
+  const view = { az: Math.PI / 4, el: Math.atan(1 / Math.SQRT2), panX: 0, panZ: 0, freeZoom: 1, w: 800, h: 540 };
   const hemi = new THREE.HemisphereLight(0xffffff, 0x8a8a9a, 1.6);
   scene.add(hemi);
   const fill = new THREE.DirectionalLight(0xcbd5e1, 0.42);
@@ -149,6 +148,23 @@ export function createThreeView(stage, onTagClick) {
   sun.shadow.normalBias = 0.025;
   Object.assign(sun.shadow.camera, { left: -16, right: 16, top: 16, bottom: -16, near: 1, far: 60 });
   scene.add(sun, sun.target);
+  const accentA = new THREE.PointLight(0xffffff, 0, 28, 1.4);
+  const accentB = new THREE.PointLight(0xfde68a, 0, 26, 1.4);
+  scene.add(accentA, accentB);
+
+  const P_COUNT = 180;
+  const pPos = new Float32Array(P_COUNT * 3);
+  const pSeed = Array.from({ length: P_COUNT }, (_, i) => [
+    (Math.sin(i * 12.9898) * 43758.5453) % 1,
+    (Math.sin(i * 78.233 + 1) * 43758.5453) % 1,
+    (Math.sin(i * 39.425 + 2) * 43758.5453) % 1,
+  ].map((v) => v - Math.floor(v)));
+  const pGeo = new THREE.BufferGeometry();
+  pGeo.setAttribute("position", new THREE.BufferAttribute(pPos, 3));
+  const pMat = new THREE.PointsMaterial({ size: 0.16, transparent: true, opacity: 0.85, depthWrite: false });
+  const pCloud = new THREE.Points(pGeo, pMat);
+  pCloud.visible = false;
+  scene.add(pCloud);
 
   const boxGeo = new THREE.BoxGeometry(1, 1, 1);
   const textures = createTextureBank(THREE);
@@ -182,8 +198,13 @@ export function createThreeView(stage, onTagClick) {
 
   function syncBox(b, glowOn) {
     const m = boxes.next();
+    if ((b.wall === "left" && Math.sin(view.az) < -0.05) || (b.wall === "back" && Math.cos(view.az) < -0.05)) {
+      m.visible = false;
+      return;
+    }
     const shape = b.shape && SHAPES[b.shape] ? b.shape : "box";
     if (m.geometry !== SHAPES[shape]) m.geometry = SHAPES[shape];
+    m.userData.pick = b.pick || null;
     m.position.set(b.x + b.w / 2, b.z + b.h / 2, b.y + b.d / 2);
     m.rotation.set(b.rx || 0, b.rz || 0, b.ry || 0);
     m.scale.set(Math.max(b.w, 0.001), Math.max(b.h, 0.001), Math.max(b.d, 0.001));
@@ -201,6 +222,10 @@ export function createThreeView(stage, onTagClick) {
 
   function syncPanel(f, seq, glowOn) {
     const m = panels.next();
+    if ((f.plane === "left" && f.c <= 0.05 && Math.sin(view.az) < -0.05) || (f.plane === "back" && f.c <= 0.05 && Math.cos(view.az) < -0.05)) {
+      m.visible = false;
+      return;
+    }
     const lift = 0;
     m.material.polygonOffset = true;
     m.material.polygonOffsetFactor = -1;
@@ -327,7 +352,7 @@ export function createThreeView(stage, onTagClick) {
   function place(zoom, v, plan) {
     // Tâm ở giữa hộp nhìn (kể cả cao độ sàn tầng thượng z0 của toà nhà); khung chiếu khớp đúng 8 góc hộp trong không gian
     // camera — "Tới phòng/tới bàn" luôn nằm trọn trong khung ở mọi góc xoay.
-    target.set((v.x0 + v.x1) / 2, (v.z0 + v.z1) / 2, (v.y0 + v.y1) / 2);
+    target.set((v.x0 + v.x1) / 2 + view.panX, (v.z0 + v.z1) / 2, (v.y0 + v.y1) / 2 + view.panZ);
     const sh = Math.max(plan.W, plan.D) * 0.75 + 4;
     Object.assign(sun.shadow.camera, { left: -sh, right: sh, top: sh, bottom: -sh, far: sh * 4 });
     sun.shadow.camera.updateProjectionMatrix();
@@ -359,20 +384,88 @@ export function createThreeView(stage, onTagClick) {
     camera.updateProjectionMatrix();
   }
 
-  // Kéo để xoay (chuột/chạm); mũi tên trái/phải/lên/xuống khi canvas có focus.
+  let lastPlan = null;
+  let lastZb = 0;
+
+  function pickAt(clientX, clientY) {
+    const r = canvas.getBoundingClientRect();
+    if (!r.width || !r.height) return null;
+    ndc.set(((clientX - r.left) / r.width) * 2 - 1, 1 - ((clientY - r.top) / r.height) * 2);
+    ray.setFromCamera(ndc, camera);
+    const active = [];
+    for (let i = 0; i < boxes.items.length; i++) {
+      const m = boxes.items[i];
+      if (m.visible && m.userData.pick) active.push(m);
+    }
+    const hits = ray.intersectObjects(active, false);
+    if (hits.length) return hits[0].object.userData.pick;
+    if (lastPlan && lastPlan.rooms && lastPlan.rooms.length && ray.ray.direction.y) {
+      const t = (lastZb - ray.ray.origin.y) / ray.ray.direction.y;
+      if (t > 0) {
+        const wx = ray.ray.origin.x + ray.ray.direction.x * t;
+        const wy = ray.ray.origin.z + ray.ray.direction.z * t;
+        const rm = lastPlan.rooms.find((x) => wx >= x.x && wx <= x.x + x.w && wy >= x.y && wy <= x.y + x.d);
+        if (rm) return { kind: "room", id: rm.id, label: rm.name };
+      }
+    }
+    return null;
+  }
+
+  // Kéo để xoay 360° tự do; Shift+kéo hoặc chuột phải để dời; cuộn chuột để zoom; bấm trực tiếp để tới.
   let drag = null;
+  let moved = 0;
   canvas.tabIndex = 0;
+  canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+  let lastZoom = 1;
+  canvas.addEventListener("wheel", (e) => {
+    if (e.ctrlKey) return;
+    e.preventDefault();
+    const f = e.deltaY < 0 ? 1.12 : 0.89;
+    const minF = 0.3 / Math.max(0.5, lastZoom);
+    const maxF = 8 / Math.max(0.5, lastZoom);
+    view.freeZoom = Math.min(maxF, Math.max(minF, view.freeZoom * f));
+    api.dirty = true;
+    if (onZoom) onZoom(Math.round(lastZoom * view.freeZoom * 100));
+  }, { passive: false });
   canvas.addEventListener("pointerdown", (e) => {
-    drag = { x: e.clientX, y: e.clientY, az: view.az, el: view.el };
+    const pan = e.button === 2 || e.shiftKey;
+    drag = { x: e.clientX, y: e.clientY, az: view.az, el: view.el, panX: view.panX, panZ: view.panZ, pan };
+    moved = 0;
     canvas.setPointerCapture(e.pointerId);
   });
   canvas.addEventListener("pointermove", (e) => {
-    if (!drag) return;
-    view.az = Math.min(AZ[1], Math.max(AZ[0], drag.az - (e.clientX - drag.x) * 0.008));
-    view.el = Math.min(EL[1], Math.max(EL[0], drag.el + (e.clientY - drag.y) * 0.006));
-    api.dirty = true;
+    if (drag) {
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      moved = Math.max(moved, Math.hypot(dx, dy));
+      if (drag.pan) {
+        const s = 0.025 / Math.max(0.3, curZoom || 1);
+        const cosA = Math.cos(view.az), sinA = Math.sin(view.az);
+        view.panX = drag.panX - (dx * cosA + dy * sinA) * s;
+        view.panZ = drag.panZ - (-dx * sinA + dy * cosA) * s;
+      } else {
+        view.az = drag.az - dx * 0.008;
+        view.el = Math.min(EL[1], Math.max(EL[0], drag.el + dy * 0.006));
+      }
+      api.dirty = true;
+      if (onHover) onHover(null);
+      canvas.dataset.hover = "";
+      return;
+    }
+    const hit = pickAt(e.clientX, e.clientY);
+    canvas.dataset.hover = hit ? "1" : "";
+    if (onHover) onHover(hit);
   });
-  const stop = () => { drag = null; };
+  canvas.addEventListener("pointerleave", () => {
+    canvas.dataset.hover = "";
+    if (onHover) onHover(null);
+  });
+  const stop = (e) => {
+    if (drag && !drag.pan && moved < 5 && e.type === "pointerup" && onTagClick) {
+      const hit = pickAt(e.clientX, e.clientY);
+      if (hit) onTagClick(hit.kind, hit.id);
+    }
+    drag = null;
+  };
   canvas.addEventListener("pointerup", stop);
   canvas.addEventListener("pointercancel", stop);
   canvas.addEventListener("keydown", (e) => {
@@ -380,7 +473,7 @@ export function createThreeView(stage, onTagClick) {
     const step = { ArrowLeft: [0.1, 0], ArrowRight: [-0.1, 0], ArrowUp: [0, 0.08], ArrowDown: [0, -0.08] }[e.key];
     if (!step) return;
     e.preventDefault();
-    view.az = Math.min(AZ[1], Math.max(AZ[0], view.az + step[0]));
+    view.az = view.az + step[0];
     view.el = Math.min(EL[1], Math.max(EL[0], view.el + step[1]));
     api.dirty = true;
   });
@@ -392,9 +485,20 @@ export function createThreeView(stage, onTagClick) {
   const api = {
     canvas,
     dirty: true,
+    freeZoom() {
+      return view.freeZoom;
+    },
+    resetPan() {
+      view.panX = 0;
+      view.panZ = 0;
+      api.dirty = true;
+    },
     resetView() {
       view.az = Math.PI / 4;
       view.el = Math.atan(1 / Math.SQRT2);
+      view.panX = 0;
+      view.panZ = 0;
+      view.freeZoom = 1;
       api.dirty = true;
     },
     resize(w, h, dpr) {
@@ -413,11 +517,43 @@ export function createThreeView(stage, onTagClick) {
       const dark = Boolean(opts.theme.edge || opts.theme.id === "night" || opts.theme.id === "library");
       hemi.intensity = dark ? 1.25 : 1.8;
       sun.intensity = dark ? 1.45 : 1.55;
-      scene.background = parseColor(opts.theme.bg).color;
+      scene.background = textures.sky(opts.theme.bg, opts.theme.glow, dark);
       if (opts.motion && prevT) textures.animate(Math.min(0.1, Math.max(0, (opts.t || 0) - prevT)));
       prevT = opts.t || 0;
       const sink = new Collector();
       const { plan } = compose(sink, opts, false);
+      const zb = plan.levels ? plan.levels * plan.levelH : 0;
+      lastPlan = plan;
+      lastZb = zb;
+      accentA.color.copy(parseColor(opts.theme.glow || "#60a5fa").color);
+      accentA.position.set(plan.W * 0.35, zb + 2.8, plan.D * 0.45);
+      accentA.intensity = glowOn ? (dark ? 2.2 : 0.45) : 0;
+      accentB.color.copy(parseColor(dark ? "#fde68a" : "#bae6fd").color);
+      accentB.position.set(plan.W * 0.78, zb + 3.2, plan.D * 0.72);
+      accentB.intensity = glowOn ? (dark ? 1.8 : 0.35) : 0;
+      const pKind = opts.season === "noel" ? "snow" : opts.theme.ambient;
+      if (opts.motion && pKind && pKind !== "none" && glowOn) {
+        pCloud.visible = true;
+        pMat.color.copy(parseColor(pKind === "rain" ? "#00e5ff" : pKind === "snow" ? "#ffffff" : pKind === "stars" ? "#e0f2fe" : "#fde68a").color);
+        pMat.size = pKind === "snow" || pKind === "rain" ? 0.22 : pKind === "stars" ? 0.2 : 0.14;
+        pMat.opacity = pKind === "dust" ? 0.5 : 0.85;
+        const spanX = plan.W + 8, spanY = plan.D + 8, tNow = opts.t || 0;
+        for (let k = 0; k < P_COUNT; k++) {
+          const [rx, ry, rz] = pSeed[k];
+          const px = -4 + ((rx + (pKind === "rain" ? tNow * 0.15 : 0)) % 1) * spanX + (pKind === "snow" ? Math.sin(tNow * 0.9 + k) * 0.45 : 0);
+          const pz = -4 + ry * spanY;
+          let py;
+          if (pKind === "stars") py = zb + 1.5 + rz * 8;
+          else if (pKind === "dust") py = zb + 0.4 + ((rz + tNow * 0.04) % 1) * 4.5;
+          else py = zb + (1 - ((rz + tNow * (pKind === "rain" ? 0.55 : 0.12)) % 1)) * 7.5;
+          pPos[k * 3] = px;
+          pPos[k * 3 + 1] = py;
+          pPos[k * 3 + 2] = pz;
+        }
+        pGeo.attributes.position.needsUpdate = true;
+      } else {
+        pCloud.visible = false;
+      }
       sink.boxes.forEach((b) => syncBox(b, glowOn));
       sink.panels.forEach((f, i) => syncPanel(f, i + 1, glowOn));
       sink.dots.forEach((d) => {
@@ -435,7 +571,8 @@ export function createThreeView(stage, onTagClick) {
       });
       for (const p of [boxes, panels, dots, rings]) p.finish();
       const dstBox = viewCorners(opts).box;
-      const dstZoom = opts.zoom || 1;
+      lastZoom = opts.zoom || 1;
+      const dstZoom = lastZoom * view.freeZoom;
       let moving = false;
       if (!curBox || !opts.motion) {
         curBox = { ...dstBox };
@@ -464,6 +601,8 @@ export function createThreeView(stage, onTagClick) {
       renderer.dispose();
       renderer.forceContextLoss(); // trả ngữ cảnh WebGL ngay (trình duyệt giới hạn số ngữ cảnh sống)
       textures.dispose();
+      pGeo.dispose();
+      pMat.dispose();
       for (const g of [...Object.values(SHAPES), planeGeo, dotGeo, ringGeo]) g.dispose();
       scene.traverse((o) => {
         if (!o.material) return;

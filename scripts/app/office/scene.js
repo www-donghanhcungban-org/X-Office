@@ -23,8 +23,8 @@ function box(x, y, z, w, d, h, color, extra) {
 // ---------------------------------------------------------------- phòng: tường, sàn, cửa sổ
 function drawRoom(iso, th, plan) {
   const { W, D, H, tile } = plan;
-  iso.box(box(-0.3, -0.3, 0, 0.3, D + 0.3, H, th.wall, { side: shade(th.wall, -0.08), top: shade(th.wall, -0.2) }));
-  iso.box(box(0, -0.3, 0, W, 0.3, H, th.wall, { front: th.wall, top: shade(th.wall, -0.2) }));
+  iso.box(box(-0.3, -0.3, 0, 0.3, D + 0.3, H, th.wall, { side: shade(th.wall, -0.08), top: shade(th.wall, -0.2), wall: "left" }));
+  iso.box(box(0, -0.3, 0, W, 0.3, H, th.wall, { front: th.wall, top: shade(th.wall, -0.2), wall: "back" }));
   for (let i = 0; i < W; i += tile) {
     for (let j = 0; j < D; j += tile) {
       iso.panel({ plane: "floor", c: 0, a: i, b: j, w: Math.min(tile, W - i), h: Math.min(tile, D - j), color: th.floor[(i / tile + j / tile) % 2] });
@@ -210,35 +210,40 @@ function bed(p, out, th) {
 // ---------------------------------------------------------------- đồ đạc của quy mô công ty
 function bigdesk(p, out, th) {
   const wood = "#5b3a29";
-  out.push(box(p.x, p.y, 0.74, 3.2, 1.3, 0.12, wood, { top: "#7c4a32" }));
-  out.push(box(p.x, p.y, 0, 0.2, 1.3, 0.74, shade(wood, -0.1)));
-  out.push(box(p.x + 3.0, p.y, 0, 0.2, 1.3, 0.74, shade(wood, -0.1)));
-  out.push(box(p.x + 2.4, p.y + 1.3, 0.74, 0.8, 1.2, 0.12, wood, { top: "#7c4a32" }));
-  out.push(box(p.x + 1.0, p.y + 0.15, 0.86, 1.3, 0.08, 0.8, "#111827", { front: shade(th.glow, -0.45), glow: th.glow }));
+  out.push(box(p.x, p.y, 0.74, 3.2, 1.3, 0.12, wood, { top: "#7c4a32", tex: "wood" }));
+  out.push(box(p.x, p.y, 0, 0.2, 1.3, 0.74, shade(wood, -0.1), { tex: "wood" }));
+  out.push(box(p.x + 3.0, p.y, 0, 0.2, 1.3, 0.74, shade(wood, -0.1), { tex: "wood" }));
+  out.push(box(p.x + 2.4, p.y + 1.3, 0.74, 0.8, 1.2, 0.12, wood, { top: "#7c4a32", tex: "wood" }));
+  out.push(box(p.x + 1.0, p.y + 0.15, 0.86, 1.3, 0.08, 0.8, "#111827", { front: shade(th.glow, -0.45), tex: "screen", glow: th.glow }));
   out.push(box(p.x + 0.4, p.y + 0.6, 0.86, 0.5, 0.18, 0.12, "#fbbf24"));
-  out.push(box(p.x + 1.0, p.y + 1.7, 0, 1.0, 0.9, 0.5, "#1f2937"));
-  out.push(box(p.x + 1.0, p.y + 2.4, 0.5, 1.0, 0.22, 1.3, "#111827", { bias: 0.2 }));
+  out.push(box(p.x + 2.65, p.y + 0.25, 0.86, 0.12, 0.12, 0.42, "#d97706", { shape: "cyl" }));
+  out.push(box(p.x + 2.5, p.y + 0.12, 1.24, 0.42, 0.42, 0.26, "#fef3c7", { shape: "cone", glow: "#fde68a" }));
+  out.push(box(p.x + 1.0, p.y + 1.7, 0, 1.0, 0.9, 0.5, "#1f2937", { shape: "cyl", tex: "fabric" }));
+  out.push(box(p.x + 1.0, p.y + 2.4, 0.5, 1.0, 0.22, 1.3, "#111827", { tex: "fabric", bias: 0.2 }));
 }
 
 function meeting(p, out, th) {
   const L = 6.8, D = 1.8;
-  out.push(box(p.x, p.y, 0.74, L, D, 0.1, "#e7e5e4", { top: "#f5f5f4" }));
-  out.push(box(p.x + 0.6, p.y + 0.7, 0, 0.3, 0.4, 0.74, "#a8a29e"));
-  out.push(box(p.x + L - 0.9, p.y + 0.7, 0, 0.3, 0.4, 0.74, "#a8a29e"));
+  out.push(box(p.x, p.y, 0.74, L, D, 0.1, "#e7e5e4", { top: "#f5f5f4", tex: "wood" }));
+  out.push(box(p.x + 0.6, p.y + 0.7, 0, 0.3, 0.4, 0.74, "#a8a29e", { shape: "cyl" }));
+  out.push(box(p.x + L - 0.9, p.y + 0.7, 0, 0.3, 0.4, 0.74, "#a8a29e", { shape: "cyl" }));
   const n = p.seats || 6;
   for (let k = 0; k < n / 2; k++) {
     const cx = p.x + 0.5 + k * (L - 1.0) / (n / 2 - 1) - 0.3;
-    out.push(box(cx, p.y - 0.9, 0, 0.6, 0.6, 0.45, th.chair));
-    out.push(box(cx, p.y - 1.05, 0.45, 0.6, 0.15, 0.6, shade(th.chair, -0.1)));
-    out.push(box(cx, p.y + D + 0.3, 0, 0.6, 0.6, 0.45, th.chair));
-    out.push(box(cx, p.y + D + 0.75, 0.45, 0.6, 0.15, 0.6, shade(th.chair, -0.1), { bias: 0.2 }));
+    out.push(box(cx, p.y - 0.9, 0, 0.6, 0.6, 0.45, th.chair, { shape: "cyl", tex: "fabric" }));
+    out.push(box(cx, p.y - 1.05, 0.45, 0.6, 0.15, 0.6, shade(th.chair, -0.1), { tex: "fabric" }));
+    out.push(box(cx, p.y + D + 0.3, 0, 0.6, 0.6, 0.45, th.chair, { shape: "cyl", tex: "fabric" }));
+    out.push(box(cx, p.y + D + 0.75, 0.45, 0.6, 0.15, 0.6, shade(th.chair, -0.1), { tex: "fabric", bias: 0.2 }));
+    out.push(box(cx + 0.08, p.y + 0.2, 0.84, 0.44, 0.32, 0.04, "#334155"));
+    out.push(box(cx + 0.08, p.y + 0.18, 0.88, 0.44, 0.04, 0.3, "#1e293b", { rx: -0.25, tex: "screen" }));
   }
-  out.push(box(p.x + L / 2 - 0.3, p.y + D / 2 - 0.2, 0.84, 0.6, 0.4, 0.06, "#334155"));
+  out.push(box(p.x + L / 2 - 0.3, p.y + D / 2 - 0.2, 0.84, 0.6, 0.4, 0.08, "#334155", { shape: "cyl" }));
 }
 
-function tree(p, out) {
+function tree(p, out, _th, t = 0, motion = false) {
   const leaf = p.color || "#2f855a";
   const pine = p.pine || rnd(p.x * 3 + p.y * 5) > 0.72;
+  const sway = motion ? Math.sin(t * 1.4 + p.x * 0.7 + p.y * 0.5) * 0.04 : 0;
   out.push(box(p.x + 0.45, p.y + 0.45, 0, 1.1, 1.1, 0.08, "#57412f", { shape: "cyl" }));
   out.push(box(p.x + 0.35, p.y + 0.65, 0.02, 0.28, 0.24, 0.16, "#78716c", { shape: "ico", tex: "stone" }));
   if (p.palm) {
@@ -250,18 +255,18 @@ function tree(p, out) {
     out.push(box(tx - 0.12, ty - 0.12, 2.75, 0.22, 0.22, 0.2, "#5c3a21", { shape: "sphere" }));
     out.push(box(tx + 0.06, ty - 0.08, 2.75, 0.2, 0.2, 0.2, "#4a2f1d", { shape: "sphere" }));
     for (let k = 0; k < 6; k++) {
-      const a = (k * Math.PI) / 3;
-      out.push(box(tx - 0.14 + Math.cos(a) * 0.62, ty - 0.14 + Math.sin(a) * 0.62, 2.78, 1.15, 0.34, 0.16, k % 2 ? shade(leaf, 0.12) : leaf, { shape: "ico", tex: "foliage", rz: a, ry: 0.38 }));
+      const a = (k * Math.PI) / 3 + sway * 1.2;
+      out.push(box(tx - 0.14 + Math.cos(a) * 0.62, ty - 0.14 + Math.sin(a) * 0.62, 2.78, 1.15, 0.34, 0.16, k % 2 ? shade(leaf, 0.12) : leaf, { shape: "ico", tex: "foliage", rz: a, ry: 0.38 + sway }));
     }
     return;
   }
   out.push(box(p.x + 0.68, p.y + 0.68, 0.04, 0.64, 0.64, 0.32, "#5c3a21", { shape: "taper", tex: "bark" }));
   out.push(box(p.x + 0.8, p.y + 0.8, 0.32, 0.4, 0.4, 1.42, "#7c4a32", { shape: "taper", tex: "bark" }));
   if (pine) {
-    out.push(box(p.x + 0.05, p.y + 0.05, 1.15, 1.9, 1.9, 1.05, shade(leaf, -0.1), { shape: "cone", tex: "foliage" }));
-    out.push(box(p.x + 0.22, p.y + 0.22, 1.85, 1.56, 1.56, 0.95, leaf, { shape: "cone", tex: "foliage" }));
-    out.push(box(p.x + 0.38, p.y + 0.38, 2.52, 1.24, 1.24, 0.85, shade(leaf, 0.12), { shape: "cone", tex: "foliage" }));
-    out.push(box(p.x + 0.56, p.y + 0.56, 3.12, 0.88, 0.88, 0.72, shade(leaf, 0.24), { shape: "cone", tex: "foliage" }));
+    out.push(box(p.x + 0.05, p.y + 0.05, 1.15, 1.9, 1.9, 1.05, shade(leaf, -0.1), { shape: "cone", tex: "foliage", rx: sway * 0.3 }));
+    out.push(box(p.x + 0.22, p.y + 0.22, 1.85, 1.56, 1.56, 0.95, leaf, { shape: "cone", tex: "foliage", rx: sway * 0.5 }));
+    out.push(box(p.x + 0.38, p.y + 0.38, 2.52, 1.24, 1.24, 0.85, shade(leaf, 0.12), { shape: "cone", tex: "foliage", rx: sway * 0.7 }));
+    out.push(box(p.x + 0.56, p.y + 0.56, 3.12, 0.88, 0.88, 0.72, shade(leaf, 0.24), { shape: "cone", tex: "foliage", rx: sway }));
   } else {
     out.push(box(p.x + 0.54, p.y + 0.72, 1.18, 0.2, 0.2, 0.76, "#7c4a32", { shape: "cyl", tex: "bark", rx: 0.48, rz: 0.42 }));
     out.push(box(p.x + 1.18, p.y + 1.02, 1.24, 0.18, 0.18, 0.72, "#7c4a32", { shape: "cyl", tex: "bark", rx: -0.42, rz: -0.38 }));
@@ -272,7 +277,7 @@ function tree(p, out) {
       [0.12, 0.42, 2.25, 1.15, 0.18], [0.44, 0.12, 2.48, 1.05, 0.2], [0.46, 0.46, 2.82, 0.86, 0.26],
     ];
     for (const [dx, dy, z, s, sh] of blobs) {
-      out.push(box(p.x + dx, p.y + dy, z, s, s, s * 0.88, shade(leaf, sh), { shape: "ico", tex: "foliage" }));
+      out.push(box(p.x + dx + sway * 1.5, p.y + dy, z, s, s, s * 0.88, shade(leaf, sh), { shape: "ico", tex: "foliage", rx: sway, rz: sway }));
     }
   }
 }
@@ -421,13 +426,20 @@ function drawGround(iso, plan) {
   }
 }
 
-function outdoorProps(plan, out) {
+function outdoorProps(plan, out, t, motion) {
   const g = plan.levels ? 6 : 4;
   fence({ axis: "x", x: 7.4, y: plan.D + g - 1.0, len: plan.W - 7.4 + g - 1 }, out);
   fence({ axis: "y", x: plan.W + g - 1.0, y: -1.0, len: plan.D + g - 1 }, out);
   fence({ axis: "x", x: -1.0, y: plan.D + g - 1.0, len: 3.8 }, out);
-  for (let x = 9; x < plan.W; x += 7) tree({ x, y: plan.D + 1.0, color: x % 2 ? "#2f855a" : "#3b8f4f", pine: x % 14 === 9, palm: x >= 30 }, out);
-  for (let y = 2; y < plan.D; y += 7) tree({ x: plan.W + 1.0, y, color: y % 2 ? "#2f855a" : "#40916c" }, out);
+  for (let x = 9; x < plan.W; x += 7) tree({ x, y: plan.D + 1.0, color: x % 2 ? "#2f855a" : "#3b8f4f", pine: x % 14 === 9, palm: x >= 30 }, out, null, t, motion);
+  for (let y = 2; y < plan.D; y += 7) tree({ x: plan.W + 1.0, y, color: y % 2 ? "#2f855a" : "#40916c" }, out, null, t, motion);
+  for (let sx = 8.4; sx < 31.5; sx += 2.2) {
+    out.push(box(sx, plan.D + 0.35, 0, 1.1, 0.75, 0.05, "#d6d3d1", { tex: "stone" }));
+    if (Math.round(sx) % 4 === 0) {
+      out.push(box(sx + 0.45, plan.D + 1.2, 0, 0.14, 0.14, 0.42, "#374151", { shape: "cyl" }));
+      out.push(box(sx + 0.43, plan.D + 1.18, 0.4, 0.18, 0.18, 0.14, "#fef3c7", { shape: "sphere", glow: "#fde68a" }));
+    }
+  }
   flowerbed(1.6, plan.D + 0.35, "#f43f5e", out);
   flowerbed(7.4, plan.D + 0.35, "#facc15", out);
   rock(31.2, 20.4, 0.8, out);
@@ -473,22 +485,31 @@ function lift(sink, dz) {
 }
 
 // ---------------------------------------------------------------- bàn + nhân vật
-function deskBoxes(th, x, y, seat, out, t, motion) {
-  out.push(box(x, y, 0.72, 2.8, 1.1, 0.1, th.desk, { tex: th.edge ? null : "wood", glow: th.edge ? th.edge : null }));
+function deskBoxes(th, x, y, seat, out, t, motion, idx = -1) {
+  const pick = seat.label && idx >= 0 ? { kind: "agent", id: String(idx), label: seat.label, state: seat.state, task: seat.task ? seat.task.id : "" } : null;
+  out.push(box(x, y, 0.72, 2.8, 1.1, 0.1, th.desk, { tex: th.edge ? null : "wood", glow: th.edge ? th.edge : null, pick }));
   for (const [dx, dy] of [[0.12, 0.12], [2.58, 0.12], [0.12, 0.88], [2.58, 0.88]]) {
-    out.push(box(x + dx, y + dy, 0, 0.1, 0.1, 0.72, th.leg, { shape: "cyl" }));
+    out.push(box(x + dx, y + dy, 0, 0.1, 0.1, 0.72, th.leg, { shape: "cyl", pick }));
   }
   const lit = seat.state === "npc" ? shade(th.glow, -0.35) : QUIET.has(seat.state) ? shade(th.screen, 0.1) : STATE_COLOR[seat.state];
   const flick = motion && seat.state === "work" ? 0.1 * Math.sin(t * 9) : 0;
-  out.push(box(x + 0.7, y + 0.15, 0.88, 1.4, 0.08, 0.78, "#111827", { front: shade(lit, -0.35 + flick), tex: "screen", glow: QUIET.has(seat.state) ? null : lit }));
-  out.push(box(x + 1.32, y + 0.2, 0.82, 0.16, 0.1, 0.12, "#374151", { shape: "cyl" }));
-  out.push(box(x + 1.2, y + 0.22, 0.82, 0.4, 0.22, 0.04, "#374151"));
-  out.push(box(x + 0.8, y + 0.55, 0.82, 1.1, 0.35, 0.03, "#4b5563"));
-  out.push(box(x + 2.02, y + 0.62, 0.82, 0.14, 0.22, 0.04, "#64748b", { shape: "sphere" }));
-  out.push(box(x + 2.24, y + 0.5, 0.82, 0.18, 0.18, 0.22, "#f8fafc", { shape: "cyl" }));
+  const dual = Boolean(seat.label) && (idx === 0 || idx === 2);
+  if (dual) {
+    out.push(box(x + 0.35, y + 0.18, 0.88, 1.0, 0.07, 0.74, "#111827", { front: shade(lit, -0.35 + flick), tex: "screen", glow: QUIET.has(seat.state) ? null : lit, rz: -0.22, pick }));
+    out.push(box(x + 1.45, y + 0.18, 0.88, 1.0, 0.07, 0.74, "#111827", { front: shade(lit, -0.35 + flick), tex: "screen", glow: QUIET.has(seat.state) ? null : lit, rz: 0.22, pick }));
+    out.push(box(x + 0.06, y + 0.28, 0.82, 0.24, 0.52, 0.46, "#1e293b", { top: "#334155", pick }));
+    out.push(box(x + 0.14, y + 0.8, 1.14, 0.08, 0.02, 0.08, th.glow, { glow: th.glow, pick }));
+  } else {
+    out.push(box(x + 0.7, y + 0.15, 0.88, 1.4, 0.08, 0.78, "#111827", { front: shade(lit, -0.35 + flick), tex: "screen", glow: QUIET.has(seat.state) ? null : lit, pick }));
+  }
+  out.push(box(x + 1.32, y + 0.2, 0.82, 0.16, 0.1, 0.12, "#374151", { shape: "cyl", pick }));
+  out.push(box(x + 1.2, y + 0.22, 0.82, 0.4, 0.22, 0.04, "#374151", { pick }));
+  out.push(box(x + 0.8, y + 0.55, 0.82, 1.1, 0.35, 0.03, "#4b5563", { pick }));
+  out.push(box(x + 2.02, y + 0.62, 0.82, 0.14, 0.22, 0.04, "#64748b", { shape: "sphere", pick }));
+  out.push(box(x + 2.24, y + 0.5, 0.82, 0.18, 0.18, 0.22, "#f8fafc", { shape: "cyl", pick }));
   if (!QUIET.has(seat.state) && STATE_COLOR[seat.state]) {
     const pulse = motion ? 0.04 * (0.5 + 0.5 * Math.sin(t * 5)) : 0;
-    out.push(box(x + 2.46, y + 0.16, 0.82, 0.18, 0.18, 0.16 + pulse, STATE_COLOR[seat.state], { shape: "sphere", glow: STATE_COLOR[seat.state] }));
+    out.push(box(x + 2.46, y + 0.16, 0.82, 0.18, 0.18, 0.16 + pulse, STATE_COLOR[seat.state], { shape: "sphere", glow: STATE_COLOR[seat.state], pick }));
   }
 }
 
@@ -755,8 +776,12 @@ export function compose(sink, opts, sorted = true) {
   const heads = [];
   (opts.seats || []).slice(0, plan.desks.length).forEach((seat, i) => {
     const [x, y] = plan.desks[i];
-    deskBoxes(th, x, y, seat, floorItems, t, motion);
-    heads.push({ seat, at: person(th, x, y, i, seat, floorItems, t, motion, season) });
+    const start = floorItems.length;
+    deskBoxes(th, x, y, seat, floorItems, t, motion, i);
+    const at = person(th, x, y, i, seat, floorItems, t, motion, season);
+    const pick = { kind: "agent", id: String(i), label: seat.label, state: seat.state, task: seat.task ? seat.task.id : "" };
+    for (let k = start; k < floorItems.length; k++) floorItems[k].pick = pick;
+    heads.push({ seat, at });
   });
   if (opts.npc !== false) {
     plan.extraDesks.forEach(([x, y], k) => {
@@ -770,7 +795,7 @@ export function compose(sink, opts, sorted = true) {
   seasonProps(season, floorItems, t, motion, plan.season);
   layoutWalls(plan.walls, th, floorItems);
   for (const b of floorItems) items.push({ ...b, z: b.z + zb });
-  if (plan.outdoor) outdoorProps(plan, items);
+  if (plan.outdoor) outdoorProps(plan, items, t, motion);
   if (sorted) items.sort((a, b) => depth(a) - depth(b));
   for (const b of items) (b.kind ? drawSpecial(sink, b) : sink.box(b));
 

@@ -169,6 +169,7 @@ const PAINTERS = {
 
 export function createTextureBank(THREE) {
   const cache = new Map();
+  const skies = new Map();
   function get(kind) {
     if (!kind || !PAINTERS[kind]) return null;
     if (cache.has(kind)) return cache.get(kind);
@@ -183,8 +184,41 @@ export function createTextureBank(THREE) {
     cache.set(kind, tex);
     return tex;
   }
+  function sky(bgHex, glowHex, dark) {
+    const key = (bgHex || "") + "|" + (glowHex || "") + "|" + (dark ? 1 : 0);
+    if (skies.has(key)) return skies.get(key);
+    const c = document.createElement("canvas");
+    c.width = 4;
+    c.height = 256;
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = bgHex || "#0b1020";
+    ctx.fillRect(0, 0, 4, 256);
+    const g = ctx.createLinearGradient(0, 0, 0, 256);
+    if (dark) {
+      g.addColorStop(0, "rgba(0,0,0,0.35)");
+      g.addColorStop(0.55, "rgba(0,0,0,0)");
+      g.addColorStop(1, glowHex || "#3b82f6");
+      ctx.fillStyle = g;
+      ctx.globalAlpha = 0.22;
+      ctx.fillRect(0, 0, 4, 256);
+    } else {
+      g.addColorStop(0, "#bcdaf7");
+      g.addColorStop(0.55, "rgba(255,255,255,0)");
+      g.addColorStop(1, "rgba(255,255,255,0.28)");
+      ctx.fillStyle = g;
+      ctx.globalAlpha = 0.55;
+      ctx.fillRect(0, 0, 4, 256);
+    }
+    ctx.globalAlpha = 1;
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.needsUpdate = true;
+    skies.set(key, tex);
+    return tex;
+  }
   return {
     get,
+    sky,
     animate(dt) {
       const w = cache.get("water");
       if (w) {
@@ -194,7 +228,9 @@ export function createTextureBank(THREE) {
     },
     dispose() {
       for (const tex of cache.values()) tex.dispose();
+      for (const tex of skies.values()) tex.dispose();
       cache.clear();
+      skies.clear();
     },
   };
 }
