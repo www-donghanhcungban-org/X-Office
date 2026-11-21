@@ -525,6 +525,147 @@ function drawContactShadow(ctx, s) {
   ctx.fillRect(0, 0, s, s);
 }
 
+// Vân mặt giải phẫu 512×256 phủ quanh đầu cầu (tâm mặt tại u = 0.75 → -Z):
+// sắc da tự nhiên, ửng hồng má, bóng hốc mắt, sống mũi sáng, chân mũi & cằm đổ bóng mềm, vi kết cấu da.
+function drawFaceSkin(ctx, w, h, baseHex) {
+  ctx.fillStyle = baseHex || "#f1c29b";
+  ctx.fillRect(0, 0, w, h);
+
+  // Vi kết cấu lỗ chân lông / sắc độ da tự nhiên (tránh bề mặt nhựa phẳng)
+  for (let i = 0; i < 1400; i++) {
+    ctx.fillStyle = i % 2 ? "rgba(255,244,232,0.06)" : "rgba(110,60,38,0.05)";
+    ctx.fillRect(rnd(i * 5) * w, rnd(i * 11) * h, 2.2, 2.2);
+  }
+
+  const fx = w * 0.75; // chính diện -Z
+  // Bóng hốc mắt mềm (Ambient Occlusion hốc mắt dưới cung mày)
+  for (const side of [-1, 1]) {
+    const ex = fx + side * w * 0.058, ey = h * 0.465;
+    const eg = ctx.createRadialGradient(ex, ey, 2, ex, ey, w * 0.046);
+    eg.addColorStop(0, "rgba(88,46,32,0.28)");
+    eg.addColorStop(0.65, "rgba(105,58,42,0.12)");
+    eg.addColorStop(1, "rgba(105,58,42,0)");
+    ctx.fillStyle = eg;
+    ctx.beginPath();
+    ctx.ellipse(ex, ey, w * 0.046, h * 0.055, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Ửng hồng gò má ấm áp (subsurface warmth)
+    const cx = fx + side * w * 0.078, cy = h * 0.565;
+    const cg = ctx.createRadialGradient(cx, cy, 2, cx, cy, w * 0.058);
+    cg.addColorStop(0, "rgba(226,104,92,0.22)");
+    cg.addColorStop(0.6, "rgba(226,114,98,0.09)");
+    cg.addColorStop(1, "rgba(226,114,98,0)");
+    ctx.fillStyle = cg;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, w * 0.058, h * 0.068, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Sống mũi & trán bắt sáng ấm nhẹ
+  const ng = ctx.createRadialGradient(fx, h * 0.515, 2, fx, h * 0.515, w * 0.026);
+  ng.addColorStop(0, "rgba(255,248,238,0.26)");
+  ng.addColorStop(1, "rgba(255,248,238,0)");
+  ctx.fillStyle = ng;
+  ctx.beginPath();
+  ctx.ellipse(fx, h * 0.515, w * 0.018, h * 0.075, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Bóng chân mũi & bóng nhẹ dưới môi dưới
+  const un = ctx.createRadialGradient(fx, h * 0.602, 1, fx, h * 0.602, w * 0.028);
+  un.addColorStop(0, "rgba(84,44,30,0.24)");
+  un.addColorStop(1, "rgba(84,44,30,0)");
+  ctx.fillStyle = un;
+  ctx.beginPath();
+  ctx.ellipse(fx, h * 0.602, w * 0.028, h * 0.02, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  const ul = ctx.createRadialGradient(fx, h * 0.715, 1, fx, h * 0.715, w * 0.032);
+  ul.addColorStop(0, "rgba(86,46,32,0.18)");
+  ul.addColorStop(1, "rgba(86,46,32,0)");
+  ctx.fillStyle = ul;
+  ctx.beginPath();
+  ctx.ellipse(fx, h * 0.715, w * 0.032, h * 0.022, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Đường bóng cổ & gáy mềm dưới hàm
+  const jaw = ctx.createLinearGradient(0, h * 0.82, 0, h);
+  jaw.addColorStop(0, "rgba(70,38,24,0)");
+  jaw.addColorStop(1, "rgba(70,38,24,0.22)");
+  ctx.fillStyle = jaw;
+  ctx.fillRect(0, h * 0.82, w, h * 0.18);
+}
+
+// Mống mắt chi tiết có viền limbal tối, tia sợi mống mắt tỏa tròn và con ngươi sâu
+function drawIris(ctx, s, colHex) {
+  const cx = s / 2, cy = s / 2, r = s * 0.48;
+  ctx.fillStyle = "#111827";
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+
+  const g = ctx.createRadialGradient(cx, cy, r * 0.25, cx, cy, r * 0.92);
+  g.addColorStop(0, "#d97706");
+  g.addColorStop(0.28, colHex || "#3d2817");
+  g.addColorStop(0.84, colHex || "#3d2817");
+  g.addColorStop(1, "#090d16");
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(cx, cy, r * 0.92, 0, Math.PI * 2); ctx.fill();
+
+  for (let i = 0; i < 42; i++) {
+    const a = (i * Math.PI * 2) / 42;
+    ctx.strokeStyle = i % 2 ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.22)";
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * r * 0.36, cy + Math.sin(a) * r * 0.36);
+    ctx.lineTo(cx + Math.cos(a) * r * 0.86, cy + Math.sin(a) * r * 0.86);
+    ctx.stroke();
+  }
+  ctx.fillStyle = "#05070c";
+  ctx.beginPath(); ctx.arc(cx, cy, r * 0.42, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,0.92)";
+  ctx.beginPath(); ctx.arc(cx - r * 0.22, cy - r * 0.22, r * 0.14, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,0.45)";
+  ctx.beginPath(); ctx.arc(cx + r * 0.2, cy + r * 0.18, r * 0.07, 0, Math.PI * 2); ctx.fill();
+}
+
+// Mặt đường nhựa đại lộ đô thị (hạt đá nhựa + vạch phân làn đứt nét)
+function drawRoad(ctx, s) {
+  ctx.fillStyle = "#333942";
+  ctx.fillRect(0, 0, s, s);
+  for (let i = 0; i < 4200; i++) {
+    const v = 42 + Math.round(rnd(i * 7) * 34);
+    ctx.fillStyle = "rgb(" + v + "," + (v + 3) + "," + (v + 7) + ")";
+    ctx.fillRect(rnd(i * 3) * s, rnd(i * 11) * s, 2.2, 2.2);
+  }
+  // Vệt bánh xe hơi sẫm nhẹ trên hai làn
+  ctx.fillStyle = "rgba(20,24,30,0.18)";
+  ctx.fillRect(0, s * 0.18, s, s * 0.14);
+  ctx.fillRect(0, s * 0.68, s, s * 0.14);
+  // Vạch kẻ đường đứt nét giữa đường
+  ctx.fillStyle = "rgba(241,245,249,0.84)";
+  for (let x = 24; x < s; x += 128) ctx.fillRect(x, s * 0.485, 72, s * 0.03);
+}
+
+// Vỉa hè bê tông cắt khe giãn nở
+function drawSidewalk(ctx, s) {
+  ctx.fillStyle = "#d9d6cf";
+  ctx.fillRect(0, 0, s, s);
+  const step = 128;
+  for (let y = 0; y < s; y += step) {
+    for (let x = 0; x < s; x += step) {
+      const t = rnd(x * 3 + y * 9);
+      ctx.fillStyle = t > 0.5 ? "rgba(255,253,248,0.22)" : "rgba(176,172,164,0.18)";
+      ctx.fillRect(x + 2, y + 2, step - 4, step - 4);
+      ctx.strokeStyle = "rgba(110,106,98,0.52)";
+      ctx.lineWidth = 2.6;
+      ctx.strokeRect(x, y, step, step);
+    }
+  }
+  for (let i = 0; i < 1800; i++) {
+    ctx.fillStyle = i % 2 ? "rgba(255,255,255,0.3)" : "rgba(110,108,104,0.24)";
+    ctx.fillRect(rnd(i * 5) * s, rnd(i * 13) * s, 2, 2);
+  }
+}
+
 // Bản đồ toàn cảnh Equirectangular HDR-feel (bầu trời, đĩa mặt trời, mây, đường chân trời, ánh đèn đêm)
 function drawEquirectSky(ctx, w, h, theme, dark) {
   const g = ctx.createLinearGradient(0, 0, 0, h);
@@ -601,6 +742,8 @@ const PAINTERS = {
   leafCluster: [drawLeafCluster, 1, 0],
   sunbeam: [drawSunbeam, 1, 0],
   clock: [drawClock, 1, 0],
+  road: [drawRoad, 3, 2.4],
+  sidewalk: [drawSidewalk, 4, 2.0],
 };
 
 const ROUGH_PAINTERS = {
@@ -644,6 +787,26 @@ export function createTextureBank(THREE) {
       const idx = Number(kind.split(":")[1]) || 0;
       const [canvas, ctx] = makeCanvas(256, 256);
       drawArt(ctx, 256, idx);
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.needsUpdate = true;
+      cache.set(kind, tex);
+      return tex;
+    }
+    if (kind.startsWith("face:")) {
+      const hex = kind.slice(5) || "#f1c29b";
+      const [canvas, ctx] = makeCanvas(512, 256);
+      drawFaceSkin(ctx, 512, 256, hex);
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.needsUpdate = true;
+      cache.set(kind, tex);
+      return tex;
+    }
+    if (kind.startsWith("iris:")) {
+      const hex = kind.slice(5) || "#3d2817";
+      const [canvas, ctx] = makeCanvas(128, 128);
+      drawIris(ctx, 128, hex);
       const tex = new THREE.CanvasTexture(canvas);
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.needsUpdate = true;

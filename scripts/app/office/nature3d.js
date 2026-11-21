@@ -2,6 +2,7 @@
 // chậu cây gốm nội thất, hồ bơi âm sàn lát gạch mosaic + mặt nước vật lý + phao/bóng nổi,
 // sàn gỗ teak + dù + ghế tắm nắng, hàng rào hoa, tảng đá, ghế công viên, đèn đường, cây Noel & cây mai Tết.
 import { shade } from "./iso.js";
+import { createWaterMaterial, createCausticsMaterial } from "./water3d.js";
 
 function rnd(i) {
   const v = Math.sin(i * 12.9898 + 78.233) * 43758.5453;
@@ -86,11 +87,37 @@ export function createNatureAssets(THREE) {
     new THREE.Vector3(-0.02, 1.98, 0.05),
   ]);
 
+  // Biên dạng hông xe điện hiện đại khí động học (ExtrudeGeometry)
+  const carShape = new THREE.Shape();
+  carShape.moveTo(-2.1, 0.28);
+  carShape.lineTo(2.15, 0.28);
+  carShape.quadraticCurveTo(2.26, 0.34, 2.22, 0.62);
+  carShape.quadraticCurveTo(2.12, 0.82, 1.38, 0.88);
+  carShape.quadraticCurveTo(0.82, 1.36, 0.22, 1.38);
+  carShape.lineTo(-0.78, 1.36);
+  carShape.quadraticCurveTo(-1.38, 1.24, -1.86, 0.88);
+  carShape.quadraticCurveTo(-2.18, 0.82, -2.2, 0.52);
+  carShape.quadraticCurveTo(-2.2, 0.3, -2.1, 0.28);
+  const carBodyGeo = new THREE.ExtrudeGeometry(carShape, {
+    depth: 1.62, bevelEnabled: true, bevelThickness: 0.08, bevelSize: 0.06, bevelSegments: 2,
+  });
+  carBodyGeo.translate(0, 0, -0.81);
+
+  // Bụi cỏ 3D 3 lá đan chéo (dùng với InstancedMesh — hàng trăm bụi cỏ chỉ 1 draw call!)
+  const grassGeo = new THREE.ConeGeometry(0.055, 0.22, 3);
+  grassGeo.translate(0, 0.11, 0);
+
   const geos = {
     unitBox: new THREE.BoxGeometry(1, 1, 1),
     unitPlane: new THREE.PlaneGeometry(1, 1),
+    waterPlane: new THREE.PlaneGeometry(1, 1, 24, 16),
     leafCard: new THREE.PlaneGeometry(1.05, 1.05),
     shadowDisc: new THREE.PlaneGeometry(1, 1),
+    grassTuft: grassGeo,
+    wildflower: new THREE.SphereGeometry(0.042, 6, 5),
+    carBody: carBodyGeo,
+    carWheel: new THREE.CylinderGeometry(0.32, 0.32, 0.22, 16),
+    carRim: new THREE.CylinderGeometry(0.19, 0.19, 0.24, 12),
     mulch: new THREE.CylinderGeometry(0.56, 0.64, 0.09, 16),
     rootFlare: new THREE.CylinderGeometry(0.15, 0.32, 0.42, 12),
     trunk: new THREE.TubeGeometry(trunkCurve, 14, 0.145, 10, false),
@@ -379,9 +406,9 @@ export function buildPlant(THREE, assets, mats, opts, anim) {
   return root;
 }
 
-// ---------------------------------------------------------------- Hồ bơi âm sàn mosaic + tụ thủy caustics + nước normal-map phản xạ trời
+// ---------------------------------------------------------------- Hồ bơi âm sàn mosaic + tụ thủy Voronoi GLSL + sóng nước Fresnel HDR
 export function buildPool(THREE, assets, mats, opts, anim) {
-  const { x, y, w, d } = opts;
+  const { x, y, w, d, dark, glowOn } = opts;
   const g = assets.geos;
   const root = new THREE.Group();
   root.position.set(x, 0, y);
@@ -413,8 +440,8 @@ export function buildPool(THREE, assets, mats, opts, anim) {
     root.add(im);
   }
 
-  // Ánh sáng tụ thủy (caustics) lấp lánh trôi nhẹ trên đáy hồ mosaic
-  const causticsMat = mats.caustics();
+  // Ánh sáng tụ thủy Voronoi GLSL tán sắc R/G/B lấp lánh trên đáy hồ mosaic
+  const causticsMat = glowOn ? mats.own(createCausticsMaterial(THREE, Boolean(dark))) : mats.caustics();
   const caustics = new THREE.Mesh(g.unitPlane, causticsMat);
   caustics.rotation.x = -Math.PI / 2;
   caustics.position.set(w / 2, 0.022, d / 2);
@@ -437,8 +464,8 @@ export function buildPool(THREE, assets, mats, opts, anim) {
     root.add(m);
   }
 
-  // Đèn LED âm tường hồ bơi phát sáng xanh lam
-  const ledMat = mats.standard("#a5f3fc", { roughness: 0.1, emissive: "#38bdf8", emissiveIntensity: 1.0 });
+  // Đèn LED âm tường hồ bơi phát sáng xanh lam (kích HDR Bloom)
+  const ledMat = mats.standard("#a5f3fc", { roughness: 0.1, emissive: "#38bdf8", emissiveIntensity: 1.4 });
   for (const lx of [1.6, w / 2, w - 1.6]) {
     const led = new THREE.Mesh(g.unitBox, ledMat);
     led.position.set(lx, 0.08, 0.07);
@@ -446,17 +473,21 @@ export function buildPool(THREE, assets, mats, opts, anim) {
     root.add(led);
   }
 
-  // Mặt nước vật lý trong suốt có normalMap sóng động + clearcoat phản xạ bầu trời & mặt trời
-  const waterMat = mats.physical("#22b8cf", {
-    roughness: 0.04, metalness: 0.06, clearcoat: 1.0, clearcoatRoughness: 0.03,
-    transparent: true, opacity: 0.62, tex: "water", normal: 0.72,
-  });
-  const water = new THREE.Mesh(g.unitPlane, waterMat);
+  // Mặt nước GLSL thời gian thực (sóng FBM 6 hướng + Fresnel bầu trời + lóe nắng HDR + bọt bờ)
+  const waterMat = glowOn
+    ? mats.own(createWaterMaterial(THREE, Boolean(dark)))
+    : mats.physical("#22b8cf", { roughness: 0.06, clearcoat: 1, transparent: true, opacity: 0.64, tex: "water" });
+  const water = new THREE.Mesh(glowOn ? g.waterPlane : g.unitPlane, waterMat);
   water.rotation.x = -Math.PI / 2;
   water.position.set(w / 2, 0.135, d / 2);
   water.scale.set(w - 0.02, d - 0.02, 1);
   water.receiveShadow = true;
   root.add(water);
+
+  if (anim && glowOn) {
+    if (waterMat.uniforms) anim.waters.push(waterMat);
+    if (causticsMat.uniforms) anim.waters.push(causticsMat);
+  }
 
   // Thang inox lên xuống hồ bơi uốn cong
   const chromeMat = mats.standard("#f1f5f9", { roughness: 0.1, metalness: 0.96 });
@@ -852,6 +883,121 @@ export function buildSeasonTree(THREE, assets, mats, season, [x, y], anim) {
       m.castShadow = true;
       root.add(m);
     }
+  }
+  return root;
+}
+
+// ---------------------------------------------------------------- Thảm cỏ 3D & hoa dại thật (InstancedMesh — 2 draw call)
+export function buildInstancedLawn(THREE, assets, mats, bounds, excludeBoxes = []) {
+  const g = assets.geos;
+  const group = new THREE.Group();
+  const { x0, x1, y0, y1, count = 420, flowers = 55 } = bounds;
+  const dummy = new THREE.Object3D();
+  const col = new THREE.Color();
+
+  const inside = (x, z) => excludeBoxes.some(([bx0, bz0, bx1, bz1]) => x >= bx0 && x <= bx1 && z >= bz0 && z <= bz1);
+
+  const grassMat = mats.standard("#ffffff", { roughness: 0.88, metalness: 0.0 });
+  const pts = [];
+  for (let i = 0; i < count * 2 && pts.length < count; i++) {
+    const gx = x0 + rnd(i * 17 + x0 * 3) * (x1 - x0);
+    const gz = y0 + rnd(i * 29 + y0 * 5) * (y1 - y0);
+    if (!inside(gx, gz)) pts.push([gx, gz, i]);
+  }
+  if (pts.length) {
+    const inst = new THREE.InstancedMesh(g.grassTuft, grassMat, pts.length);
+    inst.receiveShadow = true;
+    const greens = ["#4d8b3e", "#5fa04a", "#72b358", "#3f7a34", "#84c268"];
+    pts.forEach(([gx, gz, seed], idx) => {
+      dummy.position.set(gx, 0.008, gz);
+      dummy.rotation.set((rnd(seed + 1) - 0.5) * 0.42, rnd(seed + 2) * Math.PI * 2, (rnd(seed + 3) - 0.5) * 0.42);
+      const sc = 0.65 + rnd(seed + 4) * 0.85;
+      dummy.scale.set(sc, sc * (0.8 + rnd(seed + 5) * 0.6), sc);
+      dummy.updateMatrix();
+      inst.setMatrixAt(idx, dummy.matrix);
+      col.set(greens[seed % greens.length]);
+      inst.setColorAt(idx, col);
+    });
+    inst.instanceMatrix.needsUpdate = true;
+    if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
+    group.add(inst);
+  }
+
+  const fPts = [];
+  for (let i = 0; i < flowers * 3 && fPts.length < flowers; i++) {
+    const fx = x0 + rnd(i * 37 + 9 + x0) * (x1 - x0);
+    const fz = y0 + rnd(i * 43 + 5 + y0) * (y1 - y0);
+    if (!inside(fx, fz)) fPts.push([fx, fz, i]);
+  }
+  if (fPts.length) {
+    const fMat = mats.standard("#ffffff", { roughness: 0.55 });
+    const fInst = new THREE.InstancedMesh(g.wildflower, fMat, fPts.length);
+    const fCols = ["#fef08a", "#ffffff", "#fda4af", "#c4b5fd", "#fde047"];
+    fPts.forEach(([fx, fz, seed], idx) => {
+      dummy.position.set(fx, 0.1 + rnd(seed) * 0.08, fz);
+      dummy.rotation.set(0, rnd(seed + 7) * Math.PI, 0);
+      dummy.scale.set(1.1, 0.65, 1.1);
+      dummy.updateMatrix();
+      fInst.setMatrixAt(idx, dummy.matrix);
+      col.set(fCols[seed % fCols.length]);
+      fInst.setColorAt(idx, col);
+    });
+    fInst.instanceMatrix.needsUpdate = true;
+    if (fInst.instanceColor) fInst.instanceColor.needsUpdate = true;
+    group.add(fInst);
+  }
+  return group;
+}
+
+// ---------------------------------------------------------------- Xe ô tô điện sơn bóng clearcoat đỗ dọc đại lộ trước văn phòng
+export function buildCar(THREE, assets, mats, opts) {
+  const { x, y, color = "#e2e8f0", rotY = 0 } = opts;
+  const g = assets.geos;
+  const root = new THREE.Group();
+  root.position.set(x, 0, y);
+  root.rotation.y = rotY;
+
+  addShadow(THREE, root, assets, mats, 5.1, 2.5, 0.018);
+
+  const paintMat = mats.physical(color, { roughness: 0.16, metalness: 0.72, clearcoat: 1.0, clearcoatRoughness: 0.05 });
+  const glassMat = mats.physical("#0f172a", { roughness: 0.06, metalness: 0.15, clearcoat: 1.0, clearcoatRoughness: 0.04 });
+  const tireMat = mats.standard("#18181b", { roughness: 0.85, metalness: 0.05 });
+  const rimMat = mats.standard("#e2e8f0", { roughness: 0.15, metalness: 0.94 });
+
+  const body = new THREE.Mesh(g.carBody, paintMat);
+  body.castShadow = body.receiveShadow = true;
+  root.add(body);
+
+  // Kính cabin toàn cảnh ôm thân xe
+  const cabin = new THREE.Mesh(g.unitBox, glassMat);
+  cabin.position.set(-0.22, 1.1, 0);
+  cabin.scale.set(2.05, 0.44, 1.66);
+  root.add(cabin);
+
+  // Đèn pha LED trắng (HDR Bloom) & dải đèn hậu đỏ ruby
+  const headMat = mats.standard("#ffffff", { roughness: 0.1, emissive: "#fef9c3", emissiveIntensity: 1.65 });
+  const tailMat = mats.standard("#ef4444", { roughness: 0.15, emissive: "#ef4444", emissiveIntensity: 1.45 });
+  for (const sz of [-0.56, 0.56]) {
+    const hl = new THREE.Mesh(g.unitBox, headMat);
+    hl.position.set(2.22, 0.62, sz);
+    hl.scale.set(0.08, 0.12, 0.32);
+    root.add(hl);
+  }
+  const tl = new THREE.Mesh(g.unitBox, tailMat);
+  tl.position.set(-2.22, 0.68, 0);
+  tl.scale.set(0.06, 0.09, 1.48);
+  root.add(tl);
+
+  // 4 bánh xe lốp cao su + mâm hợp kim phay
+  for (const [wx, wz] of [[1.32, 0.84], [1.32, -0.84], [-1.32, 0.84], [-1.32, -0.84]]) {
+    const tire = new THREE.Mesh(g.carWheel, tireMat);
+    tire.rotation.x = Math.PI / 2;
+    tire.position.set(wx, 0.32, wz);
+    tire.castShadow = true;
+    const rim = new THREE.Mesh(g.carRim, rimMat);
+    rim.rotation.x = Math.PI / 2;
+    rim.position.set(wx, 0.32, wz);
+    root.add(tire, rim);
   }
   return root;
 }
