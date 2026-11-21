@@ -8,6 +8,8 @@ import { overlaps } from "./iso.js";
 import { createTextureBank } from "./textures.js";
 import { createHumanAssets } from "./human3d.js";
 import { createNatureAssets } from "./nature3d.js";
+import { createTrafficAssets } from "./traffic3d.js";
+import { createCityAssets } from "./city3d.js";
 import { buildOfficeScene, createSceneAssets } from "./scene3d.js";
 import { createPostFX } from "./postfx.js";
 
@@ -84,6 +86,8 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
   const sceneAssets = createSceneAssets(THREE);
   const humanAssets = createHumanAssets(THREE);
   const natureAssets = createNatureAssets(THREE);
+  const trafficAssets = createTrafficAssets(THREE);
+  const cityAssets = createCityAssets(THREE);
   const postfx = createPostFX(THREE, renderer);
 
   let officeObj = null;
@@ -149,20 +153,29 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
         const spots = [
           [left, top], [left, top - h * 0.65], [left, top + h * 0.65],
           [left, top - h], [left, top + h], [left - 18, top], [left + 18, top],
+          [left - 26, top - h], [left + 26, top - h], [left - 26, top + h], [left + 26, top + h],
           [left, top - 1.5 * h], [left, top + 1.5 * h],
           [left, top - 2 * h], [left, top + 2 * h],
         ];
         if (room) {
           if (room.y === 0) {
-            for (const zOff of [2.5, 3.3, 1.6]) {
-              for (const u of [0.5, 0.3, 0.7]) {
+            for (const zOff of [2.5, 3.3, 1.6, 3.8, 1.0]) {
+              for (const u of [0.5, 0.3, 0.7, 0.15, 0.85]) {
                 const q = new THREE.Vector3(room.x + u * room.w, zb + zOff, 0.2).project(camera);
                 if (q.z < 1) spots.push([((q.x + 1) / 2) * rect.w, ((1 - q.y) / 2) * rect.h]);
               }
             }
           }
-          for (const u of [0.5, 0.25, 0.75]) {
-            for (const v of [0.5, 0.25, 0.75]) {
+          if (room.x === 0) {
+            for (const zOff of [2.5, 3.3, 1.6]) {
+              for (const v of [0.5, 0.25, 0.75]) {
+                const q = new THREE.Vector3(0.2, zb + zOff, room.y + v * room.d).project(camera);
+                if (q.z < 1) spots.push([((q.x + 1) / 2) * rect.w, ((1 - q.y) / 2) * rect.h]);
+              }
+            }
+          }
+          for (const u of [0.5, 0.25, 0.75, 0.15, 0.85]) {
+            for (const v of [0.5, 0.25, 0.75, 0.15, 0.85]) {
               const q = new THREE.Vector3(room.x + u * room.w, zb + 0.6, room.y + v * room.d).project(camera);
               if (q.z < 1) spots.push([((q.x + 1) / 2) * rect.w, ((1 - q.y) / 2) * rect.h]);
             }
@@ -170,7 +183,8 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
         }
         const prev = lastSpot.get(t.id);
         const keep = prev !== undefined && prev < spots.length && ok(...spots[prev], 1) ? prev : -1;
-        const pick = keep >= 0 ? keep : spots.findIndex(([x, y]) => ok(x, y, 2));
+        let pick = keep >= 0 ? keep : spots.findIndex(([x, y]) => ok(x, y, 2));
+        if (pick < 0) pick = spots.findIndex(([x, y]) => ok(x, y, 0));
         if (pick >= 0) {
           [left, top] = spots[pick];
           lastSpot.set(t.id, pick);
@@ -432,7 +446,7 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
           scene.remove(officeObj.root);
           officeObj.dispose();
         }
-        officeObj = buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natureAssets, opts);
+        officeObj = buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natureAssets, trafficAssets, cityAssets, opts);
         scene.add(officeObj.root);
         pickables = [];
         officeObj.root.traverse((o) => { if (o.isMesh && o.userData.pick) pickables.push(o); });
@@ -515,6 +529,19 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
         } else curZoom = dstZoom;
       }
       const camera = place(curZoom, curBox, plan, mood);
+      if (plan.outdoor) {
+        const fogCol = dark ? 0x0f172a : sunset ? 0xf5c89e : 0xcfe4fb;
+        const near = view.perspective ? curDist + 48 : 115;
+        const far = view.perspective ? curDist + 175 : 240;
+        if (!scene.fog || !scene.fog.isFog) scene.fog = new THREE.Fog(fogCol, near, far);
+        else {
+          scene.fog.color.setHex(fogCol);
+          scene.fog.near = near;
+          scene.fog.far = far;
+        }
+      } else {
+        scene.fog = null;
+      }
       if (glowOn && postfx) {
         const dofStrength = view.perspective ? Math.max(0, Math.min(0.62, (curZoom - 1.5) * 0.42)) : 0;
         postfx.render(scene, camera, {
@@ -544,6 +571,8 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
       sceneAssets.dispose();
       humanAssets.dispose();
       natureAssets.dispose();
+      trafficAssets.dispose();
+      cityAssets.dispose();
       textures.dispose();
       pGeo.dispose();
       pMat.dispose();

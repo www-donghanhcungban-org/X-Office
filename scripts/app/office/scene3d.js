@@ -8,8 +8,10 @@ import { inkOn, shade } from "./iso.js";
 import { planFor } from "./plans.js";
 import { STATE_TEXT, roomLabelAt, wallSegments } from "./scene.js";
 import { buildHumanRig, animateHumanRig, buildWalkerRig, animateWalkerRig } from "./human3d.js";
+import { buildStreetTraffic } from "./traffic3d.js";
+import { buildSurroundingCity } from "./city3d.js";
 import {
-  buildBench, buildBollard, buildCar, buildFence, buildFlowerbed, buildInstancedLawn, buildPlant,
+  buildBench, buildBollard, buildFence, buildFlowerbed, buildInstancedLawn, buildPlant,
   buildPool, buildRock, buildSeasonTree, buildStreetlamp, buildTree, buildUmbrella,
 } from "./nature3d.js";
 
@@ -296,7 +298,7 @@ function addBox(THREE, parent, geo, mat, x, y, z, sx, sy, sz, cast = true, recv 
 }
 
 // ---------------------------------------------------------------- Ngoại cảnh: sân cỏ, lối vào, cây cối, bồn hoa, đèn đường
-function buildOutdoor(THREE, sceneAssets, natureAssets, mats, plan, anim) {
+function buildOutdoor(THREE, sceneAssets, natureAssets, humanAssets, trafficAssets, cityAssets, mats, plan, anim) {
   const group = new THREE.Group();
   const g = sceneAssets.geos;
   const pad = plan.levels ? 6 : 4;
@@ -373,7 +375,7 @@ function buildOutdoor(THREE, sceneAssets, natureAssets, mats, plan, anim) {
   const swMat = mats.standard("#dedad2", { roughness: 0.85, tex: "sidewalk", normal: 0.55 });
   const roadMat = mats.standard("#cfd4dc", { roughness: 0.86, tex: "road", normal: 0.65, roughMap: true });
   const curbCol = mats.standard("#a8a29e", { roughness: 0.82, tex: "stone", normal: 0.5, roughMap: true });
-  const swW = plan.W + pad + 12;
+  const swW = plan.W + pad + 2.6;
   const swX = (plan.W + pad - 1.5) / 2;
 
   const sidewalk = new THREE.Mesh(g.unitPlane, swMat);
@@ -387,14 +389,23 @@ function buildOutdoor(THREE, sceneAssets, natureAssets, mats, plan, anim) {
   const road = new THREE.Mesh(g.unitPlane, roadMat);
   road.rotation.x = -Math.PI / 2;
   road.position.set(swX, -0.028, streetZ + 5.9);
-  road.scale.set(swW, 7.2, 1);
+  road.scale.set(swW + 10, 7.2, 1);
   road.receiveShadow = true;
   group.add(road);
 
-  // Vạch phân làn đứt nét giữa đại lộ + vạch kẻ người đi bộ qua đường thẳng trục lối vào sảnh
+  // Vỉa hè phía Nam đối diện đại lộ (cho người đi bộ qua đường & dạo phố)
+  addBox(THREE, group, g.unitBox, curbCol, swX, 0.05, streetZ + 9.52, swW, 0.14, 0.18, false, true);
+  const southWalk = new THREE.Mesh(g.unitPlane, swMat);
+  southWalk.rotation.x = -Math.PI / 2;
+  southWalk.position.set(swX, -0.008, streetZ + 10.65);
+  southWalk.scale.set(swW, 2.2, 1);
+  southWalk.receiveShadow = true;
+  group.add(southWalk);
+
+  // Vạch phân làn đứt nét giữa đại lộ + vạch dừng đèn đỏ + vạch kẻ người đi bộ qua đường
   const stripeMat = mats.standard("#f1f5f9", { roughness: 0.72, polygonOffset: true, offsetUnits: -2 });
-  for (let dx = -4; dx < plan.W + pad + 4; dx += 4.2) {
-    if (dx > 2.0 && dx < 7.8) continue;
+  for (let dx = -2.2; dx < plan.W + pad + 0.5; dx += 4.2) {
+    if (dx > 1.8 && dx < 8.4) continue;
     const ln = new THREE.Mesh(g.unitPlane, stripeMat);
     ln.rotation.x = -Math.PI / 2;
     ln.position.set(dx, -0.016, streetZ + 5.9);
@@ -405,13 +416,31 @@ function buildOutdoor(THREE, sceneAssets, natureAssets, mats, plan, anim) {
     const st = new THREE.Mesh(g.unitPlane, stripeMat);
     st.rotation.x = -Math.PI / 2;
     st.position.set(3.4 + k * 0.8, -0.015, streetZ + 5.9);
-    st.scale.set(0.42, 4.8, 1);
+    st.scale.set(0.42, 6.2, 1);
     group.add(st);
   }
+  // Vạch trắng dừng đèn đỏ trước vạch qua đường ở cả hai làn
+  for (const [sx, sz] of [[1.95, streetZ + 7.65], [8.15, streetZ + 4.15]]) {
+    const stopLn = new THREE.Mesh(g.unitPlane, stripeMat);
+    stopLn.rotation.x = -Math.PI / 2;
+    stopLn.position.set(sx, -0.015, sz);
+    stopLn.scale.set(0.32, 3.1, 1);
+    group.add(stopLn);
+  }
 
-  // Hai xe ô tô điện hiện đại sơn bóng clearcoat đỗ ven đường (không che tầm nhìn sảnh)
-  group.add(buildCar(THREE, natureAssets, mats, { x: 14.5, y: streetZ + 3.85, color: "#f1f5f9", rotY: 0 }));
-  group.add(buildCar(THREE, natureAssets, mats, { x: 28.5, y: streetZ + 3.85, color: "#0284c7", rotY: Math.PI }));
+  // Hệ thống giao thông chạy thật: đèn tín hiệu Đỏ/Vàng/Xanh, ô tô, xe máy kèm người lái và người đi bộ
+  if (trafficAssets) {
+    const traffic = buildStreetTraffic(THREE, trafficAssets, natureAssets, humanAssets, mats, plan, streetZ);
+    group.add(traffic.root);
+    anim.traffics.push(traffic);
+  }
+
+  // Khu phố đô thị hoàn chỉnh bao quanh 4 phía (nhà phố, quán cà phê, cao ốc kính, công viên, trạm buýt, skyline)
+  if (cityAssets) {
+    const city = buildSurroundingCity(THREE, cityAssets, natureAssets, mats, plan, streetZ, anim);
+    group.add(city.root);
+    anim.cities.push(city);
+  }
   return group;
 }
 
@@ -1371,7 +1400,7 @@ function buildWorkstation(THREE, sceneAssets, humanAssets, mats, textures, opts)
 }
 
 // ---------------------------------------------------------------- Dựng trọn cảnh 3D bền vững
-export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natureAssets, opts) {
+export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natureAssets, trafficAssets, cityAssets, opts) {
   const th = opts.theme;
   const glowOn = opts.quality !== "low";
   const plan = planFor(opts.scale || "team", opts.layout || "open");
@@ -1381,11 +1410,11 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
   const dark = Boolean(th.edge || th.id === "night" || th.id === "library");
   const root = new THREE.Group();
   const cutaway = { left: new THREE.Group(), back: new THREE.Group(), ceiling: new THREE.Group() };
-  const anim = { trees: [], floaters: [], blinkers: [], steam: [], spinners: [], bars: [], waters: [], clockHands: [] };
+  const anim = { trees: [], floaters: [], blinkers: [], steam: [], spinners: [], bars: [], waters: [], clockHands: [], traffics: [], cities: [] };
   const rigs = [];
   const agentStations = [];
 
-  if (plan.outdoor) root.add(buildOutdoor(THREE, sceneAssets, natureAssets, mats, plan, anim));
+  if (plan.outdoor) root.add(buildOutdoor(THREE, sceneAssets, natureAssets, humanAssets, trafficAssets, cityAssets, mats, plan, anim));
   if (plan.levels) root.add(buildBuilding(THREE, sceneAssets, mats, plan, th));
 
   const floorRoot = new THREE.Group();
@@ -1500,6 +1529,7 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
           wm.uniforms.uIntensity.value = mood === "night" ? 0.34 : mood === "sunset" ? 0.56 : 0.64;
         }
       }
+      for (const ct of anim.cities) ct.setMood(mood);
     },
     getTags(curOpts) {
       const tags = [];
@@ -1565,6 +1595,12 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
       }
       for (const ch of anim.clockHands) {
         ch.rotation.z = -(motion ? t * (Math.PI * 2 / 60) : 0.85);
+      }
+      for (const tr of anim.traffics) {
+        tr.animate(t, motion);
+      }
+      for (const ct of anim.cities) {
+        ct.animate(t, motion);
       }
     },
     dispose() {

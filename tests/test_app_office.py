@@ -235,8 +235,19 @@ class OfficeVendorTest(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertEqual(hashlib.sha256((self.VENDOR / name).read_bytes()).hexdigest(), digest)
         self.assertEqual(
-            sorted(p.name for p in self.VENDOR.iterdir()), ["LICENSE", "SOURCE", "three.core.js", "three.module.js"]
+            sorted(p.name for p in self.VENDOR.iterdir()),
+            ["LICENSE", "SOURCE", "assets", "three.core.js", "three.module.js"],
         )
+        assets = dict(re.findall(r"^(assets/(?:hdri|pbr)/[\w.-]+) sha256: ([0-9a-f]{64})\b", source, re.M))
+        actual = sorted(
+            p.relative_to(self.VENDOR).as_posix()
+            for p in (self.VENDOR / "assets").rglob("*")
+            if p.is_file() and p.name != "LICENSE"
+        )
+        self.assertEqual(actual, sorted(assets))
+        for rel, digest in assets.items():
+            with self.subTest(asset=rel):
+                self.assertEqual(hashlib.sha256((self.VENDOR / rel).read_bytes()).hexdigest(), digest)
 
     def test_vendor_check_strict_green(self) -> None:
         self.assertEqual(xt.vendor_dir_problems(ROOT, "scripts/app/vendor", set()), [])
