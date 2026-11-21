@@ -22,6 +22,10 @@ export async function render(main, { api, h, loading, error }) {
     try {
       const d = await api("/api/overview");
       const loop = d.loop || {};
+      const extra = [
+        loop.reason ? h("p", null, "Lý do: " + loop.reason) : null,
+        d.blueprint ? null : h("p", null, "Ghép blueprint: ", h("code", null, "python3 scripts/xt.py compose --profile <p> --scale <S|M|L> --out BLUEPRINT.md")),
+      ].filter(Boolean);
       body.replaceChildren(
         h("p", { class: "muted" }, d.project + " · khung " + (d.version || "?")),
         h(
@@ -32,8 +36,7 @@ export async function render(main, { api, h, loading, error }) {
           card(h, "#/loop", String(d.pending_human), "Việc chờ người"),
           card(h, "#/loop", loop.verdict || "—", "Vòng tự động"),
         ),
-        loop.reason ? h("p", null, "Lý do: " + loop.reason) : null,
-        d.blueprint ? null : h("p", null, "Ghép blueprint: ", h("code", null, "python3 scripts/xt.py compose --profile <p> --scale <S|M|L> --out BLUEPRINT.md")),
+        ...extra,
       );
     } catch (e) {
       error(body, e, load);

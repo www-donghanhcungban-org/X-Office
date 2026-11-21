@@ -41,6 +41,10 @@ function setMat(mat, str, glow, glowOn) {
     if (glow && glowOn) mat.emissive.copy(parseColor(glow).color).multiplyScalar(0.55);
     else mat.emissive.setRGB(0, 0, 0);
   }
+  if (mat.specular) {
+    mat.shininess = alpha < 1 ? 90 : 24;
+    mat.specular.setHex(alpha < 1 ? 0x94a3b8 : 0x222a36);
+  }
 }
 
 // Bộ thu lệnh vẽ của compose(): giữ nguyên dữ liệu để đồng bộ vào các mesh dùng lại.
@@ -84,45 +88,69 @@ class Pool {
   }
 }
 
-export function createThreeView(stage) {
+export function createThreeView(stage, onTagClick) {
   const canvas = document.createElement("canvas");
   canvas.className = "office-canvas office-3d";
   canvas.setAttribute("role", "img");
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, failIfMajorPerformanceCaveat: false });
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFShadowMap;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
   const labels = document.createElement("div");
   labels.className = "office-labels";
   labels.setAttribute("aria-hidden", "true");
+  if (onTagClick) {
+    labels.addEventListener("click", (e) => {
+      const tag = e.target.closest(".office-tag");
+      if (tag && tag.dataset.id && (tag.dataset.kind === "room" || tag.dataset.kind === "agent")) {
+        onTagClick(tag.dataset.kind, tag.dataset.id);
+      }
+    });
+  }
   stage.append(canvas, labels);
 
   const scene = new THREE.Scene();
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 200);
   const target = new THREE.Vector3(8, 1.3, 6);
   const view = { az: Math.PI / 4, el: Math.atan(1 / Math.SQRT2), w: 800, h: 540 };
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8a9a, 1.7));
-  const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x8a8a9a, 1.6);
+  scene.add(hemi);
+  const fill = new THREE.DirectionalLight(0xcbd5e1, 0.42);
+  fill.position.set(-16, 10, -12);
+  scene.add(fill);
+  const sun = new THREE.DirectionalLight(0xffffff, 1.55);
   sun.position.set(22, 14, 14);
   sun.target.position.copy(target);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.bias = -0.0008;
+  sun.shadow.normalBias = 0.025;
   Object.assign(sun.shadow.camera, { left: -16, right: 16, top: 16, bottom: -16, near: 1, far: 60 });
   scene.add(sun, sun.target);
 
   const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+  const SHAPES = {
+    box: boxGeo,
+    cyl: new THREE.CylinderGeometry(0.5, 0.5, 1, 14),
+    taper: new THREE.CylinderGeometry(0.32, 0.5, 1, 14),
+    cone: new THREE.ConeGeometry(0.5, 1, 14),
+    sphere: new THREE.SphereGeometry(0.5, 16, 12),
+    ico: new THREE.IcosahedronGeometry(0.5, 1),
+  };
   const planeGeo = new THREE.PlaneGeometry(1, 1);
   const dotGeo = new THREE.SphereGeometry(1, 14, 10);
   const ringGeo = new THREE.TorusGeometry(1, 0.025, 6, 48);
-  const lambert = () => new THREE.MeshLambertMaterial();
+  const phong = () => new THREE.MeshPhongMaterial({ shininess: 24, specular: 0x222a36 });
   const boxes = new Pool(scene, () => {
-    const m = new THREE.Mesh(boxGeo, lambert());
+    const m = new THREE.Mesh(boxGeo, phong());
     m.userData.single = m.material;
-    m.userData.multi = Array.from({ length: 6 }, lambert);
+    m.userData.multi = Array.from({ length: 6 }, phong);
     m.castShadow = m.receiveShadow = true;
     return m;
   });
   const panels = new Pool(scene, () => {
-    const m = new THREE.Mesh(planeGeo, lambert());
+    const m = new THREE.Mesh(planeGeo, phong());
     m.receiveShadow = true;
     return m;
   });
@@ -132,15 +160,18 @@ export function createThreeView(stage) {
 
   function syncBox(b, glowOn) {
     const m = boxes.next();
+    const shape = b.shape && SHAPES[b.shape] ? b.shape : "box";
+    if (m.geometry !== SHAPES[shape]) m.geometry = SHAPES[shape];
     m.position.set(b.x + b.w / 2, b.z + b.h / 2, b.y + b.d / 2);
+    m.rotation.set(b.rx || 0, b.rz || 0, b.ry || 0);
     m.scale.set(Math.max(b.w, 0.001), Math.max(b.h, 0.001), Math.max(b.d, 0.001));
-    if (b.top || b.front || b.side) {
+    if (shape === "box" && (b.top || b.front || b.side)) {
       // Thứ tự mặt của BoxGeometry: +x, −x, +y(trên), −y, +z(trước = +y thế giới), −z.
       const faces = [b.side || b.color, b.color, b.top || b.color, b.color, b.front || b.color, b.color];
       faces.forEach((c, i) => setMat(m.userData.multi[i], c, b.glow, glowOn));
       m.material = m.userData.multi;
     } else {
-      setMat(m.userData.single, b.color, b.glow, glowOn);
+      setMat(m.userData.single, b.top || b.color, b.glow, glowOn);
       m.material = m.userData.single;
     }
   }
@@ -206,15 +237,14 @@ export function createThreeView(stage) {
       const p = new THREE.Vector3(t.x, t.z, t.y).project(camera);
       el.textContent = t.text;
       el.dataset.kind = t.kind; // agent | state | room — test và CSS phân biệt nhãn agent với nhãn phòng
+      el.dataset.id = t.id || "";
       el.hidden = false;
       el.dataset.why = "";
       let left = ((p.x + 1) / 2) * rect.w, top = ((1 - p.y) / 2) * rect.h;
       if (t.kind === "room") {
         // Nhãn phòng là biển chỉ dẫn: kẹp trọn vào khung (khung hẹp, xoay sát biên không cắt chữ), rồi chỉ giữ khi chỗ
         // nhãn đứng là sàn/tường của CHÍNH phòng đó và không đè nhãn đã đặt. Thử lần lượt: điểm neo đã kẹp, dịch lên/xuống
-        // ±1, ±2 chiều cao nhãn; rồi các điểm trên sàn phòng (lưới 3×3, ưu tiên giữa) đang nằm trọn trong khung — phòng
-        // lớn chỉ lộ một phần vẫn có nhãn. Không có chỗ: phòng đang xem vẫn đặt ở điểm neo; phòng khác ẩn, `data-why` ghi
-        // lý do (off-room: điểm neo không còn trên phòng; overlap: phòng còn trong hình nhưng hết chỗ trống).
+        // ±0.65, ±1, ±2 chiều cao nhãn và dịch ngang nhẹ; rồi các điểm trên sàn phòng (lưới 3×3, ưu tiên giữa).
         const hw = el.offsetWidth / 2 + 2;
         const raw = [left, top];
         left = Math.min(rect.w - hw, Math.max(hw, left));
@@ -227,7 +257,11 @@ export function createThreeView(stage) {
         const fits = (x, y) => x >= hw && x <= rect.w - hw && y >= h && y <= rect.h - 2;
         const ok = (x, y, gap) =>
           fits(x, y) && !placed.some((o) => overlaps(o, boxAt(x, y), gap)) && (t.id === focus || own(x, y));
-        const spots = [top, top - h, top + h, top - 2 * h, top + 2 * h].map((y) => [left, y]);
+        const spots = [
+          [left, top], [left, top - h * 0.65], [left, top + h * 0.65],
+          [left, top - h], [left, top + h], [left - 18, top], [left + 18, top],
+          [left, top - 2 * h], [left, top + 2 * h],
+        ];
         if (room) {
           for (const u of [0.5, 0.25, 0.75]) {
             for (const v of [0.5, 0.25, 0.75]) {
@@ -237,10 +271,10 @@ export function createThreeView(stage) {
           }
         }
         // Trễ chống nhảy: nhân vật nhún (chuyển động bật) làm nhãn bám người xê dịch từng khung — giữ chỗ đã chọn ở khung
-        // trước khi nó còn dùng được (khe 2 px); chỉ đổi sang chỗ khác hay hiện lại sau khi ẩn khi có khe rộng (8 px).
+        // trước khi nó còn dùng được (khe 1 px); chỉ đổi sang chỗ khác hay hiện lại sau khi ẩn khi có khe (2 px).
         const prev = lastSpot.get(t.id);
-        const keep = prev !== undefined && prev < spots.length && ok(...spots[prev], 2) ? prev : -1;
-        const pick = keep >= 0 ? keep : spots.findIndex(([x, y]) => ok(x, y, 8));
+        const keep = prev !== undefined && prev < spots.length && ok(...spots[prev], 1) ? prev : -1;
+        const pick = keep >= 0 ? keep : spots.findIndex(([x, y]) => ok(x, y, 2));
         if (pick >= 0) {
           [left, top] = spots[pick];
           lastSpot.set(t.id, pick);
@@ -327,9 +361,17 @@ export function createThreeView(stage) {
     api.dirty = true;
   });
 
+  let curBox = null;
+  let curZoom = 1;
+
   const api = {
     canvas,
     dirty: true,
+    resetView() {
+      view.az = Math.PI / 4;
+      view.el = Math.atan(1 / Math.SQRT2);
+      api.dirty = true;
+    },
     resize(w, h, dpr) {
       view.w = w;
       view.h = h;
@@ -339,10 +381,13 @@ export function createThreeView(stage) {
     },
     draw(opts) {
       const glowOn = opts.quality !== "low";
-      // Bóng đổ nhân đôi draw call; ở quy mô công ty/tập đoàn (1–2 nghìn mesh) chỉ bật cho nhóm nhỏ để giữ khung hình.
-      const shadows = glowOn && (opts.scale || "team") === "team";
+      // Bóng đổ nhân đôi draw call; bật cho nhóm nhỏ và công ty (tắt ở toà nhà tập đoàn để giữ khung hình).
+      const shadows = glowOn && (opts.scale || "team") !== "corp";
       renderer.shadowMap.enabled = shadows;
       sun.castShadow = shadows;
+      const dark = Boolean(opts.theme.edge || opts.theme.id === "night" || opts.theme.id === "library");
+      hemi.intensity = dark ? 1.25 : 1.8;
+      sun.intensity = dark ? 1.45 : 1.55;
       scene.background = parseColor(opts.theme.bg).color;
       const sink = new Collector();
       const { plan } = compose(sink, opts, false);
@@ -362,15 +407,36 @@ export function createThreeView(stage) {
         setMat(m.material, r.color);
       });
       for (const p of [boxes, panels, dots, rings]) p.finish();
-      place(opts.zoom, viewCorners(opts).box, plan);
+      const dstBox = viewCorners(opts).box;
+      const dstZoom = opts.zoom || 1;
+      let moving = false;
+      if (!curBox || !opts.motion) {
+        curBox = { ...dstBox };
+        curZoom = dstZoom;
+      } else {
+        const k = 0.22;
+        for (const key of ["x0", "y0", "z0", "x1", "y1", "z1"]) {
+          const diff = dstBox[key] - curBox[key];
+          if (Math.abs(diff) > 0.02) {
+            curBox[key] += diff * k;
+            moving = true;
+          } else curBox[key] = dstBox[key];
+        }
+        const zdiff = dstZoom - curZoom;
+        if (Math.abs(zdiff) > 0.005) {
+          curZoom += zdiff * k;
+          moving = true;
+        } else curZoom = dstZoom;
+      }
+      place(curZoom, curBox, plan);
       renderer.render(scene, camera);
       syncTags(sink.tags, opts.focus, plan);
-      api.dirty = false;
+      api.dirty = moving;
     },
     dispose() {
       renderer.dispose();
       renderer.forceContextLoss(); // trả ngữ cảnh WebGL ngay (trình duyệt giới hạn số ngữ cảnh sống)
-      for (const g of [boxGeo, planeGeo, dotGeo, ringGeo]) g.dispose();
+      for (const g of [...Object.values(SHAPES), planeGeo, dotGeo, ringGeo]) g.dispose();
       scene.traverse((o) => {
         if (!o.material) return;
         for (const mat of [o.material, ...(o.userData.multi || [])].flat()) mat.dispose();

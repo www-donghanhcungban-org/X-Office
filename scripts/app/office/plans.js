@@ -129,6 +129,6 @@ export function viewBox(plan, focus, seatIndex) {
   }
   const room = plan.rooms.find((r) => r.id === focus);
   if (room) return { x0: room.x, y0: room.y, x1: room.x + room.w, y1: room.y + room.d, z0: zb, z1: top };
-  const pad = plan.outdoor ? 2.5 : 0;
-  return { x0: -pad * 0.4, y0: -pad * 0.4, x1: plan.W + pad, y1: plan.D + pad, z0: 0, z1: top };
+  const pad = plan.outdoor ? (plan.levels ? 6 : 4) : 0;
+  return { x0: plan.outdoor ? -1.5 : 0, y0: plan.outdoor ? -1.5 : 0, x1: plan.W + pad, y1: plan.D + pad, z0: 0, z1: top };
 }
