@@ -11,7 +11,8 @@
 ## 1. User story
 Là người dùng khung (chủ repo khung hoặc chủ dự án đích), tôi muốn mở một trang web cục bộ bằng một lệnh, để xem thư viện
 yêu cầu, ghép blueprint, tiến độ, kế hoạch và việc chờ người mà không đọc markdown hay gõ nhiều lệnh. App **không chạy
-lệnh** (Gate, merge, push, defer): chỉ hiển thị lệnh để chép. Ngoại lệ duy nhất: ghi `BLUEPRINT.md` (F-003).
+lệnh** (Gate, merge, push, defer): chỉ hiển thị lệnh để chép. Ngoại lệ duy nhất: ghi blueprint (mặc định `BLUEPRINT.md`)
+kèm backlog `<tên>-BACKLOG.md` cạnh nó, như `compose --out` (F-003).
 
 ## 2. Quy ước chung (mọi endpoint)
 

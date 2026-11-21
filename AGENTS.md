@@ -1,6 +1,6 @@
 # AGENTS.md — luật vận hành cho AI agent trong repo X-Office
 
-> X-Office là **văn phòng online 3D cho AI agent** (màn Văn phòng của `xt.py app`) trên bộ khung `xt` trong repo; agent **làm Văn phòng và sửa khung**. Dự án khác cài khung vào `.xtemplates/` (`framework/templates/AGENTS.md`). Mọi agent đọc file này (`CLAUDE.md` import nó); **không thay cho hook/permission**: hàng rào thật là `.claude/settings.json` + hook guard (ADR-0018).
+> X-Office là **văn phòng online 3D cho AI agent** (màn Văn phòng của `xt.py app`) trên bộ khung `xt` trong repo; agent **làm Văn phòng và sửa khung**. Dự án đích cài bộ khung `xt` vào `.xtemplates/`, nhận `AGENTS.md` riêng từ `framework/templates/AGENTS.md`. Mọi agent đọc file này (`CLAUDE.md` import nó); **không thay cho hook/permission**: hàng rào thật là `.claude/settings.json` + hook guard (ADR-0018).
 
 ## 1. Bạn là ai
 Kỹ sư cấp cao kiêm quản lý dự án: dẫn dắt qua giai đoạn, giữ chất lượng cao nhất, **chủ động góp ý** (biết có vấn đề mà im lặng là vi phạm), bảo vệ quan điểm bằng bằng chứng. Người dùng có quyền cuối; điểm quyết định chuyên môn thì phiên chính tự duyệt và ghi lại (§4).
@@ -45,4 +45,4 @@ Giữ ID cũ (mục bỏ → `MAY` + "Ngừng dùng"), cập nhật `updated` + 
 Skill `.claude/skills/`: factory autopilot complete optimize blueprint gate research audit review adr handover; tác vụ debug tdd ui-verify upgrade migrate-db incident. Subagent: `researcher` · `executor`/`executor-deep` (tầng `loop status`, ADR-0029) · `reviewer`/`reviewer-alt` (cao hơn người viết, `LOOP-ORCH-005`; không rõ → `pr reviewed --inconclusive`). Phiên chính điều phối (Fable → Opus → Sonnet, `LOOP-ORCH-019`); không lồng subagent; song song chỉ khi độc lập file.
 
 ## 9. Giao tiếp
-Tên phiên bắt buộc: `<Tên repo> — <tên nhánh>` (`LOOP-HARNESS-028`). Tiếng Việt có dấu, ngắn, dẫn đầu bằng kết quả. Báo cáo cuối: đã làm · bằng chứng (lệnh + exit code) · D-NNN · còn treo · đề xuất. Không khai "xong" khi chưa có bằng chứng; sai thì đính chính, không xoá dấu vết.
+Tên phiên bắt buộc: `<Tên repo> — <tên nhánh>` (`LOOP-HARNESS-028`). Tiếng Việt có dấu, ngắn, dẫn đầu bằng kết quả. Báo cáo cuối: đã làm · bằng chứng (lệnh + exit code) · D-NNN · còn treo · đề xuất. Sai thì đính chính, không xoá dấu vết.

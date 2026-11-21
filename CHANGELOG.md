@@ -6,6 +6,16 @@ Bản < 3.20.0: [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md) (T-3651; `changel
 
 ## [Unreleased]
 
+### Changed
+
+- `xt.py deploy run|rollback --env dev` in tối đa 5 dòng cuối stderr của adapter cho mỗi bước thất bại (đã che bí mật, mỗi dòng ≤ 200 ký tự), nên lời hướng dẫn như `docker compose -p <project> down -v` tới người dùng; sổ `DEPLOYS.json` vẫn chỉ ghi exit code (AUD-A11Y-009). Starter `web-api-ts`: notes-ui chỉ gắn `aria-invalid`/`aria-describedby` cho lỗi dữ liệu (rỗng, 400/422), không cho lỗi mạng/503; README gói nêu cách lấy tên project Compose. **Dự án đích**: chạy lại `install.py` để nhận `xt.py` mới; mã starter chỉ chép vào repo mới, dự án có sẵn tự ghép notes-ui nếu muốn.
+- Repo cài khung ở dòng kế thừa (≤ 3.34.0) không được `doctor --drift` nhắc lên 1.x, vì lệnh này chạy `xt.py` đã cài của chính repo đó; đường nâng là chạy lại `install.py` từ bản khung mới (AUD-HAR-453).
+
+### Fixed
+
+- `install.py`: nhãn tiền phát hành (`1.0.0-rc1 (sha)`) cũ hơn bản chính cùng số (SemVer §11) — nâng lên 1.0.0 in bước của mục [1.0.0] thay vì im lặng như cài lại; 1.0.0 → 1.0.0-rc2 là hạ bản (AUD-HAR-453).
+- `audit check`: sổ lưu trữ xét theo khối bảng — dòng thiếu ô có ô ID dị dạng (rỗng, trong backtick, in đậm, chữ thường) vẫn bị kiểm, bảng chú giải khác tiêu đề bỏ cả khối kể cả dòng mở bằng `AUD-` (AUD-HAR-452).
+
 ## [1.0.0] - 2026-11-21
 
 Bản đầu của dòng phát hành riêng X-Office (ADR-9002, D-9008): từ đây X-Office cắt bản độc lập, không theo số X-Templates. Mọi thay đổi sau 3.34.0 gộp ở đây.

@@ -24,7 +24,7 @@ python3 scripts/xt.py app          # máy chủ 127.0.0.1, in URL kèm token r�
 | Máy yếu vẫn xem được | Canvas 2D tự viết là mặc định, không phụ thuộc; bộ vẽ **3D three.js** (≈ 2,1 MB, cần WebGL) là tuỳ chọn tải lười, cài bằng `install.py --with-office-3d` ([ADR-9001](docs/adr/9001-office-view-renderers.md)) |
 | Dùng được bằng bàn phím và trình đọc màn hình | Canvas có nhãn tóm tắt và phím mũi tên/`+`/`-`/`0`; bảng "Ai đang làm gì" là bản văn bản tương đương; tôn trọng `prefers-reduced-motion` |
 
-"Online" ở đây nghĩa là chạy trong trình duyệt. Hiện app là máy chủ cục bộ, không chạy lệnh và chỉ ghi `BLUEPRINT.md` ở màn Ghép
+"Online" ở đây nghĩa là chạy trong trình duyệt. Hiện app là máy chủ cục bộ, không chạy lệnh và chỉ ghi `BLUEPRINT.md` + `BLUEPRINT-BACKLOG.md` ở màn Ghép
 (màn Văn phòng chỉ đọc); **chưa có** dịch vụ lưu trữ hay nhiều người cùng vào một văn phòng. Đặc tả: [`SPEC-app.md`](docs/specs/SPEC-app.md) F-008.
 
 ## Quy trình phát triển đi kèm
@@ -153,7 +153,8 @@ Ghép blueprint · Tiến độ blueprint · Kế hoạch và phân chia việc 
 chờ người, quyết định và ADR · PR (cần `gh` đã đăng nhập; thiếu thì màn báo lý do, các màn khác vẫn chạy).
 
 App **không chạy lệnh**: không Gate, merge, push hay defer — mỗi màn chỉ hiện lệnh để chép sang terminal, nơi guard
-kiểm. Ngoại lệ duy nhất là nút "Ghi BLUEPRINT.md", đi đúng đường của `compose --out` (giữ tick theo ID). Máy chủ chỉ
+kiểm. Ngoại lệ duy nhất là nút "Ghi BLUEPRINT.md", đi đúng đường của `compose --out` (giữ tick theo ID): ghi file blueprint
+(mặc định `BLUEPRINT.md`) và backlog `<tên>-BACKLOG.md` cạnh nó (mặc định `BLUEPRINT-BACKLOG.md`). Máy chủ chỉ
 nghe 127.0.0.1, đòi token mỗi lần chạy, kiểm `Host`/`Origin` và đặt CSP chặt — mô hình đầy đủ ở
 [ADR-0038](docs/adr/0038-local-app-on-xt.md), hợp đồng API ở [`SPEC-app.md`](docs/specs/SPEC-app.md).
 `xt.py app --smoke` gọi mọi API rồi thoát (exit 1 khi có route lỗi) — dùng để kiểm bản cài.
@@ -187,7 +188,7 @@ nghe 127.0.0.1, đòi token mỗi lần chạy, kiểm `Host`/`Origin` và đặ
 | `python3 scripts/xt.py stage status/init/submit/reopen/approve/new-cycle` | Giai đoạn sản phẩm (ADR-0058): sổ `docs/autopilot/STAGE.json`; agent `init`/`submit --evidence` (HEAD cây sạch)/`reopen`; **người** `approve --sha --note` (mở giai đoạn kế) và `init --adopt 2\|3 --evidence` (dự án đã chạy) ở terminal ngoài phiên agent; agent được duyệt MVP khi bật [ADR-0069](docs/adr/0069-agent-stage-approval.md); PLAN khai `Giai đoạn sản phẩm: N (C-NNN)` — `loop init/next/record` từ chối giai đoạn khoá |
 | `python3 scripts/xt.py autonomy-bench [--corpus DIR] [--json]` | Corpus PR/rollup/review/guard/log CI ở `tests/fixtures/autonomy/` chạy qua hàm thật (merge-check, `_ci_blocker`, `pr next`, guard + chính sách): exit 1 khi false-green > 0 (máy cho merge/chạy/tính xanh ở ca phải chặn), khi có ca lệch (kể cả `code` khác mong đợi) hoặc ID bắt buộc chưa có ca; 2 khi corpus hỏng/ca không chạy được; báo chặn oan và độ phủ REC §2 + 🔴/🟠 đã sửa; job CI `checks` chạy (tổng hợp vào `quality`) (AUTO-07, [baseline](docs/ops/AUTONOMY-BASELINE.md)) |
 | `python3 scripts/xt.py mutate-guard [--functions …] [--tests …] [--jobs N] [--timeout S] [--list] [--json]` | Đột biến chính sách guard (`decide`/`policy_action`/`apply_policy`/`_strict_why`) bằng stdlib, mỗi mutant chạy bộ test guard: exit 1 khi còn mutant sống, 2 khi test đỏ lúc chưa đột biến (AUD-TEST-051; workflow `mutation.yml` hằng tuần) |
-| `python3 scripts/xt.py app [--port N] [--no-open] [--smoke]` | App web cục bộ (ADR-0038): máy chủ 127.0.0.1 cổng ngẫu nhiên, in URL kèm token rồi mở trình duyệt; chỉ đọc (trừ ghi `BLUEPRINT.md` như `compose --out`), không chạy lệnh; `--smoke` gọi mọi `GET /api/*` rồi thoát, exit 1 khi có route khác 200 |
+| `python3 scripts/xt.py app [--port N] [--no-open] [--smoke]` | App web cục bộ (ADR-0038): máy chủ 127.0.0.1 cổng ngẫu nhiên, in URL kèm token rồi mở trình duyệt; chỉ đọc (trừ ghi `BLUEPRINT.md` + `BLUEPRINT-BACKLOG.md` như `compose --out`), không chạy lệnh; `--smoke` gọi mọi `GET /api/*` rồi thoát, exit 1 khi có route khác 200 |
 | `python3 scripts/xt.py plan waves [--plan F] [--max N] [--json]` | Xếp task mở của PLAN thành đợt chạy song song (ADR-0038): mỗi đợt `sau:` đã thoả, `files:` không giao, ≤ N task (mặc định 4 — ADR-0061; trần 5 `LOOP-ORCH-008`); chu trình, ghi chú hỏng, task defer → bị chặn kèm lý do; không cần vòng đang chạy |
 | `python3 scripts/xt.py context --task T-NNNN [--json] [--plan F]` | Gói ngữ cảnh một task của PLAN (REC-11): ID yêu cầu, đoạn spec, Gate, `files:`, file thiếu, số byte — đưa cho executor thay vì cả PLAN |
 | `python3 scripts/xt.py merge-watch [--pr N] [--interval 30]` | Chạy nền sau khi mở PR: gọi `merge-check` mỗi 30 giây tới khi PR đã merge hoặc cần hành động (ADR-0021) |

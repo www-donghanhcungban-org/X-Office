@@ -11,8 +11,12 @@ const listStatus = element("list-status");
 const dates = new Intl.DateTimeFormat("vi-VN", { dateStyle: "medium", timeStyle: "short" });
 let session = "";
 
+// Lỗi do dữ liệu nhập (server trả 400/422); lỗi mạng, phiên hay dịch vụ bận không thuộc loại này.
+class InvalidInput extends Error {}
+
 // Thông báo nằm cạnh phần tử gây ra nó để lỗi luôn trong tầm nhìn.
-function report(target, message, error = false) {
+// Chỉ lỗi dữ liệu (`invalid`) đánh dấu ô nhập; lỗi khác chỉ hiện ở vùng thông báo.
+function report(target, message, error = false, invalid = false) {
   for (const place of [loginStatus, noteStatus, listStatus]) {
     if (place !== target) {
       place.textContent = "";
@@ -22,7 +26,7 @@ function report(target, message, error = false) {
   target.textContent = message;
   target.classList.toggle("error", error);
   if (error && message) target.scrollIntoView({ block: "nearest" });
-  if (target === noteStatus && error && message) {
+  if (target === noteStatus && error && invalid && message) {
     input.setAttribute("aria-invalid", "true");
     input.setAttribute("aria-describedby", noteStatus.id);
   } else {
@@ -64,6 +68,8 @@ async function request(path, body, token = "") {
       throw new Error("Phiên đã hết hạn. Hãy đăng nhập lại.");
     }
     if (response.status === 401) throw new Error("Email hoặc mật khẩu chưa đúng.");
+    if (response.status === 400 || response.status === 422)
+      throw new InvalidInput("Nội dung chưa hợp lệ. Hãy kiểm tra rồi thử lại.");
     if (response.status === 503) throw new Error("Dịch vụ đang bận. Vui lòng thử lại sau.");
     throw new Error("Yêu cầu chưa hoàn tất. Vui lòng thử lại.");
   }
@@ -103,6 +109,7 @@ async function perform(target, task) {
       session ? target : loginStatus,
       error instanceof TypeError ? "Mất kết nối. Hãy kiểm tra mạng và tải lại." : error.message,
       true,
+      error instanceof InvalidInput,
     );
   } finally {
     for (const button of buttons) button.disabled = false;
@@ -131,7 +138,7 @@ editor.addEventListener("submit", (event) => {
   event.preventDefault();
   const body = input.value.trim();
   if (!body) {
-    report(noteStatus, "Hãy nhập nội dung ghi chú.", true);
+    report(noteStatus, "Hãy nhập nội dung ghi chú.", true, true);
     input.focus();
     return;
   }

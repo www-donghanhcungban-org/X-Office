@@ -4046,6 +4046,9 @@ def split_md_row(line: str) -> List[str]:
     return [c.strip().replace("\\|", "|") for c in re.split(r"(?<!\\)\|", s)]
 
 
+MD_RULE_CELL_RE = re.compile(r":?-{3,}:?")  # ô của dòng phân cách bảng GFM
+
+
 def md_tables(text: str) -> Dict[str, List[Dict[str, str]]]:
     """Bảng đầu tiên dưới mỗi heading `## `: {tên heading: [dòng dạng dict theo tiêu đề cột]} (bỏ code fence)."""
     out: Dict[str, List[Dict[str, str]]] = {}
@@ -4072,7 +4075,7 @@ def md_tables(text: str) -> Dict[str, List[Dict[str, str]]]:
         if header is None:
             header = [unicodedata.normalize("NFC", c) for c in cells]
             out[heading] = []
-        elif all(re.fullmatch(r":?-{3,}:?", c) for c in cells if c):
+        elif all(MD_RULE_CELL_RE.fullmatch(c) for c in cells if c):
             continue
         else:
             out[heading].append(dict(zip(header, cells + [""] * (len(header) - len(cells)))))
@@ -4321,36 +4324,98 @@ def audit_archive(status: Path) -> Path:
     return status.with_name(f"{status.stem}{ARCHIVE_SUFFIX}{status.suffix}")
 
 
-def archive_tables(text: str) -> Dict[str, List[Dict[str, str]]]:
-    """Bảng của sổ lưu trữ (AUD-HAR-450/451): chỉ giữ dòng `## ` và dòng bảng `|` (kể cả thụt lề) — ghi chú `> Đợt …`
-    và dòng trống xen giữa các đợt dời không được cắt bảng (`md_tables` coi dòng không phải bảng là hết bảng nên mọi
-    dòng dời sau ghi chú đầu tiên lọt khỏi kiểm ID duy nhất và `chỉ đã sửa`). Nội dung trong code fence bị bỏ (ví dụ mẫu
-    không phải bảng thật). Mỗi heading chỉ có MỘT bảng: dòng lặp tiêu đề (đợt dời lặp) bị bỏ, dòng có ít ô hơn tiêu đề
-    (bảng chú giải `| Mức | Nghĩa |`) bị bỏ TRỪ khi ô đầu mở bằng `AUD-` — dòng phát hiện thiếu ô rỗng cuối vẫn hiển thị
-    trong GFM nên vẫn phải bị kiểm; dòng nhiều ô hơn (ô chứa `|` chưa thoát) vẫn giữ để không mất phát hiện."""
-    unfenced: List[str] = []
+def _unfenced_lines(text: str) -> List[str]:
+    """Dòng của `text` ngoài code fence (``` hoặc ~~~, đóng bằng đúng loại đã mở)."""
+    out: List[str] = []
     fence: Optional[str] = None
     for ln in text.splitlines():
         m = FENCE_RE.match(ln)
         if m and (fence is None or m.group(1) == fence):
             fence = None if fence else m.group(1)
         elif not fence:
-            unfenced.append(ln)
+            out.append(ln)
+    return out
+
+
+def _row_blocks(lines: List[str]) -> Iterator[List[str]]:
+    """Dòng `## ` thành khối một dòng; dòng bảng `|` (kể cả thụt lề) liền nhau gom thành một khối; dòng khác cắt khối."""
+    block: List[str] = []
+    for ln in lines:
+        if ln.lstrip().startswith("|"):
+            block.append(ln)
+            continue
+        if block:
+            yield block
+            block = []
+        if ln.startswith("## "):
+            yield [ln]
+    if block:
+        yield block
+
+
+def _is_rule_row(line: str) -> bool:
+    """Dòng phân cách GFM `|---|:---:|` (cùng luật ô với `md_tables`)."""
+    cells = split_md_row(line)
+    return any(cells) and all(MD_RULE_CELL_RE.fullmatch(c) for c in cells if c)
+
+
+def _header_cells(line: str) -> List[str]:
+    """Ô tiêu đề để so hai bảng: chuẩn hoá NFC như `md_tables` (tiêu đề gõ dạng tổ hợp NFD vẫn là cùng tiêu đề), bỏ ô
+    rỗng cuối (`| ID | … | Ghi chú | |` hiển thị như bảng không có ô thừa)."""
+    cells = [unicodedata.normalize("NFC", c) for c in split_md_row(line)]
+    while cells and not cells[-1]:
+        cells.pop()
+    return cells
+
+
+LEDGER_COLUMNS = ("id", "trạng thái")  # bảng có một trong các cột này là bảng kiểu sổ, không phải chú giải
+
+
+def _archive_block(
+    block: List[str], header: Optional[List[str]]
+) -> Tuple[Optional[List[str]], List[str], Optional[List[str]]]:
+    """(tiêu đề bảng chính sau khối, dòng giữ của khối, tiêu đề lệch nếu có) — AUD-HAR-452. Khối có dòng phân cách ở
+    dòng hai là một bảng có tiêu đề riêng: bảng đầu tiên của heading thành bảng chính; bảng sau cùng tiêu đề (so sau
+    `_header_cells`; đợt dời lặp) giữ dòng dữ liệu; bảng sau khác tiêu đề mà không có cột `ID`/`Trạng thái` (chú giải
+    `| Mức | Nghĩa |`) bỏ CẢ khối, kể cả dòng mở bằng `AUD-`; có cột kiểu sổ nhưng khác tiêu đề (đổi tên một cột) thì
+    fail-closed: GIỮ dòng dữ liệu (gán theo cột bảng chính) và trả tiêu đề lệch để báo lỗi. Khối không có dòng phân
+    cách là dòng nối tiếp của bảng chính (dòng dời sau ghi chú `> Đợt …`): giữ MỌI dòng bất kể số ô hay ô ID dị dạng
+    (rỗng, `` `AUD-…` ``, in đậm, chữ thường) để kiểm ID/`chỉ đã sửa` vẫn thấy; chưa có bảng chính thì không có cột để
+    gán — bỏ."""
+    own = _header_cells(block[0]) if len(block) > 1 and _is_rule_row(block[1]) else None
+    odd = own if own is not None and header is not None and own != header else None
+    if odd is not None and not any(c.casefold() in LEDGER_COLUMNS for c in odd):
+        return header, [], None
+    if own is None and header is None:
+        return None, [], None
+    main = own if header is None else header
+    head = block[:2] if header is None else []
+    rows = block[2:] if own is not None else block
+    return main, head + [ln for ln in rows if _header_cells(ln) not in (main, own)], odd
+
+
+def archive_tables(text: str, errors: Optional[List[str]] = None) -> Dict[str, List[Dict[str, str]]]:
+    """Bảng của sổ lưu trữ (AUD-HAR-450/451/452): chỉ giữ dòng `## ` và dòng bảng `|` — ghi chú `> Đợt …` và dòng trống
+    xen giữa các đợt dời không được cắt bảng (`md_tables` coi dòng không phải bảng là hết bảng nên mọi dòng dời sau ghi
+    chú đầu tiên lọt khỏi kiểm ID duy nhất và `chỉ đã sửa`). Nội dung trong code fence bị bỏ (ví dụ mẫu không phải bảng
+    thật). Mỗi heading chỉ có MỘT bảng, xét theo khối bảng (`_archive_block`): dòng lặp tiêu đề bị bỏ, bảng chú giải bị
+    bỏ, dòng nối tiếp ít/nhiều ô hơn tiêu đề vẫn giữ để không mất phát hiện; bảng kiểu sổ khác tiêu đề giữ dòng và ghi
+    lỗi vào `errors` (nếu có)."""
     kept: List[str] = []
     header: Optional[List[str]] = None
-    for ln in unfenced:
-        is_row = ln.lstrip().startswith("|")
-        if ln.startswith("## "):
-            header = None
-        elif not is_row:
+    heading = ""
+    for block in _row_blocks(_unfenced_lines(text)):
+        if block[0].startswith("## "):
+            header, heading = None, block[0][3:].strip()
+            kept += block
             continue
-        elif header is None:
-            header = split_md_row(ln)
-        else:
-            cells = split_md_row(ln)
-            if cells == header or (len(cells) < len(header) and not cells[0].startswith("AUD-")):
-                continue
-        kept.append(ln)
+        header, rows, odd = _archive_block(block, header)
+        kept += rows
+        if odd is not None and errors is not None:
+            errors.append(
+                f"`## {heading}`: bảng khác tiêu đề bảng chính (`| {' | '.join(odd)} |`) — dòng vẫn kiểm theo cột của"
+                " bảng chính; sửa tiêu đề cho khớp"
+            )
     return md_tables("\n".join(kept))
 
 
@@ -4636,7 +4701,9 @@ def _audit_archive_rows(status: Path, errors: List[str], counts: Dict[str, int])
     archive = audit_archive(status)
     if not archive.is_file():
         return []
-    tables = archive_tables(archive.read_text(encoding="utf-8"))
+    odd: List[str] = []
+    tables = archive_tables(archive.read_text(encoding="utf-8"), odd)
+    errors += [f"{archive.name}: {e}" for e in odd]
     if "Phát hiện" not in tables:
         errors.append(f"{archive.name}: thiếu bảng `## Phát hiện`")
     rows = tables.get("Phát hiện", [])
@@ -14696,6 +14763,34 @@ def _dev_candidate(base: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     return identity, [{"path": a["path"], "sha256": a["sha256"]} for a in arts]
 
 
+DEV_STDERR_BYTES = 8192  # cửa sổ cuối stderr của adapter đọc khi bước thất bại (AUD-A11Y-009)
+DEV_STDERR_LINES = 5
+DEV_STDERR_CHARS = 200
+
+
+def _adapter_said(errors: BinaryIO) -> List[str]:
+    """≤ DEV_STDERR_LINES dòng cuối khác rỗng của stderr adapter, mỗi dòng ≤ DEV_STDERR_CHARS ký tự; che bí mật trên CẢ
+    cửa sổ đọc trước khi cắt (như `redact_tail`). Cửa sổ chỉ là đuôi stderr nên che thêm hai chỗ `redact` không thấy:
+    dòng đầu cửa sổ có thể cắt dở (`sword=…` mất tên khoá) — bỏ; dòng `-----END … KEY-----` còn lại sau `redact` mất
+    BEGIN ở trước cửa sổ — thân khoá tới hết END thành `PEM_MASK` (AUD-SEC-142). Lời hướng dẫn của adapter (vd
+    `docker compose -p <project> down -v`) tới người dùng qua đây; sổ triển khai không giữ."""
+    size = errors.seek(0, os.SEEK_END)
+    start = max(0, size - DEV_STDERR_BYTES)
+    errors.seek(start)
+    raw = errors.read()
+    if start:
+        raw = raw.partition(b"\n")[2]
+    text = redact(raw.decode("utf-8", errors="replace"))
+    orphan = [m.end() for m in PEM_END_RE.finditer(text)]
+    if orphan:
+        text = PEM_MASK + text[orphan[-1] :]
+    return [ln.strip()[:DEV_STDERR_CHARS] for ln in text.splitlines() if ln.strip()][-DEV_STDERR_LINES:]
+
+
+def _adapter_lines(said: List[str]) -> str:
+    return "".join(f"\n  adapter {line}" for line in said)
+
+
 @dataclass
 class DevPreview:
     base: Path
@@ -14703,26 +14798,32 @@ class DevPreview:
     timeout: int
     subject: dict[str, Any]
     previous: str
-    keep: str = ""
+    keep: Optional[str] = (
+        None  # None = không biết slot trước → không đặt XT_DEPLOY_KEEP (adapter không dọn); "" = slot trống
+    )
+    failures: list[str] = field(default_factory=list)  # "<bước> (exit N): <dòng stderr>" của các bước thất bại
 
     def invoke(self, action: str) -> tuple[dict[str, Any], Optional[str]]:
-        """digest đọc giá trị quan sát ở đích; không truyền sẵn đáp án. Sổ không giữ stdout/stderr.
-        XT_DEPLOY_KEEP = digest của slot trước khi ghi đè: adapter dọn ảnh cũ không được xoá bản sổ còn trỏ tới."""
+        """digest đọc giá trị quan sát ở đích; không truyền sẵn đáp án. Sổ không giữ stdout/stderr; đuôi stderr của bước
+        thất bại vào `failures` để báo người dùng. XT_DEPLOY_KEEP = digest của slot trước khi ghi đè: adapter dọn ảnh cũ
+        không được xoá bản sổ còn trỏ tới."""
         cmd = f"{DEV_DRIVER} {action}"
         env = {k: v for k, v in os.environ.items() if not k.startswith("XT_DEPLOY_")}
         env.update(XT_DEPLOY_ENV="dev", XT_DEPLOY_STATE=str(self.state), XT_DEPLOY_ARTIFACTS="dist/app.tgz")
         if action != "digest":
-            env.update(
-                XT_DEPLOY_DIGEST=self.subject["digest"], XT_DEPLOY_PREVIOUS=self.previous, XT_DEPLOY_KEEP=self.keep
-            )
-        with tempfile.TemporaryFile() as sink:
-            rc = self.run(cmd.split(), env, sink)
+            env.update(XT_DEPLOY_DIGEST=self.subject["digest"], XT_DEPLOY_PREVIOUS=self.previous)
+            if self.keep is not None:
+                env["XT_DEPLOY_KEEP"] = self.keep
+        with tempfile.TemporaryFile() as sink, tempfile.TemporaryFile() as errors:
+            rc = self.run(cmd.split(), env, sink, errors)
             sink.seek(0)
             raw = sink.read(67)
+            if rc:
+                self.failures += [f"{action} (exit {rc}): {line}" for line in _adapter_said(errors)]
         digest = raw[:64].decode("ascii") if re.fullmatch(rb"[0-9a-f]{64}(?:\r?\n)?", raw) else None
         return {"cmd_sha256": hashlib.sha256(cmd.encode()).hexdigest(), "exit_code": rc}, digest
 
-    def run(self, argv: list[str], env: dict[str, str], sink: BinaryIO) -> int:
+    def run(self, argv: list[str], env: dict[str, str], sink: BinaryIO, errors: BinaryIO) -> int:
         try:
             proc = subprocess.Popen(
                 argv,
@@ -14730,7 +14831,7 @@ class DevPreview:
                 env=env,
                 stdin=subprocess.DEVNULL,
                 stdout=sink,
-                stderr=subprocess.DEVNULL,
+                stderr=errors,
                 start_new_session=True,
             )
         except OSError:
@@ -14816,7 +14917,8 @@ def _dev_write(base: Path, ledger: dict[str, Any]) -> None:
     write_atomic(path, json.dumps(_validate_deploy_ledger(ledger), ensure_ascii=False, indent=2) + "\n", keep_mode=True)
 
 
-def _dev_execute(base: Path, state: Path, timeout: int, explicit: bool) -> tuple[dict[str, Any], bool]:
+def _dev_execute(base: Path, state: Path, timeout: int, explicit: bool) -> tuple[dict[str, Any], bool, list[str]]:
+    """(biên nhận, thành công, đuôi stderr của các bước adapter thất bại)."""
     ledger = read_deploy_ledger(base)
     slot = ledger["envs"].setdefault("dev", {"current": None, "previous": None, "unknown": False})
     current, previous = slot["current"], slot["previous"]
@@ -14835,7 +14937,10 @@ def _dev_execute(base: Path, state: Path, timeout: int, explicit: bool) -> tuple
     if not explicit:
         check, _ = driver.invoke("candidate")
         if check["exit_code"]:
-            raise DeployError("không xác nhận được dist/app.tgz từ mã hiện tại; chạy pnpm build rồi thử lại")
+            raise DeployError(
+                "không xác nhận được dist/app.tgz từ mã hiện tại; chạy pnpm build rồi thử lại"
+                + _adapter_lines(driver.failures)
+            )
     # Nếu tiến trình bị ngắt sau khi chạm đích, lần sau chỉ có thể tin bản đã xác nhận sau khi smoke lại.
     slot.update(current=None, previous=target, unknown=True)
     _dev_write(base, ledger)
@@ -14851,7 +14956,7 @@ def _dev_execute(base: Path, state: Path, timeout: int, explicit: bool) -> tuple
         slot.update(current=target, previous=current if explicit else previous, unknown=False)
     ledger["events"].append(receipt)
     _dev_write(base, ledger)
-    return receipt, ok
+    return receipt, ok, driver.failures
 
 
 def cmd_deploy_dev(args: argparse.Namespace) -> int:
@@ -14859,11 +14964,13 @@ def cmd_deploy_dev(args: argparse.Namespace) -> int:
     try:
         timeout = _dev_preflight(base, args.env)
         with _dev_lock(base) as state:
-            receipt, ok = _dev_execute(base, state, timeout, args.deploy_cmd == "rollback")
+            receipt, ok, said = _dev_execute(base, state, timeout, args.deploy_cmd == "rollback")
     except (DeployError, OSError, ValueError, _ReleaseTreeError) as exc:
         print(f"✗ deploy dev: {exc}", file=sys.stderr)
         return 126 if isinstance(exc, DevGuardDenied) else 2
     print(json.dumps(receipt) if args.json else f"dev: {receipt['result']} — {receipt['url']} ({DEPLOY_LEDGER})")
+    for line in said:  # lời hướng dẫn của adapter khi bước thất bại (AUD-A11Y-009)
+        print(f"  adapter {line}", file=sys.stderr)
     return 0 if ok else 1
 
 

@@ -6,6 +6,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import unittest
 from pathlib import Path
 from unittest import mock
 
@@ -29,7 +30,14 @@ action = sys.argv[2]
 live = state / "live"
 with (state / "calls").open("a") as f:
     print(action, file=f)
+if action in ("deploy", "rollback"):
+    with (state / "keep").open("a") as f:
+        print(action, os.environ.get("XT_DEPLOY_KEEP", "<unset>"), file=f)
+if (state / "chatty").exists():
+    sys.stderr.write((state / "chatty").read_text())
 if (state / ("fail-" + action)).exists():
+    hint = state / ("hint-" + action)
+    sys.stderr.write(hint.read_text() if hint.exists() else "")
     sys.exit(9)
 if action == "deploy":
     artifact = Path(os.environ["XT_DEPLOY_ARTIFACTS"])
@@ -41,7 +49,7 @@ elif action == "rollback":
 elif action == "smoke":
     sys.exit(int((state / "bad-digest").exists() and live.read_text() == (state / "bad-digest").read_text()))
 elif action == "digest":
-    assert "XT_DEPLOY_DIGEST" not in os.environ and "XT_DEPLOY_PREVIOUS" not in os.environ
+    assert not {"XT_DEPLOY_DIGEST", "XT_DEPLOY_PREVIOUS", "XT_DEPLOY_KEEP"} & set(os.environ)
     sys.stdout.write((state / "answer").read_text() if (state / "answer").exists() else live.read_text() + chr(10))
 """
 
@@ -62,6 +70,7 @@ class DevPreviewCommandTest(TmpRepoCase):
                     "PATH": str(self.tmp) + os.pathsep + os.environ["PATH"],
                     "XT_DEPLOY_DIGEST": "inherited",
                     "XT_DEPLOY_PREVIOUS": "inherited",
+                    "XT_DEPLOY_KEEP": "inherited",
                     "GITHUB_ACTIONS": "false",
                 },
             )
@@ -220,12 +229,102 @@ class DevPreviewCommandTest(TmpRepoCase):
     def test_missing_timeout_and_interrupted_adapter_process(self):
         driver = xt.DevPreview(self.repo, self.state, 1, {"digest": "a" * 64}, "")
         with tempfile.TemporaryFile() as sink:
-            self.assertEqual(driver.run(["/missing-dev-preview-executable"], {}, sink), 127)
+            self.assertEqual(driver.run(["/missing-dev-preview-executable"], {}, sink, sink), 127)
             with mock.patch.object(xt, "_stop_group") as stop, mock.patch.object(subprocess, "Popen") as spawn:
                 spawn.return_value.wait.side_effect = subprocess.TimeoutExpired("fixture", 1)
-                self.assertEqual(driver.run(["node"], {}, sink), 124)
+                self.assertEqual(driver.run(["node"], {}, sink, sink), 124)
                 stop.assert_called_once_with(spawn.return_value)
                 spawn.return_value.wait.side_effect = KeyboardInterrupt
                 with self.assertRaises(KeyboardInterrupt):
-                    driver.run(["node"], {}, sink)
+                    driver.run(["node"], {}, sink, sink)
                 self.assertEqual(stop.call_count, 2)
+
+    def test_keep_reaches_deploy_and_rollback_only_and_none_means_unset(self):
+        """AUD-HAR-452 (2, 3): XT_DEPLOY_KEEP tới deploy/rollback (slot trống → chuỗi rỗng, không phải vắng), không tới
+        digest (fake assert — đột biến truyền KEEP cho digest làm deploy thất bại); DevPreview mặc định `keep=None` không
+        đặt biến (kể cả biến kế thừa của phiên) nên adapter không dọn ảnh."""
+        a = self.call()
+        self.dist.write_bytes(b"B")
+        b = self.call()
+        self.call("rollback")
+        digest_a, digest_b = a["subject"]["digest"], b["subject"]["digest"]
+        self.assertEqual(
+            (self.state / "keep").read_text().splitlines(),
+            ["deploy ", f"deploy {digest_a}", f"rollback {digest_b} {digest_a}"],
+        )
+        (self.state / "keep").unlink()
+        driver = xt.DevPreview(self.repo, self.state, 5, {"digest": digest_b}, digest_a)
+        self.assertIsNone(driver.keep)
+        self.assertEqual(driver.invoke("rollback")[0]["exit_code"], 0)
+        self.assertEqual((self.state / "keep").read_text(), "rollback <unset>\n")
+        self.assertEqual(driver.failures, [])
+
+    def test_adapter_stderr_reaches_user_on_failure_only(self):
+        """AUD-A11Y-009: stderr của bước adapter thất bại (vd hướng dẫn `docker compose -p <project> down -v`) tới người
+        dùng — ≤ 5 dòng cuối khác rỗng, mỗi dòng ≤ 200 ký tự, đã che bí mật; sổ không giữ; bước thành công không in gì
+        kể cả khi adapter có ghi stderr (đột biến "đọc stderr cả khi bước thành công" phải đỏ)."""
+        self.state.mkdir(parents=True)
+        (self.state / "chatty").write_text("Pulling image… done\n")
+        code, _, err = run_main("deploy", "run", "--env", "dev")
+        self.assertEqual((code, err), (0, ""))
+        self.assertEqual((self.state / "calls").read_text().splitlines(), ["candidate", "deploy", "smoke", "digest"])
+        (self.state / "chatty").unlink()
+        self.dist.write_bytes(b"B")
+        (self.state / "fail-deploy").touch()
+        hint = "Xoá dữ liệu dev bằng: docker compose -p xtdev0123 down -v — rồi triển khai lại."
+        noise = "".join(f"docker dòng {i}\n" for i in range(8))
+        (self.state / "hint-deploy").write_text(
+            noise + "\n\npassword=hunter2-secret\n" + "x" * 500 + "\n" + hint + "\n"
+        )
+        code, out, err = run_main("deploy", "run", "--env", "dev")
+        self.assertEqual(code, 1, err)
+        self.assertIn("dev: rolled_back", out)
+        lines = err.splitlines()
+        self.assertEqual(
+            lines[:2], ["  adapter deploy (exit 9): docker dòng 6", "  adapter deploy (exit 9): docker dòng 7"]
+        )
+        self.assertEqual(lines[-1], f"  adapter deploy (exit 9): {hint}")
+        self.assertEqual(len(lines), 5)
+        self.assertNotIn("hunter2", err)
+        self.assertIn("password=***", err)
+        self.assertIn("  adapter deploy (exit 9): " + "x" * 200 + "\n", err)
+        self.assertNotIn("x" * 201, err)
+        self.assertNotIn("down -v", self.ledger.read_text())
+        (self.state / "fail-deploy").unlink()
+        self.commit_files({"src/example.ts": "export const version = 'C';\n"}, 2)
+        (self.state / "fail-candidate").touch()
+        (self.state / "hint-candidate").write_text("Artifact chưa khớp mã hiện tại. Chạy node scripts/build.ts.\n")
+        err = self.error("run", "--env", "dev")
+        self.assertIn("pnpm build rồi thử lại\n  adapter candidate (exit 9): Artifact chưa khớp mã hiện tại.", err)
+
+
+class AdapterSaidTest(unittest.TestCase):
+    """AUD-A11Y-009 (review): `_adapter_said` chỉ đọc đuôi DEV_STDERR_BYTES của stderr — che bí mật cả ở ranh giới cửa
+    sổ: dòng đầu cắt dở (tên khoá nằm trước cửa sổ) bị bỏ; khoá PEM dài hơn cửa sổ (mất BEGIN) không lộ thân/END."""
+
+    def said(self, data: bytes) -> list[str]:
+        with tempfile.TemporaryFile() as f:
+            f.write(data)
+            return xt._adapter_said(f)
+
+    def test_window_cut_line_dropped(self):
+        line = "mật khẩu password=hunter2xyz ".encode() + b"z" * 8174 + b"\n"
+        self.assertGreater(len(line), xt.DEV_STDERR_BYTES)
+        self.assertEqual(self.said(line), [])
+        self.assertEqual(self.said(line + "cuối\n".encode()), ["cuối"])
+        exact = b"a\n" + b"b" * (xt.DEV_STDERR_BYTES - 3) + b"\n"  # vừa khít cửa sổ: dòng đầu đủ, giữ
+        self.assertEqual(self.said(exact), ["a", "b" * xt.DEV_STDERR_CHARS])
+        self.assertEqual(self.said(b"x" + exact), ["b" * xt.DEV_STDERR_CHARS])
+
+    def test_pem_longer_than_window_masked(self):
+        body = b"".join(b"MIIE" + str(i % 10).encode() * 60 + b"\n" for i in range(140))
+        pem = b"-----BEGIN PRIVATE KEY-----\n" + body + b"-----END PRIVATE KEY-----\n"
+        self.assertGreater(len(pem), xt.DEV_STDERR_BYTES)
+        self.assertEqual(self.said(pem), [xt.PEM_MASK])
+        tail = self.said(
+            b"truoc\n" + pem + b"sau khoa\n-----BEGIN RSA PRIVATE KEY-----\nAAAA\n-----END RSA PRIVATE KEY-----\n"
+        )
+        self.assertEqual(tail, [xt.PEM_MASK, "sau khoa", xt.PEM_MASK])
+        self.assertEqual(
+            self.said(b"-----BEGIN PRIVATE KEY-----\nMIIE\n-----END PRIVATE KEY-----\nok\n"), [xt.PEM_MASK, "ok"]
+        )

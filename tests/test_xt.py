@@ -2312,6 +2312,78 @@ class LedgerArchiveTest(unittest.TestCase):
         self.assertEqual(errors, ["AUD-SEC-009: sổ lưu trữ AUDIT-STATUS-ARCHIVE.md chỉ nhận dòng `đã sửa` (đang `mở`)"])
         self.assertEqual(counts["lưu trữ"], 2)
 
+    def test_archive_short_rows_with_malformed_id_kept(self):
+        """AUD-HAR-452 (1): dòng thiếu ô với ô ID dị dạng (rỗng, `` `AUD-…` ``, in đậm, chữ thường) vẫn là dòng của bảng
+        phát hiện — trong bảng chính lẫn khối nối tiếp sau ghi chú — nên vẫn bị kiểm; không lọc theo tiền tố `AUD-`."""
+        odd = ["", "`AUD-SEC-010`", "**AUD-SEC-011**", "aud-sec-012"]
+        rows = "".join(f"| {i} | 🔴 | mở | b | đo được: y |\n" for i in odd)
+        for text in (archive_text([self.FIXED]) + rows, archive_text([self.FIXED]) + "\n> Đợt 2\n\n" + rows):
+            with self.subTest(text=text):
+                self.assertEqual(self.ids(text), ["AUD-SEC-001", *odd])
+        self.books([], [self.FIXED])
+        (self.d / "AUDIT-STATUS-ARCHIVE.md").write_text(archive_text([self.FIXED]) + rows, encoding="utf-8")
+        errors, counts = self.check()
+        self.assertEqual(counts["lưu trữ"], 5)
+        self.assertIn("(dòng thiếu ID): sổ lưu trữ AUDIT-STATUS-ARCHIVE.md chỉ nhận dòng `đã sửa` (đang `mở`)", errors)
+
+    def test_archive_legend_rows_starting_with_aud_ignored(self):
+        """AUD-HAR-452 (1): bảng chú giải (tiêu đề + phân cách riêng, khác tiêu đề bảng chính) bỏ cả khối, kể cả dòng mở
+        bằng `AUD-`; khối `|` không phân cách đứng trước bảng chính không có cột để gán — bỏ; bảng lặp đúng tiêu đề
+        (kể cả dòng lặp tiêu đề nằm liền trong khối) không thành phát hiện."""
+        legend = "\n| Mã | Nghĩa |\n|---|---|\n| AUD-SEC | nhóm bảo mật |\n| AUD-HAR | nhóm harness |\n"
+        self.assertEqual(self.ids(archive_text([self.FIXED]) + legend), ["AUD-SEC-001"])
+        stray = "## Phát hiện\n\n| AUD-SEC-020 | lạc |\n\n" + FINDING_HEAD + "| " + self.FIXED + " |\n"
+        self.assertEqual(self.ids(stray), ["AUD-SEC-001"])
+        inline = (
+            archive_text([self.FIXED]) + FINDING_HEAD.splitlines()[0] + "\n| " + self.FIXED.replace("1", "2") + " |\n"
+        )
+        self.assertEqual(self.ids(inline), ["AUD-SEC-001", "AUD-SEC-002"])
+        self.assertEqual(self.ids("| a |\n|---|\n| b |\n## Phát hiện\n" + FINDING_HEAD), [])  # bảng trước heading
+        self.assertFalse(xt._is_rule_row("| | |"))
+
+    def test_archive_batch_header_compared_after_nfc_and_trailing_empty_cells(self):
+        """AUD-HAR-452 (review): đợt dời lặp tiêu đề gõ dạng NFD hoặc thừa ô rỗng cuối vẫn là CÙNG bảng — dòng `mở` của đợt
+        đó vẫn bị kiểm (trước đây khác tiêu đề nên bỏ cả khối im lặng); dòng lặp tiêu đề không thành phát hiện."""
+        head, rule = FINDING_HEAD.splitlines()
+        batch = "| " + self.OPEN + " |\n"
+        for variant in (unicodedata.normalize("NFD", head), head + " |", unicodedata.normalize("NFD", head) + "  |  |"):
+            with self.subTest(variant=variant):
+                text = (
+                    archive_text([self.FIXED]) + "\n> Đợt 2\n\n" + variant + "\n" + rule + "\n" + batch + variant + "\n"
+                )
+                self.assertEqual(self.ids(text), ["AUD-SEC-001", "AUD-SEC-002"])
+        main = "## Phát hiện\n\n" + head + " |\n" + rule + "\n| " + self.FIXED + " |\n\n> Đợt 2\n\n"
+        self.assertEqual(self.ids(main + head + "\n" + rule + "\n" + batch), ["AUD-SEC-001", "AUD-SEC-002"])
+        self.assertEqual(xt._header_cells("|  |  |"), [])
+
+    def test_archive_renamed_column_batch_kept_and_reported(self):
+        """AUD-HAR-452 (review): bảng kiểu sổ (có cột `ID`/`Trạng thái`, không phân biệt hoa thường) mà khác tiêu đề bảng
+        chính (đổi tên một cột) KHÔNG bị coi là chú giải: dòng vẫn giữ theo cột bảng chính (dòng `mở`, ID trùng vẫn bị
+        bắt) và `audit check` báo rõ "bảng khác tiêu đề" (fail-closed); chú giải thật (không cột kiểu sổ) vẫn bỏ im lặng."""
+        head, rule = FINDING_HEAD.splitlines()
+        renamed = head.replace("Ghi chú", "Ghi chu")
+        dup = "| " + self.FIXED + " |\n"
+        text = archive_text([self.FIXED]) + "\n> Đợt 2\n\n" + renamed + "\n" + rule + "\n| " + self.OPEN + " |\n" + dup
+        self.assertEqual(self.ids(text), ["AUD-SEC-001", "AUD-SEC-002", "AUD-SEC-001"])
+        lower = "| id | Ý nghĩa |\n|---|---|\n| AUD-SEC-030 | x |\n"
+        self.assertEqual(self.ids(archive_text([self.FIXED]) + "\n" + lower), ["AUD-SEC-001", "AUD-SEC-030"])
+        self.status.write_text(audit_status_text(findings=[]), encoding="utf-8")
+        (self.d / "AUDIT-STATUS-ARCHIVE.md").write_text(text, encoding="utf-8")
+        errors, counts = self.check()
+        self.assertEqual(
+            errors,
+            [
+                "AUDIT-STATUS-ARCHIVE.md: `## Phát hiện`: bảng khác tiêu đề bảng chính (`| ID | Mức | Trạng thái | Tóm tắt"
+                " | Bằng chứng | Gate | Ghi chu |`) — dòng vẫn kiểm theo cột của bảng chính; sửa tiêu đề cho khớp",
+                "AUD-SEC-002: sổ lưu trữ AUDIT-STATUS-ARCHIVE.md chỉ nhận dòng `đã sửa` (đang `mở`)",
+                "AUD-SEC-001: ID trùng 2 lần",
+            ],
+        )
+        self.assertEqual(counts["lưu trữ"], 3)
+        legend = "\n| Mức | Nghĩa |\n|---|---|\n| AUD-SEC-031 | mở |\n"
+        (self.d / "AUDIT-STATUS-ARCHIVE.md").write_text(archive_text([self.FIXED]) + legend, encoding="utf-8")
+        self.assertEqual(self.check()[0], [])
+
     def test_no_archive_keeps_counts(self):
         self.books([self.FIXED])
         errors, counts = self.check()
@@ -2450,6 +2522,14 @@ class ChangelogReleaseLineTest(unittest.TestCase):
                     self.check(self.NEW + bad + "\n\n" + self.OLD),
                     [f"`{bad}`: ranh giới dòng phải đúng dạng `{xt.CHANGELOG_LINE_PREFIX} X-Templates (đến X.Y.Z)`"],
                 )
+
+    def test_real_boundary_matches_legacy_release_tags(self):
+        """AUD-HAR-453 (1): số trong ranh giới `(đến X.Y.Z)` của CHANGELOG.md thật thuộc `LEGACY_RELEASE_TAGS` và ngược
+        lại — dời ranh giới hay thêm tag kế thừa mà quên nguồn kia thì đỏ."""
+        lines = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8").splitlines()
+        found = {m[1] for ln in lines if (m := xt.CHANGELOG_LINE_RE.fullmatch(ln.rstrip()))}
+        self.assertEqual(found, {".".join(map(str, tag)) for tag in xt.LEGACY_RELEASE_TAGS})
+        self.assertEqual(len(found), 1)
 
 
 class DecisionLogsTest(unittest.TestCase):

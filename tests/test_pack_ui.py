@@ -2,6 +2,7 @@
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -23,6 +24,82 @@ BROWSER = "tests_e2e/prepare-chromium.sh"
 LOCK = "tests_e2e/requirements.txt"
 TOOLS = ".github/actions/xt-ci-tools/action.yml"
 TEST_DB = "scripts/test-with-postgres.sh"
+NODE = shutil.which("node")
+
+# DOM tối thiểu để chạy app.js thật trong Node: đăng nhập, rồi mỗi ca bắt đầu khi ô nhập đang bị
+# đánh dấu sau một lần gửi rỗng, gửi lại với phản hồi server cho trước và ghi thuộc tính ARIA của ô nhập.
+NOTES_DOM = r"""
+class HTMLButtonElement {}
+class Node {
+  constructor(id) {
+    this.id = id;
+    this.attributes = new Map();
+    this.handlers = {};
+    this.children = [];
+    this.textContent = "";
+    this.value = "";
+    this.hidden = false;
+    this.disabled = false;
+    this.classList = { toggle() {}, remove() {} };
+  }
+  setAttribute(name, value) { this.attributes.set(name, String(value)); }
+  removeAttribute(name) { this.attributes.delete(name); }
+  getAttribute(name) { return this.attributes.get(name) ?? null; }
+  addEventListener(type, handler) { this.handlers[type] = handler; }
+  scrollIntoView() {}
+  focus() { document.activeElement = this; }
+  reset() { this.value = ""; }
+  replaceChildren(...items) { this.children = items; }
+  prepend(item) { this.children.unshift(item); }
+  append(...items) { this.children.push(...items); }
+  closest() { return null; }
+}
+const nodes = new Map();
+globalThis.HTMLButtonElement = HTMLButtonElement;
+globalThis.document = {
+  activeElement: null,
+  getElementById(id) {
+    if (!nodes.has(id)) nodes.set(id, new Node(id));
+    return nodes.get(id);
+  },
+  createElement: (tag) => new Node(tag),
+  querySelectorAll: () => [],
+};
+let reply = null;
+globalThis.fetch = async (path) => {
+  if (path === "/v1/login") return { ok: true, status: 200, json: async () => ({ token: "t" }) };
+  if (reply === "offline") throw new TypeError("fetch failed");
+  if (reply === null) return { ok: true, status: 200, json: async () => ({ notes: [] }) };
+  return { ok: false, status: reply, json: async () => ({}) };
+};
+await import(process.env.NOTES_APP);
+const el = (id) => document.getElementById(id);
+const submit = async (id) => {
+  el(id).handlers.submit({ preventDefault() {} });
+  await new Promise((done) => setTimeout(done, 20));
+};
+await submit("login-form");
+const body = el("note-body");
+const seen = {};
+for (const status of ["empty", 400, 422, 401, 500, 503, "offline"]) {
+  body.value = "";
+  await submit("note-form");
+  if (status !== "empty") {
+    reply = status;
+    body.value = "Ghi chú";
+    await submit("note-form");
+    reply = null;
+  }
+  seen[status] = {
+    invalid: body.getAttribute("aria-invalid"),
+    describedby: body.getAttribute("aria-describedby"),
+    message: el("note-status").textContent || el("login-status").textContent,
+  };
+  // 401 trả người dùng về màn đăng nhập: đăng nhập lại cho ca kế.
+  if (status === 401) await submit("login-form");
+}
+console.log(JSON.stringify(seen));
+"""
 
 
 class PackUiTest(unittest.TestCase):
@@ -127,6 +204,7 @@ class PackUiTest(unittest.TestCase):
         self.assertIn('"aria-invalid", "true"', script)
         self.assertIn('"aria-describedby", noteStatus.id', script)
         self.assertIn('removeAttribute("aria-invalid")', script)
+        self.assertIn("error instanceof InvalidInput", script)
         self.assertLess(script.index("const focused = document.activeElement"), script.index("button.disabled = true"))
         self.assertIn("focused.focus(", script)
 
@@ -142,6 +220,36 @@ class PackUiTest(unittest.TestCase):
         border = css.split("input,\ntextarea {")[1].split("border: 1px solid ")[1].split(";")[0]
         self.assertGreaterEqual(contrast(border, "#e2eadc"), 3.0)
         self.assertGreaterEqual(contrast(border, "#ffffff"), 3.0)
+
+    @unittest.skipUnless(NODE, "cần node")
+    def test_notes_ui_marks_input_invalid_only_for_data_errors(self):
+        """Rỗng, 400/422 gắn lỗi vào ô nhập; lỗi mạng, phiên, 5xx chỉ ở vùng thông báo và gỡ dấu cũ."""
+        run = subprocess.run(
+            [NODE, "--input-type=module", "-e", NOTES_DOM],
+            env={**os.environ, "NOTES_APP": (STARTER / "src/notes-ui/app.js").as_uri()},
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        self.assertEqual(run.returncode, 0, run.stderr)
+        seen = json.loads(run.stdout)
+        for case in ("empty", "400", "422"):
+            with self.subTest(case=case):
+                self.assertEqual(seen[case]["invalid"], "true")
+                self.assertEqual(seen[case]["describedby"], "note-status")
+        self.assertEqual(seen["empty"]["message"], "Hãy nhập nội dung ghi chú.")
+        self.assertEqual(seen["422"]["message"], "Nội dung chưa hợp lệ. Hãy kiểm tra rồi thử lại.")
+        expected = {
+            "401": "Phiên đã hết hạn. Hãy đăng nhập lại.",
+            "500": "Yêu cầu chưa hoàn tất. Vui lòng thử lại.",
+            "503": "Dịch vụ đang bận. Vui lòng thử lại sau.",
+            "offline": "Mất kết nối. Hãy kiểm tra mạng và tải lại.",
+        }
+        for case, message in expected.items():
+            with self.subTest(case=case):
+                self.assertIsNone(seen[case]["invalid"])
+                self.assertIsNone(seen[case]["describedby"])
+                self.assertEqual(seen[case]["message"], message)
 
     def test_failed_prerequisite_preserves_previous_proof_under_separate_name(self):
         with tempfile.TemporaryDirectory() as tmp:
