@@ -1,4 +1,4 @@
-# AUDIT-REPORT — X-Templates · 2026-10-25 (delta `00ead5f..daefc7c`)
+# AUDIT-REPORT — X-Office · 2026-10-25 (delta `00ead5f..daefc7c`)
 
 > Commit quét: `main` `daefc7c` (3.25.0) · Phạm vi: delta `00ead5f..daefc7c` (#261 sổ audit, #262 ADR-0047 / 3.24.0, #263 ADR-0048 /
 > 3.25.0; D-176…D-183) — nhóm 1 ARCH, 2 SEC, 3 CODE, 4 TEST, 8 CI, 9 DOC, 11 CFG, 12 XFEAT, 13 HAR · Lý do: `release-check` NO-GO hàng

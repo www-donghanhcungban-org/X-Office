@@ -1,4 +1,4 @@
-# AUDIT-REPORT — X-Templates · 2026-11-11 (delta)
+# AUDIT-REPORT — X-Office · 2026-11-11 (delta)
 
 > Mốc quét `454d146..7ca87a6` trên `main` (TEST từ `c9f62ce`, A11Y từ `6acc573`, DATA từ `80566f7`). Sáu cụm reviewer read-only chạy trong một workflow, mỗi 🔴/🟠 một người xác minh độc lập (`reviewer-alt`, effort cao nhất, không nhận lý luận của người tìm), rồi một lượt đo hiệu năng chạy một mình. Kết quả theo ID ở [sổ audit](AUDIT-STATUS.md); kế hoạch sửa: [PLAN-harden-2026-11-11](../autopilot/PLAN-harden-2026-11-11.md) (D-416).
 

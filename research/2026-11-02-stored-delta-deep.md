@@ -7,7 +7,7 @@ updated: 2026-11-02
 # Đề xuất từ stored (đợt 2026-11-01/02)
 
 Bổ sung cho [`2026-11-01-stored-delta-upgrade.md`](2026-11-01-stored-delta-upgrade.md) (không sửa file đó). Ký hiệu `NN §x` là chuyên mục NN,
-mục x của catalog. **File này chỉ là đề xuất**: chưa thêm ID, chưa sửa `framework/`; phiên X-Templates tự xác minh, cấp số ID và ghi
+mục x của catalog. **File này chỉ là đề xuất**: chưa thêm ID, chưa sửa `framework/`; phiên X-Office tự xác minh, cấp số ID và ghi
 `CHANGELOG.md` khi nâng cấp.
 
 ## 1. Phạm vi

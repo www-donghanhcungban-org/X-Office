@@ -8,6 +8,7 @@ import {
   lstatSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   renameSync,
   rmSync,
@@ -44,9 +45,19 @@ function stateDirectory() {
   return expected;
 }
 
-function readAccess(state, create = false) {
+// Passing docker allows creating the password book. Never pruned: see `prune`.
+function readAccess(state, docker = null) {
   const file = join(state, "preview-access.json");
-  if (create && !existsSync(file)) {
+  if (docker && !existsSync(file)) {
+    // A new book would not open the database volume initialised with the lost password.
+    const volume = `${project()}_db`;
+    const volumes = docker.output(["volume", "ls", "--quiet", "--filter", `name=${volume}`]).split("\n");
+    if (volumes.includes(volume)) {
+      throw new Error(
+        `Mất sổ mật khẩu dev nhưng volume ${volume} còn dữ liệu với mật khẩu cũ. ` +
+          `Xoá dữ liệu dev bằng: docker compose -p ${project()} down -v — rồi triển khai lại.`,
+      );
+    }
     mkdirSync(state, { recursive: true, mode: 0o700 });
     const generate = () => randomBytes(32).toString("hex");
     const access = {
@@ -92,22 +103,84 @@ function localDocker() {
     "COMPOSE_FILE",
     "COMPOSE_PROFILES",
     "COMPOSE_ENV_FILES",
+    "XT_SKIP_MIGRATE",
   ])
     delete env[key];
-  return (args, extra = {}) =>
+  const docker = (args, extra = {}) =>
     execFileSync("docker", ["--host", endpoint, ...args], {
       env: { ...env, ...extra },
       stdio: ["ignore", "inherit", "inherit"],
     });
+  docker.output = (args) =>
+    execFileSync("docker", ["--host", endpoint, ...args], {
+      env,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "inherit"],
+    });
+  return docker;
 }
 
-function compose(docker, access, file, image, ...args) {
+// Rollback runs an older image on a database a newer image may have migrated: the older migrator rejects
+// migrations it does not know, so rollback skips them (compose.yaml, service setup).
+function compose(docker, access, file, image, args, skipMigrate = false) {
   docker(["compose", "--env-file", "/dev/null", "-f", file, "-p", project(), ...args], {
     XT_PREVIEW_IMAGE: image,
     XT_PREVIEW_DB_PASSWORD: access.database,
     XT_DEMO_OWNER_PASSWORD: access.owner.password,
     XT_DEMO_GUEST_PASSWORD: access.guest.password,
+    XT_SKIP_MIGRATE: skipMigrate ? "1" : "0",
   });
+}
+
+const STAGED = /^([a-f0-9]{64})\.(?:image\.tar|image\.tmp|compose\.yaml|compose\.tmp)$/;
+
+// Digests a rollback may still need. The coordinator rewrites the dev slot to {current: null, previous:
+// target} before calling the adapter, so the slot it held before this run is rebuilt from the ledger
+// history: the two most recent distinct digests confirmed as served.
+function retained(...digests) {
+  const keep = new Set(digests.filter(Boolean).map(validatedDigest));
+  const ledger = JSON.parse(readFileSync("docs/ops/DEPLOYS.json", "utf8"));
+  const slot = ledger.envs?.dev ?? {};
+  for (const entry of [slot.current, slot.previous]) {
+    if (entry) keep.add(validatedDigest(entry.subject?.digest));
+  }
+  const served = [];
+  for (const event of [...(ledger.events ?? [])].reverse()) {
+    if (served.length === 2) break;
+    if (event.env !== "dev" || !["deployed", "rolled_back"].includes(event.result)) continue;
+    const digest = validatedDigest(event.served_digest);
+    if (!served.includes(digest)) served.push(digest);
+  }
+  for (const digest of served) keep.add(digest);
+  return keep;
+}
+
+// Best effort after the app is up: removes saved images (≥ 80 MB each), Compose files and image tags no
+// longer reachable by a rollback. Only files named <digest>.<kind> are touched; preview-access.json and
+// coordinator.lock stay. Any doubt about the ledger keeps everything.
+function prune(docker, state, ...digests) {
+  let keep;
+  try {
+    keep = retained(...digests);
+  } catch (error) {
+    console.error(`Bỏ qua dọn ảnh dev cũ: ${error.message}`);
+    return;
+  }
+  for (const name of readdirSync(state)) {
+    const match = STAGED.exec(name);
+    if (match && !keep.has(match[1])) rmSync(join(state, name), { force: true });
+  }
+  const remove = (args) => {
+    try {
+      return docker.output(args);
+    } catch (error) {
+      console.error(`Không gỡ được ảnh dev cũ: ${error.message}`);
+      return "";
+    }
+  };
+  for (const tag of remove(["image", "ls", "--format", "{{.Tag}}", project()]).split("\n")) {
+    if (/^[a-f0-9]{64}$/.test(tag) && !keep.has(tag)) remove(["image", "rm", `${project()}:${tag}`]);
+  }
 }
 
 function stageImage(docker, state, digest) {
@@ -223,26 +296,17 @@ async function main(action) {
   }
   if (action === "smoke") return smoke(readAccess(state));
   if (action === "stop")
-    return compose(localDocker(), readAccess(state), `${cfg}/compose.yaml`, "xt-dev:local", "down");
+    return compose(localDocker(), readAccess(state), `${cfg}/compose.yaml`, "xt-dev:local", ["down"]);
   if (action !== "deploy" && action !== "rollback") throw new Error("Lệnh dev không hợp lệ");
   const rollback = action === "rollback";
   const digest = validatedDigest(rollback ? process.env.XT_DEPLOY_PREVIOUS : process.env.XT_DEPLOY_DIGEST);
   const docker = localDocker();
-  const access = readAccess(state, !rollback);
+  const access = readAccess(state, rollback ? null : docker);
   if (rollback) docker(["image", "load", "-i", join(state, `${digest}.image.tar`)]);
   else stageImage(docker, state, digest);
-  compose(
-    docker,
-    access,
-    join(state, `${digest}.compose.yaml`),
-    imageTag(digest),
-    "up",
-    "-d",
-    "--wait",
-    "--wait-timeout",
-    "120",
-    ...(rollback ? ["--pull", "never"] : []),
-  );
+  const up = ["up", "-d", "--wait", "--wait-timeout", "120", ...(rollback ? ["--pull", "never"] : [])];
+  compose(docker, access, join(state, `${digest}.compose.yaml`), imageTag(digest), up, rollback);
+  prune(docker, state, process.env.XT_DEPLOY_DIGEST, process.env.XT_DEPLOY_PREVIOUS);
 }
 
 main(process.argv[2]).catch((error) => {

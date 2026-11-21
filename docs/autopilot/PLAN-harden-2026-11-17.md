@@ -1,4 +1,4 @@
-# PLAN harden X-Templates 2026-11-17 — đợt 2 (🟠)
+# PLAN harden X-Office 2026-11-17 — đợt 2 (🟠)
 
 > Duyệt: D-496 (phiên chính tự duyệt) · Blueprint: BLUEPRINT.md · Quy trình: ADR-0080 (D-494) · Đợt trước: PLAN-harden-2026-11-16 (🔴 = 0)
 

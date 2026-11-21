@@ -1,4 +1,4 @@
-# PLAN-3.21-single-loop.md — Khung X-Templates · một vòng lặp agent hay agent con chuyên biệt: đổi tiêu chí, giữ harness, đo trước → bản 3.20.0
+# PLAN-3.21-single-loop.md — Khung X-Office · một vòng lặp agent hay agent con chuyên biệt: đổi tiêu chí, giữ harness, đo trước → bản 3.20.0
 
 > Lập ngày 2026-10-24. Chủ repo gửi bài claude.com *Building agents: When to fold subagents into your main agent loop*
 > (2026-10-22) + kit `anthropics/single-agent-loop-kit`, yêu cầu kiểm chứng rồi "lập PLAN cho mục 1 và 2 rồi làm" (mục 1 =

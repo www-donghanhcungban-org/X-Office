@@ -4,7 +4,7 @@ kind: research
 updated: 2026-10-21
 ---
 
-# Nâng khung X-Templates lên tầng mới — nghiên cứu 2026-10-21
+# Nâng khung X-Office lên tầng mới — nghiên cứu 2026-10-21
 
 Đầu vào: yêu cầu chủ repo 2026-10-21 *"nghiên cứu nâng bộ khung này lên tầng cao mới, code nhanh hơn, tự động tối đa,
 chất lượng tối đa"*. Khung đang ở 3.12.0 (`cd17588`), vừa xong PLAN-3.12 (tinh gọn) và cài cho hai dự án đích.

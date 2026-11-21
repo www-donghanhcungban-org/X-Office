@@ -3,10 +3,10 @@
 > G8 Vận hành & tiến hoá (3.34.0, `harden`, D-136) · 2026-11-20
 
 ## Đang làm
-- 2026-11-20 `/complete` xong tới gói nghiệm thu: audit delta `fe5f1e8..ce0e3c8` (#17–#19, 0 🔴, 🟠 mở 0), `release-check` **GO** ở `dcccb48`; chưa ký §5/cắt bản (cắt cùng 3.35.0); chưa quét gitleaks/semgrep/zizmor, đo thật. Trước đó **3.34.0 phát hành** (tag `v3.34.0` của X-Templates; giới hạn guard ở `harness-files.md`, hạn 2027-01-21); 🟠 chấp nhận AUD-DEP-037 (D-514).
+- 2026-11-20 `/complete` xong tới gói nghiệm thu: audit delta `fe5f1e8..ce0e3c8` (#17–#19, 0 🔴, 🟠 mở 0), `release-check` **GO** ở `dcccb48`; chưa ký §5/cắt bản (cắt cùng 3.35.0); chưa quét gitleaks/semgrep/zizmor, đo thật. Trước đó **3.34.0 phát hành** (tag `v3.34.0` của X-Office; giới hạn guard ở `harness-files.md`, hạn 2027-01-21); 🟠 chấp nhận AUD-DEP-037 (D-514).
 - ADR-0081 (D-511, #673): `compose` giữ quy mô cũ, mặc định mới S; `doctor` ở build không cảnh báo chậm MINOR/PATCH ([đo dự án đích](research/2026-11-19-target-project-speed.md)). Nâng khung kèm `actions/setup-python` 3.15.2 ở CI dự án gọi `xt.py` (ADR-0078).
 - D-522/523: trình MVP sau smoke. [Vòng sửa–thử nhanh](docs/adr/0085-fast-development-feedback.md) cho gói web, PLAN và CI.
-- **Factory** ([ADR-0083](docs/adr/0083-factory-lifecycle-flow.md), X-Templates D-521): ba giai đoạn, nghiệm thu trên repo mới, receipt vào release/registry, diễn tập bàn giao và kiểm SLO. Nợ và điều kiện lên production ở [PLAN](docs/autopilot/PLAN-factory-e2e.md).
+- **Factory** ([ADR-0083](docs/adr/0083-factory-lifecycle-flow.md), D-521): ba giai đoạn, nghiệm thu trên repo mới, receipt vào release/registry, diễn tập bàn giao và kiểm SLO. Nợ và điều kiện lên production ở [PLAN](docs/autopilot/PLAN-factory-e2e.md).
 - Dự án đích ([registry](docs/ops/registry.json)): X-Company #114, xboss #747, dhcb #1506 đã nâng 3.34.0; hotel-manager #159 mở, chờ chủ dự án xử lý check đỏ có từ trước (`dep-audit` Next 16.x, ngoại lệ zod quá hạn, test `expected 410 to be 200`, `schema-compat`). Còn mở: AUD-TEST-061 (CodeQL); fixture host Codex/Gemini.
 - D-457: PLAN factory-A/BE đã lưu kho. `LOOP-ORCH-020`: chỉ tăng agent khi có số. 10 nhóm `cong-cu` chờ phân loại ([TARGETS](docs/ops/TARGETS.md)). Hoãn: T-1690/T-1691 (quét lại SEC-091…099); rà `seeker19110/stored` chờ chủ repo (hạn xét 2026-12-31).
 
@@ -34,5 +34,5 @@
 - Coverage cục bộ < 100 % khi `coverage` cài ở site người dùng: hook chạy `python3 -I` nên tiến trình con không được đo — CI là cổng coverage (đo 2026-11-05).
 
 ## Bàn giao phiên
-- Mốc X-Office: `41f1d20` (#20); đồng bộ X-Templates #691. Mở `python3 scripts/xt.py app` để thử Văn phòng; chạy `python3 -m unittest tests.test_app_office` và `python3 scripts/xt.py app --smoke` trước khi trình.
+- Mốc X-Office: `41f1d20` (#20). Mở `python3 scripts/xt.py app` để thử Văn phòng; chạy `python3 -m unittest tests.test_app_office` và `python3 scripts/xt.py app --smoke` trước khi trình.
 - Container mới: `scripts/dev-task.sh setup`; trước khi đẩy `gate-fast`, CI là cổng đầy đủ. Subagent dùng scratch riêng dưới `/home/liend` (không `/tmp`: tmpfs, mất khi khởi động lại). Gate cục bộ: `coverage` và `pip` phải ở site-packages của `python3` (hook chạy `python3 -I`) — venv 3.15 đầu PATH; G7 cần `fetch --unshallow --tags`; `release-check` chạy ở worktree sạch (`.agents/`, `.codex/` chưa commit làm hàng `tree` đỏ).

@@ -146,7 +146,7 @@ input,
 textarea {
   width: 100%;
   padding: 0.7rem 0.85rem;
-  border: 1px solid #87988e;
+  border: 1px solid #6b7f74;
   border-radius: 0.45rem;
   color: var(--ink);
   background: #fff;
@@ -235,6 +235,9 @@ button:disabled {
 #empty {
   padding-block: 1.25rem;
   color: var(--muted);
+}
+.status {
+  scroll-margin-bottom: 1rem;
 }
 .status:not(:empty),
 noscript {

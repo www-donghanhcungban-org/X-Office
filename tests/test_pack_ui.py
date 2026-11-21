@@ -113,6 +113,36 @@ class PackUiTest(unittest.TestCase):
                 self.assertEqual(result.returncode == 0, success, result.stderr)
                 self.assertEqual(trace.read_text().splitlines(), expected)
 
+    def test_notes_ui_keeps_focus_and_shows_feedback_next_to_the_form(self):
+        ui = STARTER / "src/notes-ui"
+        html = (ui / "index.html").read_text(encoding="utf-8")
+        script = (ui / "app.js").read_text(encoding="utf-8")
+        css = (ui / "app.css").read_text(encoding="utf-8")
+        login_form = html.split('<form id="login-form"')[1].split("</form>")[0]
+        note_form = html.split('<form id="note-form"')[1].split("</form>")[0]
+        self.assertIn('id="login-status"', login_form)
+        self.assertIn('id="note-status"', note_form)
+        self.assertEqual(html.count('aria-live="polite"'), 3)
+        self.assertNotIn('id="status"', html)
+        self.assertIn('"aria-invalid", "true"', script)
+        self.assertIn('"aria-describedby", noteStatus.id', script)
+        self.assertIn('removeAttribute("aria-invalid")', script)
+        self.assertLess(script.index("const focused = document.activeElement"), script.index("button.disabled = true"))
+        self.assertIn("focused.focus(", script)
+
+        def luminance(color):
+            channels = [int(color[i : i + 2], 16) / 255 for i in (1, 3, 5)]
+            lin = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in channels]
+            return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]
+
+        def contrast(a, b):
+            high, low = sorted((luminance(a), luminance(b)), reverse=True)
+            return (high + 0.05) / (low + 0.05)
+
+        border = css.split("input,\ntextarea {")[1].split("border: 1px solid ")[1].split(";")[0]
+        self.assertGreaterEqual(contrast(border, "#e2eadc"), 3.0)
+        self.assertGreaterEqual(contrast(border, "#ffffff"), 3.0)
+
     def test_failed_prerequisite_preserves_previous_proof_under_separate_name(self):
         with tempfile.TemporaryDirectory() as tmp:
             proof = Path(tmp) / "report.json"

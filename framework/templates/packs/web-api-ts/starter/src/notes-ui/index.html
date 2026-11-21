@@ -26,6 +26,7 @@
             <label for="password">Mật khẩu</label>
             <input id="password" type="password" autocomplete="current-password" maxlength="1000" required />
             <button type="submit" class="primary">Đăng nhập</button>
+            <p id="login-status" class="status" role="status" aria-live="polite" aria-atomic="true"></p>
           </form>
         </div>
       </section>
@@ -38,6 +39,7 @@
               <label for="note-body">Nội dung</label>
               <textarea id="note-body" rows="6" maxlength="10000" required></textarea>
               <button type="submit" class="primary">Lưu ghi chú</button>
+              <p id="note-status" class="status" role="status" aria-live="polite" aria-atomic="true"></p>
             </form>
           </section>
           <section class="entries" aria-labelledby="entries-title">
@@ -45,12 +47,12 @@
               <h2 id="entries-title">Mới nhất</h2>
               <button id="refresh" type="button" class="quiet">Tải lại</button>
             </div>
+            <p id="list-status" class="status" role="status" aria-live="polite" aria-atomic="true"></p>
             <p id="empty" hidden>Nhóm chưa có ghi chú nào.</p>
             <ul id="notes-list"></ul>
           </section>
         </div>
       </section>
-      <p id="status" class="status" role="status" aria-live="polite" aria-atomic="true"></p>
     </main>
   </body>
 </html>

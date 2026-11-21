@@ -7,10 +7,31 @@ services:
     volumes:
       - db:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "xt_preview"]
+      # TCP, not the Unix socket: the image's init server listens on the socket only, then restarts.
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres", "-d", "xt_preview"]
       interval: 2s
       timeout: 3s
       retries: 30
+  # One-shot step: migrations and demo accounts. Demo passwords never reach the long-running app process.
+  # Rollback starts an older image on a database that a newer image already migrated: the adapter sets
+  # XT_SKIP_MIGRATE=1 there, because the older migrator rejects migrations it does not know.
+  setup:
+    image: ${XT_PREVIEW_IMAGE:?missing local dev image}
+    pull_policy: never
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://postgres:${XT_PREVIEW_DB_PASSWORD}@db:5432/xt_preview
+      XT_DEMO_OWNER_PASSWORD: ${XT_DEMO_OWNER_PASSWORD:?missing dev owner password}
+      XT_DEMO_GUEST_PASSWORD: ${XT_DEMO_GUEST_PASSWORD:?missing dev guest password}
+      XT_SKIP_MIGRATE: ${XT_SKIP_MIGRATE:?missing migration mode (0 or 1)}
+    healthcheck:
+      disable: true
+    command:
+      - sh
+      - -ec
+      - case "$$XT_SKIP_MIGRATE" in 0) node src/migrate.ts up ;; 1) ;; *) echo "XT_SKIP_MIGRATE must be 0 or 1" >&2; exit 64 ;; esac; exec node ops/dev/seed.mjs
   app:
     image: ${XT_PREVIEW_IMAGE:?missing local dev image}
     pull_policy: never
@@ -18,15 +39,11 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      setup:
+        condition: service_completed_successfully
     ports:
       - "127.0.0.1:4317:3000"
     environment:
       DATABASE_URL: postgres://postgres:${XT_PREVIEW_DB_PASSWORD}@db:5432/xt_preview
-      XT_DEMO_OWNER_PASSWORD: ${XT_DEMO_OWNER_PASSWORD:?missing dev owner password}
-      XT_DEMO_GUEST_PASSWORD: ${XT_DEMO_GUEST_PASSWORD:?missing dev guest password}
-    command:
-      - sh
-      - -ec
-      - node src/migrate.ts up && node ops/dev/seed.mjs && unset XT_DEMO_OWNER_PASSWORD XT_DEMO_GUEST_PASSWORD && exec node src/server.ts
 volumes:
   db: {}

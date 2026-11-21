@@ -5,13 +5,30 @@ const input = element("note-body");
 const list = element("notes-list");
 const refresh = element("refresh");
 const logout = element("logout");
-const status = element("status");
+const loginStatus = element("login-status");
+const noteStatus = element("note-status");
+const listStatus = element("list-status");
 const dates = new Intl.DateTimeFormat("vi-VN", { dateStyle: "medium", timeStyle: "short" });
 let session = "";
 
-function report(message, error = false) {
-  status.textContent = message;
-  status.classList.toggle("error", error);
+// Thông báo nằm cạnh phần tử gây ra nó để lỗi luôn trong tầm nhìn.
+function report(target, message, error = false) {
+  for (const place of [loginStatus, noteStatus, listStatus]) {
+    if (place !== target) {
+      place.textContent = "";
+      place.classList.remove("error");
+    }
+  }
+  target.textContent = message;
+  target.classList.toggle("error", error);
+  if (error && message) target.scrollIntoView({ block: "nearest" });
+  if (target === noteStatus && error && message) {
+    input.setAttribute("aria-invalid", "true");
+    input.setAttribute("aria-describedby", noteStatus.id);
+  } else {
+    input.removeAttribute("aria-invalid");
+    input.removeAttribute("aria-describedby");
+  }
 }
 
 function setSignedIn(signedIn) {
@@ -71,23 +88,28 @@ async function loadNotes() {
 }
 
 // Một thao tác tại mỗi thời điểm để lần tải lại cũ không ghi đè ghi chú vừa lưu.
-async function perform(task) {
+async function perform(target, task) {
   const buttons = document.querySelectorAll("button");
   if (refresh.disabled) return;
+  // Vô hiệu hóa nút đang focus làm trình duyệt đưa focus về <body>; trả lại khi xong.
+  const focused = document.activeElement;
   for (const button of buttons) button.disabled = true;
-  report("");
+  report(target, "");
   try {
     await task();
   } catch (error) {
-    report(error instanceof TypeError ? "Mất kết nối. Hãy kiểm tra mạng và tải lại." : error.message, true);
+    // Hết phiên đã đưa người dùng về màn đăng nhập: báo lỗi ở đó.
+    report(session ? target : loginStatus, error instanceof TypeError ? "Mất kết nối. Hãy kiểm tra mạng và tải lại." : error.message, true);
   } finally {
     for (const button of buttons) button.disabled = false;
+    const lost = !document.activeElement || document.activeElement === document.body;
+    if (lost && focused instanceof HTMLButtonElement && !focused.closest("[hidden]")) focused.focus({ preventScroll: true });
   }
 }
 
 login.addEventListener("submit", (event) => {
   event.preventDefault();
-  perform(async () => {
+  perform(loginStatus, async () => {
     const { token } = await request("/v1/login", {
       email: element("email").value.trim(),
       password: element("password").value,
@@ -104,28 +126,28 @@ editor.addEventListener("submit", (event) => {
   event.preventDefault();
   const body = input.value.trim();
   if (!body) {
-    report("Hãy nhập nội dung ghi chú.", true);
+    report(noteStatus, "Hãy nhập nội dung ghi chú.", true);
     input.focus();
     return;
   }
-  perform(async () => {
+  perform(noteStatus, async () => {
     const note = await request("/v1/notes", { body }, session);
     list.prepend(entry(note));
     if (list.children.length > 100) list.lastElementChild.remove();
     element("empty").hidden = true;
     if (input.value.trim() === body) input.value = "";
     input.focus();
-    report("Đã lưu ghi chú.");
+    report(noteStatus, "Đã lưu ghi chú.");
   });
 });
 
 refresh.addEventListener("click", () =>
-  perform(async () => {
+  perform(listStatus, async () => {
     await loadNotes();
-    report("Đã tải lại danh sách.");
+    report(listStatus, "Đã tải lại danh sách.");
   }),
 );
 logout.addEventListener("click", () => {
   signOut();
-  report("Đã đăng xuất.");
+  report(loginStatus, "Đã đăng xuất.");
 });

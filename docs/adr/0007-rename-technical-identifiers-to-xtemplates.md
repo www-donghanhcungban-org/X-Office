@@ -7,7 +7,7 @@
 
 ## Bối cảnh
 
-ADR-0006 đổi tên hiển thị sang X-Templates nhưng giữ định danh kỹ thuật của tên cũ X-stored: thư mục cài `.xstored/`,
+ADR-0006 đổi tên hiển thị sang X-Office nhưng giữ định danh kỹ thuật của tên cũ X-stored: thư mục cài `.xstored/`,
 `xs.py`, `xs.yaml`, biến `XS_*`, đuôi `.xstored-new`. Chủ repo yêu cầu (2026-10-15) tên dự án đúng **ở mọi chỗ**, kể cả các
 định danh này. Tên repo trên GitHub đã kiểm cùng ngày: `seeker19110/X-Templates`.
 

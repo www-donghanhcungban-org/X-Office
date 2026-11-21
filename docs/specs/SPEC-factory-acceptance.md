@@ -8,7 +8,7 @@
 | Kiến trúc | [ADR-0075](../adr/0075-end-to-end-factory.md) — file này chốt giao ước, không chép lại lý do |
 | Kế hoạch | [`PLAN-factory-e2e.md`](../autopilot/PLAN-factory-e2e.md) T-3848, T-3849 |
 
-**Phạm vi đã có ([D-521 của X-Templates](https://github.com/www-donghanhcungban-org/X-Templates/blob/3a1cd5471cb1f634656c62369559c4a489a58dcc/docs/autopilot/DECISIONS.md)).** Dự án có thể ghi SPEC và bài thử vào `docs/autopilot/ACCEPTANCE.paths`, chốt
+**Phạm vi đã có ([D-521 của X-Office](https://github.com/www-donghanhcungban-org/X-Templates/blob/3a1cd5471cb1f634656c62369559c4a489a58dcc/docs/autopilot/DECISIONS.md)).** Dự án có thể ghi SPEC và bài thử vào `docs/autopilot/ACCEPTANCE.paths`, chốt
 commit trước khi viết tính năng và chạy `xt_acceptance.py check --base <sha-đầy-đủ>`. Công cụ đọc danh sách
 ở chính commit đó và so file với HEAD, index và cây làm việc. Pilot dùng bài thử đã chốt để chứng minh
 đỏ rồi xanh. Giao ước F-121 về danh tính tác giả, sửa đổi có reviewer và số ca theo từng khoá vẫn ở Draft.

@@ -1,4 +1,4 @@
-# AUDIT-REPORT — X-Templates · 2026-11-14 (delta DOC)
+# AUDIT-REPORT — X-Office · 2026-11-14 (delta DOC)
 
 > Snapshot `2bf2e1cfdd5f99bc5568f7036a5061c134316061` trên `main`. Tiếp phần DOC còn trống của
 > [audit 2026-11-11](AUDIT-REPORT-2026-11-11-delta.md) trên phạm vi `454d146..2bf2e1cf`.

@@ -1,4 +1,4 @@
-# PLAN-upgrade-2026-11-02.md — Khung X-Templates · gom mọi đề xuất 2026-11-02 (audit D-302 + ADR-0064 D-303) + phần mở của PLAN-harden
+# PLAN-upgrade-2026-11-02.md — Khung X-Office · gom mọi đề xuất 2026-11-02 (audit D-302 + ADR-0064 D-303) + phần mở của PLAN-harden
 
 > Lập ngày 2026-11-02 theo yêu cầu chủ dự án "cập nhật tất cả đề xuất, nâng cấp trong hôm nay rồi tối ưu lại và triển khai".
 > Duyệt: D-304 (phiên chính tự duyệt). Pha `harden`; review 1 lần theo ADR-0062. Nguồn việc: `docs/ops/AUDIT-REPORT-2026-11-02-full.md`

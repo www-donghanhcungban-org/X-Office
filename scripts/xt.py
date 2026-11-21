@@ -4322,10 +4322,32 @@ def audit_archive(status: Path) -> Path:
 
 
 def archive_tables(text: str) -> Dict[str, List[Dict[str, str]]]:
-    """Bảng của sổ lưu trữ (AUD-HAR-450): chỉ giữ dòng `## ` và dòng bảng `|` — ghi chú `> Đợt …` và dòng trống xen giữa
-    các đợt dời không được cắt bảng (`md_tables` coi dòng không phải bảng là hết bảng nên mọi dòng dời sau ghi chú đầu
-    tiên lọt khỏi kiểm ID duy nhất và `chỉ đã sửa`)."""
-    kept = [ln for ln in text.splitlines() if ln.startswith(("|", "## "))]
+    """Bảng của sổ lưu trữ (AUD-HAR-450/451): chỉ giữ dòng `## ` và dòng bảng `|` (kể cả thụt lề) — ghi chú `> Đợt …`
+    và dòng trống xen giữa các đợt dời không được cắt bảng (`md_tables` coi dòng không phải bảng là hết bảng nên mọi
+    dòng dời sau ghi chú đầu tiên lọt khỏi kiểm ID duy nhất và `chỉ đã sửa`). Nội dung trong code fence bị bỏ (ví dụ mẫu
+    không phải bảng thật). Mỗi heading chỉ có MỘT bảng: dòng lặp tiêu đề (đợt dời lặp) bị bỏ, dòng có ít ô hơn tiêu đề
+    (bảng chú giải `| Mức | Nghĩa |`) bị bỏ; dòng nhiều ô hơn (ô chứa `|` chưa thoát) vẫn giữ để không mất phát hiện."""
+    unfenced: List[str] = []
+    fence: Optional[str] = None
+    for ln in text.splitlines():
+        m = FENCE_RE.match(ln)
+        if m and (fence is None or m.group(1) == fence):
+            fence = None if fence else m.group(1)
+        elif not fence:
+            unfenced.append(ln)
+    kept: List[str] = []
+    header: Optional[List[str]] = None
+    for ln in unfenced:
+        is_row = ln.lstrip().startswith("|")
+        if ln.startswith("## "):
+            header = None
+        elif not is_row:
+            continue
+        elif header is None:
+            header = split_md_row(ln)
+        elif split_md_row(ln) == header or len(split_md_row(ln)) < len(header):
+            continue
+        kept.append(ln)
     return md_tables("\n".join(kept))
 
 

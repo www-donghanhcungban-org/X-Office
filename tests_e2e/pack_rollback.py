@@ -15,6 +15,26 @@ from uuid import UUID, uuid4
 
 CLI = [sys.executable, ".xtemplates/scripts/xt.py", "deploy", "run", "--env", "dev", "--json"]
 LEDGER = Path("docs/ops/DEPLOYS.json")
+STATE = Path(".git/xt-preview/dev")
+MIGRATE = Path("src/migrate.ts")
+PROBE = Path("src/migrations/0006_rollback_probe.ts")
+# Expand: bản B thêm bảng mà bản A không biết. Migrator của A từ chối DB có migration lạ, nên A chỉ khởi động lại
+# được khi đường rollback không chạy `migrate up` (AUD-DATA-019).
+PROBE_SOURCE = """import { type Kysely, sql } from "kysely";
+
+export async function up(db: Kysely<unknown>): Promise<void> {
+  await sql`CREATE TABLE rollback_probe (id integer PRIMARY KEY)`.execute(db);
+}
+
+export async function down(db: Kysely<unknown>): Promise<void> {
+  await sql`DROP TABLE rollback_probe`.execute(db);
+}
+"""
+
+
+def replace_once(source: bytes, before: bytes, after: bytes, reason: str) -> bytes:
+    require(source.count(before) == 1, reason)
+    return source.replace(before, after)
 
 
 def require(condition: bool, reason: str) -> None:
@@ -91,11 +111,24 @@ def rollback() -> None:
 
     source = Path("src/server.ts")
     original = source.read_bytes()
+    migrations = MIGRATE.read_bytes()
     good = b"return [201, note];"
-    require(original.count(good) == 1, "Fixture cần đúng một handler tạo ghi chú")
+    require(not PROBE.exists(), "Fixture migration đã tồn tại")
+    broken = replace_once(original, good, b"return [200, note];", "Fixture cần đúng một handler tạo ghi chú")
+    registered = replace_once(
+        migrations,
+        b"export const MIGRATIONS:",
+        f'import * as probe from "./{PROBE.relative_to("src").as_posix()}";\n\nexport const MIGRATIONS:'.encode(),
+        "migrate.ts cần đúng một danh sách MIGRATIONS",
+    )
+    registered = replace_once(
+        registered, b"};\n\nfunction migrator", b'  "0006_rollback_probe": probe,\n};\n\nfunction migrator', "Sai mẫu"
+    )
     try:
-        # B vẫn sẵn sàng trên /healthz nhưng trả sai mã HTTP khi tạo ghi chú.
-        source.write_bytes(original.replace(good, b"return [200, note];"))
+        # B áp một migration expand, vẫn sẵn sàng trên /healthz nhưng trả sai mã HTTP khi tạo ghi chú.
+        source.write_bytes(broken)
+        PROBE.write_text(PROBE_SOURCE)
+        MIGRATE.write_bytes(registered)
         subprocess.run(["node", "scripts/build.ts"], check=True, timeout=120)
         artifact_sha = sha256(Path("dist/app.tgz").read_bytes()).hexdigest()
         candidate = sha256(f"dist/app.tgz\0{artifact_sha}\n".encode()).hexdigest()
@@ -115,10 +148,20 @@ def rollback() -> None:
         restored = api(f"/v1/notes/{note_id}", 200, token=restored_token)
         require(restored["id"] == note["id"] and restored["body"] == body, "Mất ghi chú của A sau rollback")
         check_deploy_gate(candidate, "FAIL")
+        # Ảnh đã lưu chỉ còn bản sổ cần; sổ mật khẩu không bị dọn.
+        older = state["previous"]["subject"]["digest"] if state["previous"] else None
+        saved = {path.name.removesuffix(".image.tar") for path in STATE.glob("*.image.tar")}
+        require(baseline in saved and saved <= {baseline, candidate, older}, f"Ảnh đã lưu sai: {sorted(saved)}")
+        require((STATE / "preview-access.json").is_file(), "Mất sổ mật khẩu dev sau khi dọn")
     finally:
         source.write_bytes(original)
+        MIGRATE.write_bytes(migrations)
+        PROBE.unlink(missing_ok=True)
         subprocess.run(["node", "scripts/build.ts"], check=True, timeout=120)
-    print(f"Đã khôi phục {baseline} sau khi smoke {candidate} thất bại. Đã đọc lại ghi chú của bản A.")
+    print(
+        f"Đã khôi phục {baseline} sau khi smoke {candidate} (có migration expand) thất bại. "
+        "Đã đọc lại ghi chú của bản A."
+    )
 
 
 if __name__ == "__main__":

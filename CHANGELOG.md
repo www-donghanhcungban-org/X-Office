@@ -68,9 +68,8 @@ Bản < 3.20.0: [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md) (T-3651; `changel
 
 ### Changed
 
-- ADR riêng của X-Office (bản phái sinh) dùng dải số **9001+** để không va với số tăng dần của X-Templates: ADR màn
-  Văn phòng đổi `ADR-0082` → [ADR-9001](docs/adr/9001-office-view-renderers.md) (nội dung không đổi; D-9001, trước ghi nhầm D-521) vì đồng bộ
-  X-Templates mang `ADR-0082` của chính nó (harness Codex). Đồng bộ X-Templates tới `9a65104b` (#684–#686).
+- ADR màn Văn phòng đổi `ADR-0082` → [ADR-9001](docs/adr/9001-office-view-renderers.md) (nội dung không đổi; D-9001,
+  trước ghi nhầm D-521); ADR `ADR-0082` nay là harness Codex. ADR mới của X-Office nối tiếp dải `9001+`.
 - `xt.py test-select --unittest` (cổng commit `gate-fast`, khoá `test_fast`) chọn test theo **lớp** thay vì theo tệp: lớp
   chạy khi thân lớp nhắc tên tệp đổi, có glob khớp tên đó (`GO-NO-GO*.md` không còn khớp mọi `.md`), hoặc nhắc tên một
   lớp cùng tệp đang chạy (lớp cha, lớp phụ trợ — bắc cầu); cả tệp chạy khi phần ngoài lớp khớp, tệp import module đổi,
@@ -102,12 +101,21 @@ Bản < 3.20.0: [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md) (T-3651; `changel
 - Guard chặn `git merge-file <tệp hàng rào> …` (ghi đè tệp đầu; `-p`/`--stdout`/`--object-id` vẫn cho chạy): AUD-SEC-999
   (T-3971). Đổi guard của khung — dự án đích nhận khi chạy lại `install.py`.
 - Skill gate/autopilot/complete: `description` đặt trong nháy (YAML hợp lệ cho Codex); `render_skill` từ chối
-  frontmatter hỏng kèm lý do (AUD-HAR-447, T-4004). README.md:73 trỏ đúng `/tmp/x-office`; tên lịch sử "X-Templates"
-  được trả lại ở ADR-0006/0007/0068/0078 và mục [3.34.0] (T-4005).
-- Tài liệu lịch sử (ADR `0xxx`, `docs/archive/`, research, báo cáo audit, PLAN đã xong; 84 tệp) trở lại chữ X-Templates
-  của lúc sự kiện xảy ra — đổi chữ hàng loạt khi tách repo làm sai lịch sử và gây xung đột đồng bộ (AUD-DOC-309, rộng hơn
-  T-4005; `tests/test_docs_history.py`). Quyết định riêng của X-Office dùng dải `D-9001+` (mục D-521 cục bộ → D-9001,
-  trùng D-521 của X-Templates — AUD-DOC-310). README thêm cờ `--with-office-3d`, `CLAUDE.md` thêm `/factory`.
+  frontmatter hỏng kèm lý do (AUD-HAR-447, T-4004). README.md:73 trỏ đúng `/tmp/x-office` (T-4005). README thêm cờ
+  `--with-office-3d`, `CLAUDE.md` thêm `/factory`.
+- Gói `web-api-ts` (D-9006): quay lui bản dev qua một migration expand không còn hỏng — service `setup` chạy một lần
+  (migrate rồi seed; `XT_SKIP_MIGRATE=1` khi rollback), `app` chỉ chạy sau khi `setup` xong và không nhận `XT_DEMO_*`;
+  `dev-preview.mjs` dọn ảnh/compose không còn cần sau mỗi lần `up` (giữ current, previous và hai digest phục vụ gần
+  nhất) và dừng kèm hướng dẫn `down -v` khi mất sổ mật khẩu mà volume DB còn; `pg_isready -h 127.0.0.1`; `seed.mjs`
+  từ chối `DATABASE_URL` có query/fragment (AUD-DATA-019, AUD-CI-036, AUD-CFG-010). UI notes-ui trả focus sau thao tác,
+  đặt thông báo trong từng form kèm `aria-invalid`/`aria-describedby`, viền ô nhập ≥ 3:1 (AUD-A11Y-005). Dự án đã cài
+  gói nhận bản sửa khi chạy lại `install.py`; ảnh lưu từ trước vẫn chạy compose cũ.
+- `xt.py audit check` đọc sổ lưu trữ đúng với dòng bảng thụt lề, ví dụ trong code fence, bảng lặp tiêu đề và bảng
+  chú giải (AUD-HAR-451).
+- X-Office là dự án độc lập, không còn làn đồng bộ X-Templates (D-9007): mọi mô tả "bản phái sinh", "đồng bộ upstream",
+  "tên lịch sử X-Templates" đổi thành X-Office ở tài liệu (ADR, research, báo cáo, PLAN, CHANGELOG); `docs/adr/README.md`
+  bỏ quy ước dải số tránh va chạm; bỏ `tests/test_docs_history.py` (tiền đề đã đảo). Giữ nguyên liên kết ngoài tới
+  repo khác và định danh kỹ thuật `.xtemplates/`, `xt.py` (ADR-0006).
 
 - Màn Văn phòng 3D: nhãn phòng ẩn/hiện theo chỗ nhãn đứng có còn là sàn hay tường của **chính** phòng đó (tia từ
   camera, không theo hộp nhãn) — phóng to ở toàn cảnh, phòng còn trên hình vẫn giữ nhãn: thử điểm neo đã kẹp rồi các điểm trên sàn phòng (lưới 3×3)
@@ -168,7 +176,7 @@ Bản harden (ADR-0080): guard mặc định chặn theo danh sách đóng (D-50
 
 ### Added
 
-- README thêm mục "Vì sao dùng X-Templates" (vấn đề → lợi ích) và "Ủng hộ và liên hệ" (VietQR Techcombank,
+- README thêm mục "Vì sao dùng X-Office" (vấn đề → lợi ích) và "Ủng hộ và liên hệ" (VietQR Techcombank,
   điện thoại/Zalo, email, hỗ trợ triển khai tại TP.HCM hoặc online); `.github/FUNDING.yml` bật nút Sponsor trỏ về mục này.
 
 - `NOTICE` ghi phạm vi giấy phép MIT, thành phần bên thứ ba (axe-core, MPL-2.0) và tuyên bố nhãn hiệu; README trỏ tới
