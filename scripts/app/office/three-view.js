@@ -8,6 +8,8 @@ import { overlaps } from "./iso.js";
 import { createTextureBank } from "./textures.js";
 import { createHumanAssets } from "./human3d.js";
 import { createNatureAssets } from "./nature3d.js";
+import { createTrafficAssets } from "./traffic3d.js";
+import { createCityAssets } from "./city3d.js";
 import { buildOfficeScene, createSceneAssets } from "./scene3d.js";
 import { createPostFX } from "./postfx.js";
 
@@ -79,11 +81,13 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
   pCloud.visible = false;
   scene.add(pCloud);
 
-  // Kho tài nguyên dùng chung & bộ hậu kỳ HDR WebGL2
-  const textures = createTextureBank(THREE);
+  // Kho tài nguyên dùng chung & bộ hậu kỳ HDR WebGL2 (tự vẽ lại ngay khi ảnh PBR/HDRI thật nạp xong)
+  const textures = createTextureBank(THREE, () => { api.dirty = true; });
   const sceneAssets = createSceneAssets(THREE);
   const humanAssets = createHumanAssets(THREE);
   const natureAssets = createNatureAssets(THREE);
+  const trafficAssets = createTrafficAssets(THREE);
+  const cityAssets = createCityAssets(THREE);
   const postfx = createPostFX(THREE, renderer);
 
   let officeObj = null;
@@ -149,20 +153,29 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
         const spots = [
           [left, top], [left, top - h * 0.65], [left, top + h * 0.65],
           [left, top - h], [left, top + h], [left - 18, top], [left + 18, top],
+          [left - 26, top - h], [left + 26, top - h], [left - 26, top + h], [left + 26, top + h],
           [left, top - 1.5 * h], [left, top + 1.5 * h],
           [left, top - 2 * h], [left, top + 2 * h],
         ];
         if (room) {
           if (room.y === 0) {
-            for (const zOff of [2.5, 3.3, 1.6]) {
-              for (const u of [0.5, 0.3, 0.7]) {
+            for (const zOff of [2.5, 3.3, 1.6, 3.8, 1.0]) {
+              for (const u of [0.5, 0.3, 0.7, 0.15, 0.85]) {
                 const q = new THREE.Vector3(room.x + u * room.w, zb + zOff, 0.2).project(camera);
                 if (q.z < 1) spots.push([((q.x + 1) / 2) * rect.w, ((1 - q.y) / 2) * rect.h]);
               }
             }
           }
-          for (const u of [0.5, 0.25, 0.75]) {
-            for (const v of [0.5, 0.25, 0.75]) {
+          if (room.x === 0) {
+            for (const zOff of [2.5, 3.3, 1.6]) {
+              for (const v of [0.5, 0.25, 0.75]) {
+                const q = new THREE.Vector3(0.2, zb + zOff, room.y + v * room.d).project(camera);
+                if (q.z < 1) spots.push([((q.x + 1) / 2) * rect.w, ((1 - q.y) / 2) * rect.h]);
+              }
+            }
+          }
+          for (const u of [0.5, 0.25, 0.75, 0.15, 0.85]) {
+            for (const v of [0.5, 0.25, 0.75, 0.15, 0.85]) {
               const q = new THREE.Vector3(room.x + u * room.w, zb + 0.6, room.y + v * room.d).project(camera);
               if (q.z < 1) spots.push([((q.x + 1) / 2) * rect.w, ((1 - q.y) / 2) * rect.h]);
             }
@@ -170,7 +183,8 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
         }
         const prev = lastSpot.get(t.id);
         const keep = prev !== undefined && prev < spots.length && ok(...spots[prev], 1) ? prev : -1;
-        const pick = keep >= 0 ? keep : spots.findIndex(([x, y]) => ok(x, y, 2));
+        let pick = keep >= 0 ? keep : spots.findIndex(([x, y]) => ok(x, y, 2));
+        if (pick < 0) pick = spots.findIndex(([x, y]) => ok(x, y, 0));
         if (pick >= 0) {
           [left, top] = spots[pick];
           lastSpot.set(t.id, pick);
@@ -195,13 +209,20 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
     for (let i = list.length; i < tagEls.length; i++) tagEls[i].hidden = true;
   }
 
-  function place(zoom, v, plan) {
+  let curDist = 20;
+  function place(zoom, v, plan, mood) {
     target.set((v.x0 + v.x1) / 2 + view.panX, (v.z0 + v.z1) / 2, (v.y0 + v.y1) / 2 + view.panZ);
     const sh = Math.max(plan.W, plan.D) * 0.78 + 5;
     Object.assign(sun.shadow.camera, { left: -sh, right: sh, top: sh, bottom: -sh, far: sh * 4.2 });
     sun.shadow.camera.updateProjectionMatrix();
     sun.target.position.set(plan.W / 2, 0, plan.D / 2);
-    sun.position.set(plan.W / 2 + sh * 0.92, sh * 1.05 + (v.z1 || 0), plan.D / 2 + sh * 0.62);
+    if (mood === "sunset") {
+      sun.position.set(plan.W / 2 + sh * 1.25, sh * 0.56 + (v.z1 || 0), plan.D / 2 + sh * 0.45);
+    } else if (mood === "night") {
+      sun.position.set(plan.W / 2 - sh * 0.75, sh * 1.05 + (v.z1 || 0), plan.D / 2 + sh * 0.7);
+    } else {
+      sun.position.set(plan.W / 2 + sh * 0.92, sh * 1.05 + (v.z1 || 0), plan.D / 2 + sh * 0.62);
+    }
 
     const aspect = view.w / view.h;
     const dx = Math.sin(view.az) * Math.cos(view.el);
@@ -223,6 +244,7 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
         need = Math.max(need, closer + (Math.abs(p.y) * 1.05) / tanY, closer + (Math.abs(p.x) * 1.05) / tanX);
       }
       const dist = Math.max(3.0, need / Math.max(0.25, zoom || 1));
+      curDist = dist;
       perspCam.aspect = aspect;
       perspCam.near = Math.max(0.2, dist * 0.025);
       perspCam.far = dist + Math.max(plan.W, plan.D) * 3.5 + 90;
@@ -390,17 +412,24 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
       renderer.shadowMap.enabled = shadows;
       sun.castShadow = shadows;
 
-      const dark = Boolean(opts.theme.edge || opts.theme.id === "night" || opts.theme.id === "library");
-      renderer.toneMappingExposure = dark ? 1.18 : 1.05;
-      hemi.color.set(dark ? 0x64748b : 0xdbeafe);
-      hemi.groundColor.set(dark ? 0x0f172a : 0x6b7280);
-      hemi.intensity = dark ? 0.5 : 0.62;
-      sun.color.set(dark ? 0xc7d2fe : 0xfff0d4);
-      sun.intensity = dark ? 1.38 : 2.75;
-      fill.intensity = dark ? 0.36 : 0.42;
-      scene.background = textures.sky(opts.theme.bg, opts.theme.glow, dark);
-      scene.environment = glowOn ? textures.envMap(renderer, opts.theme, dark) : null;
-      if ("environmentIntensity" in scene) scene.environmentIntensity = dark ? 0.68 : 0.6;
+      const themeDark = Boolean(opts.theme.edge || opts.theme.id === "night" || opts.theme.id === "library");
+      const lightPref = opts.light || "auto";
+      const mood = lightPref !== "auto"
+        ? lightPref
+        : (themeDark ? "night" : (opts.theme.window === "dusk" || opts.theme.id === "cafe" || opts.theme.id === "studio") ? "sunset" : "day");
+      const dark = mood === "night";
+      const sunset = mood === "sunset";
+
+      renderer.toneMappingExposure = dark ? 1.18 : sunset ? 1.08 : 1.04;
+      hemi.color.set(dark ? 0x64748b : sunset ? 0xffedd5 : 0xdbeafe);
+      hemi.groundColor.set(dark ? 0x0f172a : sunset ? 0x57423a : 0x6b7280);
+      hemi.intensity = dark ? 0.5 : sunset ? 0.56 : 0.62;
+      sun.color.set(dark ? 0xc7d2fe : sunset ? 0xffb86c : 0xfff0d4);
+      sun.intensity = dark ? 1.38 : sunset ? 2.65 : 2.75;
+      fill.intensity = dark ? 0.36 : sunset ? 0.38 : 0.42;
+      scene.background = textures.sky(opts.theme.bg, opts.theme.glow, dark, mood);
+      scene.environment = glowOn ? textures.envMap(renderer, opts.theme, dark, mood) : null;
+      if ("environmentIntensity" in scene) scene.environmentIntensity = dark ? 0.72 : sunset ? 0.68 : 0.62;
 
       const nextKey = [
         opts.scale || "team",
@@ -417,7 +446,7 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
           scene.remove(officeObj.root);
           officeObj.dispose();
         }
-        officeObj = buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natureAssets, opts);
+        officeObj = buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natureAssets, trafficAssets, cityAssets, opts);
         scene.add(officeObj.root);
         pickables = [];
         officeObj.root.traverse((o) => { if (o.isMesh && o.userData.pick) pickables.push(o); });
@@ -429,6 +458,7 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
       const { plan, zb } = officeObj;
       lastPlan = plan;
       lastZb = zb;
+      officeObj.setMood(mood);
 
       // Tự động ẩn tường chắn & đèn trần khi xoay góc nhìn ra phía sau hoặc nhìn thẳng từ trên xuống
       officeObj.cutaway.left.visible = Math.sin(view.az) >= -0.05;
@@ -498,11 +528,28 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
           moving = true;
         } else curZoom = dstZoom;
       }
-      const camera = place(curZoom, curBox, plan);
+      const camera = place(curZoom, curBox, plan, mood);
+      if (plan.outdoor) {
+        const fogCol = dark ? 0x0f172a : sunset ? 0xf5c89e : 0xcfe4fb;
+        const near = view.perspective ? curDist + 48 : 115;
+        const far = view.perspective ? curDist + 175 : 240;
+        if (!scene.fog || !scene.fog.isFog) scene.fog = new THREE.Fog(fogCol, near, far);
+        else {
+          scene.fog.color.setHex(fogCol);
+          scene.fog.near = near;
+          scene.fog.far = far;
+        }
+      } else {
+        scene.fog = null;
+      }
       if (glowOn && postfx) {
+        const dofStrength = view.perspective ? Math.max(0, Math.min(0.62, (curZoom - 1.5) * 0.42)) : 0;
         postfx.render(scene, camera, {
           dark,
-          exposure: dark ? 1.18 : 1.06,
+          sunset,
+          focusDist: curDist,
+          dofStrength,
+          exposure: dark ? 1.18 : sunset ? 1.08 : 1.05,
           aoStrength: dark ? 0.48 : 0.56,
           aoRadius: (opts.scale || "team") === "team" ? 0.9 : 1.5,
         });
@@ -524,6 +571,8 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
       sceneAssets.dispose();
       humanAssets.dispose();
       natureAssets.dispose();
+      trafficAssets.dispose();
+      cityAssets.dispose();
       textures.dispose();
       pGeo.dispose();
       pMat.dispose();

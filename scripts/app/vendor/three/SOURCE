@@ -12,3 +12,37 @@ bundler hay import map, đúng CSP `script-src 'self'` của app.
 Dùng ở đâu: bộ vẽ 3D tuỳ chọn của màn Văn phòng (scripts/app/office/three-view.js), chỉ tải khi người dùng chọn "3D (three.js)".
 Kích thước: ~2,1 MB chưa nén (gói npm không có bản .min); chép sang dự án đích cùng scripts/app khi chạy install.py.
 Kiểm: python3 scripts/xt.py vendor-check --dirs scripts/app/vendor --strict
+
+---
+Tên: polyhaven-cc0-office-hd (thư mục assets/ bên cạnh)
+Phiên bản: 2026-11-22 (gói tuyển chọn 1K rút gọn 512px cho X-Office 3D)
+License: CC0-1.0 (Public Domain — xem tệp assets/LICENSE)
+Nguồn: https://polyhaven.com/ (API https://api.polyhaven.com/files/<id>)
+Ngày lấy: 2026-11-22
+Sửa đổi: giảm độ phân giải HDRI 1024×512 → 512×256 RGBE (giữ nguyên dải sáng tuyến tính float cho PMREMGenerator) và vân PBR 1024×1024 → 512×512 JPEG tối ưu (vải denim chuyển xám sáng để nhuộm màu trang phục/ghế).
+Dùng ở đâu: ánh sáng IBL 360° thật và vân PBR chụp quét thật cho bộ vẽ 3D màn Văn phòng (scripts/app/office/textures.js, rgbe.js); chép sang dự án đích chỉ khi --with-office-3d (ADR-9001).
+
+assets/hdri/day.hdr sha256: 9db5c6f04f3f8d187254057090b9becd91c1010da8301955732b8790888ac240 (kloofendal_48d_partly_cloudy_puresky <- https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/kloofendal_48d_partly_cloudy_puresky_1k.hdr)
+assets/hdri/sunset.hdr sha256: 26303d3bad1d30df94c865ddb10d617dcdd711641dcb657e80659eafcf323683 (kiara_1_dawn <- https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/kiara_1_dawn_1k.hdr)
+assets/hdri/night.hdr sha256: c7bd99c34e0ec3d2afba72e0c775ed4a648fc3367a15b835b547b09e8f616ef0 (shanghai_bund <- https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/shanghai_bund_1k.hdr)
+assets/pbr/wood_diff.jpg sha256: 392959988034e642d9382f04b63b0b125fdd230dd86ef13f94569317bf2868f6 (wood_floor_deck <- https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/wood_floor_deck/wood_floor_deck_diff_1k.jpg)
+assets/pbr/wood_nor.jpg sha256: 2f8b70c0cf3c16e6529162a35d4146683c304a1188fb031b6a984f8248dc3dd0 (wood_floor_deck <- https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/wood_floor_deck/wood_floor_deck_nor_gl_1k.jpg)
+assets/pbr/wood_rough.jpg sha256: 9b6640f4f68fd8bffb7d74ff4a8fa8d03d28ca3861e7d9b24f144912b94d5a14 (wood_floor_deck <- https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/wood_floor_deck/wood_floor_deck_rough_1k.jpg)
+assets/pbr/tileFloor_diff.jpg sha256: c65bcbafbd29e0291d038d0f08430aa0837fe1038a08436595502d61d8c21092 (marble_01 <- https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/marble_01/marble_01_diff_1k.jpg)
+assets/pbr/tileFloor_nor.jpg sha256: a0554ce0938fb0e82c859bad953de1e88278e551e3ca2328494f6d224cf31503 (marble_01 <- https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/marble_01/marble_01_nor_gl_1k.jpg)
+assets/pbr/tileFloor_rough.jpg sha256: cc606e3760973352ad311970c9e8f57f2f787d46f4e4d40e54252068779688f4 (marble_01 <- https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/marble_01/marble_01_rough_1k.jpg)
+assets/pbr/grass_diff.jpg sha256: 384f9bba11304a6081608a3939e26ab17d92fa6ac3166cfa0de3648671d15dd4 (leafy_grass <- https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/leafy_grass/leafy_grass_diff_1k.jpg)
+assets/pbr/grass_nor.jpg sha256: 203ad61db02e4ba75ad4ea2644bf7f8b3ec23de135686836bc37ed6d8791c67b (leafy_grass <- https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/leafy_grass/leafy_grass_nor_gl_1k.jpg)
+assets/pbr/grass_rough.jpg sha256: 0382d6ff88e8c81c49257c9cb09d63cb3e949126a5158e81475308325103d27c (leafy_grass <- https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/leafy_grass/leafy_grass_rough_1k.jpg)
+assets/pbr/bark_diff.jpg sha256: 14c612974beb747836e464dbb0572943d06d4514a96f1cea48876891a5b8befd (bark_brown_02 <- https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/bark_brown_02/bark_brown_02_diff_1k.jpg)
+assets/pbr/bark_nor.jpg sha256: d4d4b1e78c8d05fa1126fa3204d7aa0ded133b05270f9a29f6a457ad8aa68980 (bark_brown_02 <- https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/bark_brown_02/bark_brown_02_nor_gl_1k.jpg)
+assets/pbr/bark_rough.jpg sha256: ba995ed9acbc1cf6bc86ffce4e92219484fee93220b29f43e9d3ed0319102a7f (bark_brown_02 <- https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/bark_brown_02/bark_brown_02_rough_1k.jpg)
+assets/pbr/stone_diff.jpg sha256: 214595f357d5a8ff9e3de154c399654777aa9ea51cc5998904b1298f680aa097 (stone_tiles_02 <- https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/stone_tiles_02/stone_tiles_02_diff_1k.jpg)
+assets/pbr/stone_nor.jpg sha256: 5e3c47e6ec5a9bc61579b4032dbb7e8ac169530f057e2f425d9aceb91ae7c75a (stone_tiles_02 <- https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/stone_tiles_02/stone_tiles_02_nor_gl_1k.jpg)
+assets/pbr/stone_rough.jpg sha256: e0daaabd9a1a7a34ea06cbf32ddd52acd8b25e38e9e420a66f9daae84108c094 (stone_tiles_02 <- https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/stone_tiles_02/stone_tiles_02_rough_1k.jpg)
+assets/pbr/fabric_diff.jpg sha256: 6d31ae124f05df698425ced373432f8c64ffb3b2a3aa041f17f37fe1fcaed714 (denim_fabric <- https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/denim_fabric/denim_fabric_diff_1k.jpg)
+assets/pbr/fabric_nor.jpg sha256: 69e0859d4afbe10be2ab59cb1a3e6f9fc3d74edc664f524ff7e5f2452d80380c (denim_fabric <- https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/denim_fabric/denim_fabric_nor_gl_1k.jpg)
+assets/pbr/fabric_rough.jpg sha256: 7950024cf34a58229f7b35a84c5d0a6612611f6ea9cd42f53f781feb917e3b91 (denim_fabric <- https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/denim_fabric/denim_fabric_rough_1k.jpg)
+assets/pbr/road_diff.jpg sha256: 6f0ce11d026edfaebc0638a99701d0bf57ffb415848e24898f60c5575a65a042 (asphalt_02 <- https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/asphalt_02/asphalt_02_diff_1k.jpg)
+assets/pbr/road_nor.jpg sha256: fcf34ba83486d60ceba48167ae5392aa2ad61d20ccbc09dcbb359dc6fcf4ecf9 (asphalt_02 <- https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/asphalt_02/asphalt_02_nor_gl_1k.jpg)
+assets/pbr/road_rough.jpg sha256: 7918e82549f73edcb4eaffba6ee32172f3fb305eed17c88993a2c3989c66fa6c (asphalt_02 <- https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/asphalt_02/asphalt_02_rough_1k.jpg)

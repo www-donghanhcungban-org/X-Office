@@ -1,6 +1,9 @@
-// Bộ sinh vân PBR đầy đủ (Diffuse + Tangent Normal Map + Roughness Map + Alpha Foliage + Caustics + Sunbeam)
-// kết hợp bản đồ phản xạ toàn cảnh Equirectangular IBL (PMREMGenerator) cho chất lượng hình ảnh chân thực nhất.
-// Toàn bộ sinh bằng Canvas 2D nội bộ — không tải tài nguyên ngoài, tôn trọng CSP chặt.
+// Bộ sinh & nạp vân PBR đầy đủ: kết hợp 7 bộ vân chụp quét thật 512px (Poly Haven CC0: Diffuse + Normal OpenGL + Roughness)
+// cùng 3 bản đồ ánh sáng 360° HDRI thật (day/sunset/night qua rgbe.js → PMREMGenerator), có lớp dự phòng thủ tục tức thì.
+import { decodeRGBE } from "./rgbe.js";
+
+const PHOTO_PBR = new Set(["wood", "tileFloor", "grass", "bark", "stone", "fabric", "road"]);
+const ASSET_BASE = "/vendor/three/assets/";
 
 function rnd(i) {
   const v = Math.sin(i * 12.9898 + 78.233) * 43758.5453;
@@ -749,17 +752,40 @@ const PAINTERS = {
 const ROUGH_PAINTERS = {
   wood: [drawWoodRough, 2],
   tileFloor: [drawTileRough, 3],
+  grass: [drawWoodRough, 8],
+  bark: [drawWoodRough, 2],
+  stone: [drawTileRough, 3],
+  fabric: [drawWoodRough, 4],
+  road: [drawTileRough, 3],
 };
 
 const NO_REPEAT = new Set(["shadow", "beachball", "leafCluster", "sunbeam", "clock", "towel"]);
 
-export function createTextureBank(THREE) {
+export function createTextureBank(THREE, onReady) {
   const cache = new Map();
   const canvases = new Map();
   const normals = new Map();
   const roughs = new Map();
   const skies = new Map();
   const envs = new Map();
+  const hdriEnvs = new Map();
+  const hdriPending = new Set();
+  let disposed = false;
+
+  // Nạp ảnh PBR chụp quét thật (Poly Haven CC0) đè mượt tại chỗ lên Texture đang dùng (không nhấp nháy, không dựng lại cảnh)
+  function upgradePhoto(tex, relPath, isLinear = false) {
+    const img = new Image();
+    img.decoding = "async";
+    img.onload = () => {
+      if (disposed) return;
+      tex.image = img;
+      if (isLinear) tex.colorSpace = THREE.NoColorSpace;
+      tex.needsUpdate = true;
+      if (onReady) onReady();
+    };
+    img.onerror = () => {};
+    img.src = ASSET_BASE + relPath;
+  }
 
   function get(kind) {
     if (!kind) return null;
@@ -827,6 +853,7 @@ export function createTextureBank(THREE) {
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.needsUpdate = true;
     cache.set(kind, tex);
+    if (PHOTO_PBR.has(kind)) upgradePhoto(tex, "pbr/" + kind + "_diff.jpg", false);
     return tex;
   }
 
@@ -843,8 +870,10 @@ export function createTextureBank(THREE) {
       tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
       tex.repeat.set(repeat, repeat);
     }
+    tex.colorSpace = THREE.NoColorSpace;
     tex.needsUpdate = true;
     normals.set(kind, tex);
+    if (PHOTO_PBR.has(kind)) upgradePhoto(tex, "pbr/" + kind + "_nor.jpg", true);
     return tex;
   }
 
@@ -857,31 +886,41 @@ export function createTextureBank(THREE) {
     const tex = new THREE.CanvasTexture(canvas);
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
     tex.repeat.set(repeat, repeat);
+    tex.colorSpace = THREE.NoColorSpace;
     tex.needsUpdate = true;
     roughs.set(kind, tex);
+    if (PHOTO_PBR.has(kind)) upgradePhoto(tex, "pbr/" + kind + "_rough.jpg", true);
     return tex;
   }
 
-  function sky(bgHex, glowHex, dark) {
-    const key = (bgHex || "") + "|" + (glowHex || "") + "|" + (dark ? 1 : 0);
+  function sky(bgHex, glowHex, dark, mood) {
+    const key = (bgHex || "") + "|" + (glowHex || "") + "|" + (dark ? 1 : 0) + "|" + (mood || "");
     if (skies.has(key)) return skies.get(key);
     const [c, ctx] = makeCanvas(4, 256);
     ctx.fillStyle = bgHex || "#0b1020";
     ctx.fillRect(0, 0, 4, 256);
     const g = ctx.createLinearGradient(0, 0, 0, 256);
-    if (dark) {
-      g.addColorStop(0, "rgba(3,6,16,0.58)");
-      g.addColorStop(0.55, "rgba(0,0,0,0)");
+    if (mood === "sunset") {
+      g.addColorStop(0, "#1e3a8a");
+      g.addColorStop(0.45, "#f97316");
+      g.addColorStop(0.85, "#fde68a");
+      g.addColorStop(1, "#fef3c7");
+      ctx.fillStyle = g;
+      ctx.globalAlpha = 0.85;
+      ctx.fillRect(0, 0, 4, 256);
+    } else if (dark || mood === "night") {
+      g.addColorStop(0, "rgba(3,6,16,0.68)");
+      g.addColorStop(0.55, "rgba(10,16,38,0.22)");
       g.addColorStop(1, glowHex || "#3b82f6");
       ctx.fillStyle = g;
-      ctx.globalAlpha = 0.28;
+      ctx.globalAlpha = 0.34;
       ctx.fillRect(0, 0, 4, 256);
     } else {
-      g.addColorStop(0, "#7ec4f8");
-      g.addColorStop(0.48, "rgba(255,255,255,0)");
-      g.addColorStop(1, "rgba(255,245,225,0.42)");
+      g.addColorStop(0, "#5eb2f5");
+      g.addColorStop(0.46, "rgba(255,255,255,0)");
+      g.addColorStop(1, "rgba(255,244,220,0.46)");
       ctx.fillStyle = g;
-      ctx.globalAlpha = 0.72;
+      ctx.globalAlpha = 0.78;
       ctx.fillRect(0, 0, 4, 256);
     }
     ctx.globalAlpha = 1;
@@ -892,7 +931,27 @@ export function createTextureBank(THREE) {
     return tex;
   }
 
-  function envMap(renderer, theme, dark) {
+  // Nạp bản đồ ánh sáng 360° HDRI chụp thật (Poly Haven CC0: day / sunset / night) qua rgbe.js → PMREMGenerator
+  function envMap(renderer, theme, dark, mood) {
+    const pickMood = mood || (dark ? "night" : (theme.window === "dusk" || theme.id === "cafe" || theme.id === "studio") ? "sunset" : "day");
+    if (hdriEnvs.has(pickMood)) return hdriEnvs.get(pickMood).texture;
+    if (!hdriPending.has(pickMood)) {
+      hdriPending.add(pickMood);
+      fetch(ASSET_BASE + "hdri/" + pickMood + ".hdr")
+        .then((r) => (r.ok ? r.arrayBuffer() : null))
+        .then((buf) => {
+          if (!buf || disposed) return;
+          const hdrTex = decodeRGBE(THREE, buf);
+          const pmrem = new THREE.PMREMGenerator(renderer);
+          pmrem.compileEquirectangularShader();
+          const rt = pmrem.fromEquirectangular(hdrTex);
+          hdrTex.dispose();
+          pmrem.dispose();
+          hdriEnvs.set(pickMood, rt);
+          if (onReady) onReady();
+        })
+        .catch(() => {});
+    }
     const key = (dark ? "dark:" : "day:") + (theme.glow || "");
     if (envs.has(key)) return envs.get(key).texture;
     const [c, ctx] = makeCanvas(512, 256);
@@ -933,17 +992,21 @@ export function createTextureBank(THREE) {
       }
     },
     dispose() {
+      disposed = true;
       for (const tex of cache.values()) tex.dispose();
       for (const tex of normals.values()) tex.dispose();
       for (const tex of roughs.values()) tex.dispose();
       for (const tex of skies.values()) tex.dispose();
       for (const rt of envs.values()) rt.dispose();
+      for (const rt of hdriEnvs.values()) rt.dispose();
       cache.clear();
       canvases.clear();
       normals.clear();
       roughs.clear();
       skies.clear();
       envs.clear();
+      hdriEnvs.clear();
+      hdriPending.clear();
     },
   };
 }
