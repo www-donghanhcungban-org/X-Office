@@ -5633,6 +5633,9 @@ FRAMEWORK_REPO = "www-donghanhcungban-org/X-Office"
 # Đầu nhãn `.xtemplates/VERSION`: "3.0.0 (abc1234)"; đuôi pre-release ("3.0.0-rc1") nhỏ hơn bản cùng số (SemVer §11).
 SEMVER_PREFIX_RE = re.compile(r"v?(\d+)\.(\d+)\.(\d+)(-[0-9A-Za-z.-]+)?")
 RELEASE_TAG_RE = re.compile(r"v(\d+)\.(\d+)\.(\d+)")  # tag phát hành (release-tag.yml); pre-release không tính
+# Tag của dòng X-Templates kế thừa (ADR-9002): X-Office có dòng riêng từ 1.0.0 — bỏ khi tìm bản mới nhất, registry báo
+# `legacy-line` cho lõi ở tag này.
+LEGACY_RELEASE_TAGS: FrozenSet[Tuple[int, int, int]] = frozenset({(3, 34, 0)})
 VERSION_CHECK_TIMEOUT = 10
 
 
@@ -5658,6 +5661,7 @@ def latest_framework_tag() -> Optional[Tuple[int, int, int]]:
     names = [t.get("name") for t in tags if isinstance(t, dict)]
     found = [RELEASE_TAG_RE.fullmatch(n) for n in names if isinstance(n, str)]
     vers = [(int(m[1]), int(m[2]), int(m[3])) for m in found if m]
+    vers = [v for v in vers if v not in LEGACY_RELEASE_TAGS]  # tag dòng kế thừa không thắng dòng mới (ADR-9002)
     return max(vers) if vers else None
 
 
@@ -10083,6 +10087,8 @@ def cmd_plan(args: argparse.Namespace) -> int:
 
 CHANGELOG_GROUPS = ("Added", "Changed", "Deprecated", "Removed", "Fixed", "Security")
 CHANGELOG_VERSION_RE = re.compile(r"## \[(\d+)\.(\d+)\.(\d+)\] - (\d{4}-\d{2}-\d{2})(?: \[YANKED\])?")
+CHANGELOG_LINE_PREFIX = "## Dòng kế thừa"  # ranh giới dòng phát hành (ADR-9002), dưới nó là bản kế thừa
+CHANGELOG_LINE_RE = re.compile(re.escape(CHANGELOG_LINE_PREFIX) + r" X-Templates \(đến (\d+\.\d+\.\d+)\)")
 
 
 def _changelog_sections(text: str) -> List[Tuple[str, List[str]]]:
@@ -10124,28 +10130,52 @@ def _changelog_date_errors(head: str, raw: str, dates: List[_dt.date]) -> List[s
     return errs
 
 
+def _changelog_line_errors(
+    head: str, groups: List[str], after: List[Tuple[str, List[str]]], chains: List[List[Tuple[int, ...]]]
+) -> List[str]:
+    """Ranh giới dòng phát hành (ADR-9002): đúng dạng, không nhóm, một lần, sau ≥ 1 bản dòng mới, ngay trên bản X.Y.Z."""
+    m = CHANGELOG_LINE_RE.fullmatch(head)
+    if not m:
+        return [f"`{head}`: ranh giới dòng phải đúng dạng `{CHANGELOG_LINE_PREFIX} X-Templates (đến X.Y.Z)`"]
+    errs = [f"`{head}`: ranh giới không chứa nhóm `### …`"] if groups else []
+    if len(chains) > 1:
+        errs.append(f"`{head}`: chỉ được một ranh giới dòng phát hành")
+    elif not chains[0]:
+        errs.append(f"`{head}`: ranh giới dòng phát hành phải đứng sau ít nhất một bản của dòng mới")
+    nxt = CHANGELOG_VERSION_RE.fullmatch(after[0][0]) if after else None
+    if not nxt or ".".join(nxt.groups()[:3]) != m[1]:
+        errs.append(f"`{head}`: phải đứng ngay trên `## [{m[1]}] - YYYY-MM-DD` (bản cuối của dòng kế thừa)")
+    return errs
+
+
 def changelog_check(text: str, version: Optional[str], archive: str = "") -> List[str]:
     """Keep a Changelog 1.1.0 (BASE-REPO-007): `## [Unreleased]` đầu tiên, bản có ngày ISO 8601, giảm dần,
     nhóm chuẩn, không trùng nhóm trong Unreleased; bản mới nhất == `VERSION` (nếu có). `archive` = nội dung
-    CHANGELOG-ARCHIVE.md (T-3651, bản cũ dời ra): kiểm như đuôi của CHANGELOG — mục nào cũng phải là bản có ngày."""
+    CHANGELOG-ARCHIVE.md (T-3651, bản cũ dời ra): kiểm như đuôi của CHANGELOG — mục nào cũng phải là bản có ngày.
+    Ranh giới dòng phát hành (ADR-9002) bắt đầu chuỗi giảm dần mới; VERSION chỉ so dòng đầu."""
     sections = _changelog_sections(text)
     if not sections or sections[0][0] != "## [Unreleased]":
         return ["mục `## ` đầu tiên phải là `## [Unreleased]`"]
     errors = _changelog_group_errors(*sections[0], unreleased=True)
-    versions: List[Tuple[int, ...]] = []
+    chains: List[List[Tuple[int, ...]]] = [[]]
     dates: List[_dt.date] = []
-    for head, groups in sections[1:] + _changelog_sections(archive):
+    rest = sections[1:] + _changelog_sections(archive)
+    for i, (head, groups) in enumerate(rest):
+        if head.startswith(CHANGELOG_LINE_PREFIX):
+            errors += _changelog_line_errors(head, groups, rest[i + 1 : i + 2], chains)
+            chains.append([])
+            continue
         m = CHANGELOG_VERSION_RE.fullmatch(head)
         if not m:
             errors.append(f"`{head}`: phải dạng `## [X.Y.Z] - YYYY-MM-DD` (X.Y.Z không pre-release, ngày ISO 8601)")
             continue
         v = tuple(int(x) for x in m.groups()[:3])
-        if versions and v >= versions[-1]:
+        if chains[-1] and v >= chains[-1][-1]:
             errors.append(f"`{head}`: phiên bản phải giảm dần (bản mới nhất trước)")
-        versions.append(v)
+        chains[-1].append(v)
         errors += _changelog_date_errors(head, m.group(4), dates)
         errors += _changelog_group_errors(head, groups, unreleased=False)
-    latest = ".".join(map(str, versions[0])) if versions else None
+    latest = ".".join(map(str, chains[0][0])) if chains[0] else None
     if version and latest != version:
         errors.append(f"VERSION = {version} nhưng bản mới nhất trong CHANGELOG là {latest or '(không có)'}")
     return errors
@@ -12267,15 +12297,19 @@ def _reg_version(framework: Path) -> Optional[Tuple[str, Tuple[int, int, int], b
     return (m[0], (int(m[1]), int(m[2]), int(m[3])), bool(m[4])) if m else None
 
 
+REG_DRIFT_OK = ("current", "legacy-line")  # trạng thái không tính là lệch (`--strict` không đỏ)
+
+
 def _reg_drift(have: Optional[str], ver: Optional[Tuple[str, Tuple[int, int, int], bool]]) -> str:
-    """Lệch của bản `have` (X.Y.Z) so với VERSION khung: current · patch · minor · major · ahead · unknown."""
+    """Lệch của bản `have` (X.Y.Z) so với VERSION khung: current · patch · minor · major · ahead · legacy-line ·
+    unknown. `legacy-line` (ADR-9002): `have` là tag dòng kế thừa, khung đã sang dòng mới (số nhỏ hơn) — không lệch."""
     if have is None or ver is None:
         return "unknown"
     h, v = tuple(int(x) for x in have.split(".")), ver[1]
     if h == v:
         return "ahead" if ver[2] else "current"  # 3.30.0 > 3.30.0-rc1 (SemVer §11)
     if h > v:
-        return "ahead"
+        return "legacy-line" if h in LEGACY_RELEASE_TAGS and v not in LEGACY_RELEASE_TAGS else "ahead"
     return "major" if h[0] != v[0] else "minor" if h[1] != v[1] else "patch"
 
 
@@ -12290,7 +12324,7 @@ def registry_report(data: Dict[str, Any], framework: Path, today: _dt.date) -> D
         expired = [e["id"] for e in p["exceptions"] if e["until"] < today.isoformat()]  # ISO: so chuỗi = so ngày
         rows.append({"repo": p["repo"], "core": p["core"], "core_drift": _reg_drift(p["core"], ver)})
         rows[-1].update({"pack": pack, "pack_drift": pack_drift, "expired": expired})
-    drift = sum(1 for r in rows if r["core_drift"] != "current" or r["pack_drift"] not in (None, "current"))
+    drift = sum(1 for r in rows if r["core_drift"] not in REG_DRIFT_OK or r["pack_drift"] not in (None, *REG_DRIFT_OK))
     return {
         "schema": 1,
         "version": ver[0] if ver else None,

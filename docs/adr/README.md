@@ -3,7 +3,7 @@
 X-Office là dự án độc lập, không còn đồng bộ với X-Templates (D-9007). ADR `0001`–`8999` là lịch sử kế thừa, giữ nguyên số;
 ADR mới nối tiếp dải `9001+`.
 
-- **Số ADR kế tiếp** là số lớn nhất của dải `9001+` cộng 1 (hiện đã có ADR-9001); không dùng lại số `00xx`
+- **Số ADR kế tiếp** là số lớn nhất của dải `9001+` cộng 1 (hiện đã có ADR-9002); không dùng lại số `00xx`
   ([D-9001](../autopilot/DECISIONS.md)).
 - **Quyết định `D-NNN`**: số kế = max+1 của sổ (`loop decide`), nên tự tiếp nối `D-9001+`; `D-NNN` dưới 9000 là lịch sử kế thừa.
 - Đổi ý về một ADR đã chấp nhận: viết ADR mới, ADR cũ chỉ đổi dòng trạng thái (`/adr`).
@@ -14,3 +14,4 @@ ADR mới nối tiếp dải `9001+`.
 | Số | Quyết định |
 |---|---|
 | [ADR-9001](9001-office-view-renderers.md) | Màn Văn phòng của `xt.py app`: Canvas 2D mặc định, three.js vendor tuỳ chọn (trước là ADR-0082) |
+| [ADR-9002](9002-release-line.md) | Dòng phát hành riêng từ 1.0.0: ranh giới CHANGELOG, `LEGACY_RELEASE_TAGS`, registry `legacy-line` |
