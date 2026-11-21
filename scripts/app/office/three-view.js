@@ -5,6 +5,7 @@
 import * as THREE from "../vendor/three/three.module.js";
 import { compose, viewCorners } from "./scene.js";
 import { overlaps } from "./iso.js";
+import { createTextureBank } from "./textures.js";
 
 // Mặt phẳng chồng nhau (cửa sổ trên tường, thảm trên sàn) nằm đúng toạ độ; thứ tự phát (như painter của 2D) được giữ
 // bằng polygonOffset — dịch độ sâu, không dịch hình — nên toạ độ lớn (mặt tiền toà nhà) không bị đẩy lệch.
@@ -31,19 +32,39 @@ function parseColorNew(str) {
   return { color: new THREE.Color(str || "#ffffff"), alpha: 1 };
 }
 
-function setMat(mat, str, glow, glowOn) {
+const MATTE_TEX = new Set(["grass", "bark", "foliage", "fabric", "hair"]);
+const BUMP_SCALE = { bark: 0.05, stone: 0.04, foliage: 0.035, grass: 0.025, wood: 0.02, water: 0.02, fabric: 0.015, hair: 0.015 };
+
+function setMat(mat, str, glow, glowOn, tex, texKind) {
   const { color, alpha } = parseColor(str);
   mat.color.copy(color);
-  if (mat.transparent !== alpha < 1) mat.needsUpdate = true; // three.js chỉ đổi chương trình shader (OPAQUE) khi được báo
+  const nextMap = tex || null;
+  if (mat.transparent !== alpha < 1 || mat.map !== nextMap) mat.needsUpdate = true; // three.js chỉ biên dịch lại shader khi map/opacity đổi
   mat.transparent = alpha < 1;
   mat.opacity = alpha;
+  if ("map" in mat) {
+    mat.map = nextMap;
+    mat.bumpMap = nextMap;
+    mat.bumpScale = nextMap ? (BUMP_SCALE[texKind] || 0.015) : 0;
+  }
   if (mat.emissive) {
     if (glow && glowOn) mat.emissive.copy(parseColor(glow).color).multiplyScalar(0.55);
     else mat.emissive.setRGB(0, 0, 0);
   }
   if (mat.specular) {
-    mat.shininess = alpha < 1 ? 90 : 24;
-    mat.specular.setHex(alpha < 1 ? 0x94a3b8 : 0x222a36);
+    if (alpha < 1 || texKind === "water") {
+      mat.shininess = 95;
+      mat.specular.setHex(0xbfe8ff);
+    } else if (texKind === "screen") {
+      mat.shininess = 65;
+      mat.specular.setHex(0x607080);
+    } else if (MATTE_TEX.has(texKind)) {
+      mat.shininess = 8;
+      mat.specular.setHex(0x111518);
+    } else {
+      mat.shininess = 24;
+      mat.specular.setHex(0x222a36);
+    }
   }
 }
 
@@ -130,6 +151,7 @@ export function createThreeView(stage, onTagClick) {
   scene.add(sun, sun.target);
 
   const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+  const textures = createTextureBank(THREE);
   const SHAPES = {
     box: boxGeo,
     cyl: new THREE.CylinderGeometry(0.5, 0.5, 1, 14),
@@ -165,13 +187,14 @@ export function createThreeView(stage, onTagClick) {
     m.position.set(b.x + b.w / 2, b.z + b.h / 2, b.y + b.d / 2);
     m.rotation.set(b.rx || 0, b.rz || 0, b.ry || 0);
     m.scale.set(Math.max(b.w, 0.001), Math.max(b.h, 0.001), Math.max(b.d, 0.001));
+    const tex = b.tex ? textures.get(b.tex) : null;
     if (shape === "box" && (b.top || b.front || b.side)) {
       // Thứ tự mặt của BoxGeometry: +x, −x, +y(trên), −y, +z(trước = +y thế giới), −z.
       const faces = [b.side || b.color, b.color, b.top || b.color, b.color, b.front || b.color, b.color];
-      faces.forEach((c, i) => setMat(m.userData.multi[i], c, b.glow, glowOn));
+      faces.forEach((c, i) => setMat(m.userData.multi[i], c, b.glow, glowOn, tex, b.tex));
       m.material = m.userData.multi;
     } else {
-      setMat(m.userData.single, b.top || b.color, b.glow, glowOn);
+      setMat(m.userData.single, b.top || b.color, b.glow, glowOn, tex, b.tex);
       m.material = m.userData.single;
     }
   }
@@ -192,7 +215,8 @@ export function createThreeView(stage, onTagClick) {
       m.rotation.x = -Math.PI / 2;
     }
     m.scale.set(f.w, f.h, 1);
-    setMat(m.material, f.color, f.glow, glowOn);
+    const tex = f.tex ? textures.get(f.tex) : null;
+    setMat(m.material, f.color, f.glow, glowOn, tex, f.tex);
   }
 
   // Điểm màn (px trong khung) có nằm trên sàn hay tường neo của CHÍNH phòng `r` không: tia từ camera qua điểm đó cắt
@@ -363,6 +387,7 @@ export function createThreeView(stage, onTagClick) {
 
   let curBox = null;
   let curZoom = 1;
+  let prevT = 0;
 
   const api = {
     canvas,
@@ -389,6 +414,8 @@ export function createThreeView(stage, onTagClick) {
       hemi.intensity = dark ? 1.25 : 1.8;
       sun.intensity = dark ? 1.45 : 1.55;
       scene.background = parseColor(opts.theme.bg).color;
+      if (opts.motion && prevT) textures.animate(Math.min(0.1, Math.max(0, (opts.t || 0) - prevT)));
+      prevT = opts.t || 0;
       const sink = new Collector();
       const { plan } = compose(sink, opts, false);
       sink.boxes.forEach((b) => syncBox(b, glowOn));
@@ -436,6 +463,7 @@ export function createThreeView(stage, onTagClick) {
     dispose() {
       renderer.dispose();
       renderer.forceContextLoss(); // trả ngữ cảnh WebGL ngay (trình duyệt giới hạn số ngữ cảnh sống)
+      textures.dispose();
       for (const g of [...Object.values(SHAPES), planeGeo, dotGeo, ringGeo]) g.dispose();
       scene.traverse((o) => {
         if (!o.material) return;
