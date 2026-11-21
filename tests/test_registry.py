@@ -439,15 +439,19 @@ class TargetReposTest(unittest.TestCase):
 
 
 class RealRegistryTest(unittest.TestCase):
-    """`docs/ops/registry.json` của repo khung hợp lệ và chỉ chứa dữ kiện đọc được (không bịa digest/SLO)."""
+    """`docs/ops/registry.json` của repo hợp lệ (schema 1) và chỉ chứa dữ kiện đọc được (không bịa digest/SLO). X-Office là
+    dự án đích độc lập (D-9007): không theo dõi dự án khác, registry rỗng — test không gắn tên repo nào, chỉ đối chiếu."""
 
     def test_real_file_validates(self) -> None:
-        data, errors = xt.registry_load(ROOT / "docs" / "ops" / "registry.json", ROOT / "framework")
+        path = ROOT / "docs" / "ops" / "registry.json"
+        data, errors = xt.registry_load(path, ROOT / "framework")
         self.assertEqual(errors, [])
         assert data is not None
+        self.assertEqual(json.loads(path.read_text(encoding="utf-8"))["schema"], 1)
         repos = [p["repo"] for p in data["products"]]
-        self.assertIn("www-donghanhcungban-org/hotel-manager", repos)
         targets = (ROOT / "docs" / "ops" / "TARGETS.md").read_text(encoding="utf-8")
+        # mục đọc được dù rỗng: thiếu tiêu đề thì đối chiếu hai chiều dưới đây luôn so hai danh sách rỗng
+        self.assertIn("\n## Danh sách\n", targets)
         # hai chiều (AUD-TEST-064): repo thêm vào TARGETS.md mà quên registry cũng đỏ
         self.assertEqual(sorted(target_repos(targets)), sorted(repos))
         for p in data["products"]:
@@ -457,24 +461,28 @@ class RealRegistryTest(unittest.TestCase):
 
     def test_real_file_cli(self) -> None:
         env = {**os.environ, "CLAUDE_PROJECT_DIR": str(ROOT)}
-        r = subprocess.run(
-            [sys.executable, str(ROOT / "scripts" / "xt.py"), "registry", "--json"],
-            capture_output=True,
-            text=True,
-            check=False,
-            env=env,
-        )
+
+        def run(*extra: str) -> "subprocess.CompletedProcess[str]":
+            cmd = [sys.executable, str(ROOT / "scripts" / "xt.py"), "registry", *extra]
+            return subprocess.run(cmd, capture_output=True, text=True, check=False, env=env)
+
+        r = run("--json")
         self.assertEqual(r.returncode, 0, r.stderr)
         got = json.loads(r.stdout)
         self.assertEqual(got["version"], (ROOT / "VERSION").read_text(encoding="utf-8").strip())
-        # số lệch tính độc lập từ registry.json + VERSION: core hoặc gói khác VERSION khung (dữ kiện thật đổi theo dự án
-        # đích — không giả định "mọi dự án đều cũ"; review #461)
+        # số lệch tính độc lập từ registry.json + VERSION: core hoặc gói khác VERSION khung (dữ kiện thật đổi theo
+        # registry — không giả định số sản phẩm hay "mọi dự án đều cũ"; review #461)
         data = json.loads((ROOT / "docs" / "ops" / "registry.json").read_text(encoding="utf-8"))
         want = sum(
             p["core"] != got["version"] or (p["pack"] is not None and p["pack"]["version"] != got["version"])
             for p in data["products"]
         )
         self.assertEqual(want, got["drift"])
+        self.assertEqual(len(got["products"]), len(data["products"]))
+        # --strict đỏ đúng khi còn lệch hoặc ngoại lệ hết hạn (registry rỗng → xanh)
+        strict = run("--strict")
+        self.assertEqual(strict.returncode, 1 if want or got["expired"] else 0, strict.stdout + strict.stderr)
+        self.assertIn(f"{len(data['products'])} sản phẩm · lệch {want} ·", strict.stdout)
 
 
 def call(base: Path, framework: Path) -> Dict[str, Any]:
@@ -528,6 +536,28 @@ class AppTest(unittest.TestCase):
         )
         self.assertEqual((row["release"], row["exceptions"]), (rel, exc))  # dữ liệu thô; màn hiện bằng textContent
         self.assertEqual((got["drift"], got["expired"]), (0, 1))
+
+    def test_empty_registry_available(self) -> None:
+        """Registry rỗng (X-Office không theo dõi dự án khác — D-9007) là trạng thái hợp lệ: màn hiện "Chưa có sản phẩm"."""
+        with Sandbox() as sb:
+            sb.write(registry())
+            got = call(sb.base, sb.framework)
+        self.assertEqual(
+            got,
+            {
+                "schema": 1,
+                "version": "3.29.2",
+                "products": [],
+                "drift": 0,
+                "expired": 0,
+                "available": True,
+                "path": "docs/ops/registry.json",
+            },
+        )
+        view = (ROOT / "scripts" / "app" / "views" / "registry.js").read_text(encoding="utf-8")
+        self.assertIn(
+            'd.products.length ? table(h, d.products) : h("p", { class: "muted" }, "Chưa có sản phẩm.")', view
+        )
 
     def test_concurrent_reads_same_result_no_write(self) -> None:
         with Sandbox() as sb:
