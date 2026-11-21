@@ -2,7 +2,8 @@
 
 > **Xem AI agent làm việc như một văn phòng thật.** Mỗi agent của vòng tự động (điều phối, `executor`, `executor-deep`,
 > `reviewer`, `researcher`) ngồi một bàn trong văn phòng isometric chạy ngay trên trình duyệt: đang làm, đang sửa khi cổng
-> đỏ, chờ người, xong hay rảnh. Trạng thái lấy từ bằng chứng máy của vòng lặp, không phải lời khai.
+> đỏ, chờ người, xong hay rảnh. Trạng thái lấy từ bằng chứng máy của vòng lặp, không phải lời khai. Riêng bàn `reviewer` và
+> `researcher` hiện "chưa có tín hiệu" vì vòng chưa ghi lần chạy của hai vai này.
 >
 > Mã mở [MIT](LICENSE), miễn phí. Thấy hữu ích? [Ủng hộ tác giả](#ủng-hộ-và-liên-hệ) ☕
 
@@ -17,14 +18,14 @@ python3 scripts/xt.py app          # máy chủ 127.0.0.1, in URL kèm token r�
 | Bạn muốn | Văn phòng cho bạn |
 |---|---|
 | Biết agent nào đang làm gì | Mỗi agent một bàn; trạng thái suy từ verdict của vòng và `.autopilot/runs.jsonl`, kèm danh sách "Ai đang làm gì", feed lần chạy gần đây và việc chờ người |
-| Nhìn ở quy mô của mình | Quy mô **nhóm nhỏ** (1 phòng), **công ty** (khu có lễ tân, giám đốc, phòng họp, server, pantry, khu làm việc mở, vườn hồ bơi) và **tập đoàn** (toà nhà 4 tầng); nhân viên minh hoạ lấp bàn trống, tắt được |
+| Nhìn ở quy mô của mình | Quy mô **nhóm nhỏ** (1 phòng), **công ty** (khu có lễ tân, giám đốc, phòng họp, server, pantry, khu làm việc mở, vườn hồ bơi) và **tập đoàn** (toà nhà nhiều tầng mặt kính, mặt bằng công ty ở tầng thượng); nhân viên minh hoạ lấp bàn trống, tắt được |
 | Chọn không khí | 8 kiểu văn phòng (công nghệ, studio sáng tạo, thư viện, ban đêm, cyberpunk, quán cà phê, vũ trụ, bệnh viện) và lớp mùa |
 | Đi tới đúng chỗ | Nút "Tới phòng" và "tới bàn" (bấm tên agent) đưa camera tới phòng hoặc bàn ở cả 2D lẫn 3D; kéo để dời góc nhìn, phóng tới 4× |
 | Máy yếu vẫn xem được | Canvas 2D tự viết là mặc định, không phụ thuộc; bộ vẽ **3D three.js** (≈ 2,1 MB, cần WebGL) là tuỳ chọn tải lười, cài bằng `install.py --with-office-3d` ([ADR-9001](docs/adr/9001-office-view-renderers.md)) |
 | Dùng được bằng bàn phím và trình đọc màn hình | Canvas có nhãn tóm tắt và phím mũi tên/`+`/`-`/`0`; bảng "Ai đang làm gì" là bản văn bản tương đương; tôn trọng `prefers-reduced-motion` |
 
-"Online" ở đây nghĩa là chạy trong trình duyệt. Hiện app là máy chủ cục bộ chỉ đọc; **chưa có** dịch vụ lưu trữ hay nhiều người
-cùng vào một văn phòng. Đặc tả: [`SPEC-app.md`](docs/specs/SPEC-app.md) F-008.
+"Online" ở đây nghĩa là chạy trong trình duyệt. Hiện app là máy chủ cục bộ, không chạy lệnh và chỉ ghi `BLUEPRINT.md` ở màn Ghép
+(màn Văn phòng chỉ đọc); **chưa có** dịch vụ lưu trữ hay nhiều người cùng vào một văn phòng. Đặc tả: [`SPEC-app.md`](docs/specs/SPEC-app.md) F-008.
 
 ## Quy trình phát triển đi kèm
 
