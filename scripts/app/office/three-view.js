@@ -133,7 +133,7 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
   const scene = new THREE.Scene();
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 200);
   const target = new THREE.Vector3(8, 1.3, 6);
-  const view = { az: Math.PI / 4, el: Math.atan(1 / Math.SQRT2), panX: 0, panZ: 0, w: 800, h: 540 };
+  const view = { az: Math.PI / 4, el: Math.atan(1 / Math.SQRT2), panX: 0, panZ: 0, freeZoom: 1, w: 800, h: 540 };
   const hemi = new THREE.HemisphereLight(0xffffff, 0x8a8a9a, 1.6);
   scene.add(hemi);
   const fill = new THREE.DirectionalLight(0xcbd5e1, 0.42);
@@ -416,10 +416,16 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
   let moved = 0;
   canvas.tabIndex = 0;
   canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+  let lastZoom = 1;
   canvas.addEventListener("wheel", (e) => {
-    if (!onZoom || e.ctrlKey) return;
+    if (e.ctrlKey) return;
     e.preventDefault();
-    onZoom(e.deltaY < 0 ? 1.12 : 0.89);
+    const f = e.deltaY < 0 ? 1.12 : 0.89;
+    const minF = 0.3 / Math.max(0.5, lastZoom);
+    const maxF = 8 / Math.max(0.5, lastZoom);
+    view.freeZoom = Math.min(maxF, Math.max(minF, view.freeZoom * f));
+    api.dirty = true;
+    if (onZoom) onZoom(Math.round(lastZoom * view.freeZoom * 100));
   }, { passive: false });
   canvas.addEventListener("pointerdown", (e) => {
     const pan = e.button === 2 || e.shiftKey;
@@ -479,6 +485,9 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
   const api = {
     canvas,
     dirty: true,
+    freeZoom() {
+      return view.freeZoom;
+    },
     resetPan() {
       view.panX = 0;
       view.panZ = 0;
@@ -489,6 +498,7 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
       view.el = Math.atan(1 / Math.SQRT2);
       view.panX = 0;
       view.panZ = 0;
+      view.freeZoom = 1;
       api.dirty = true;
     },
     resize(w, h, dpr) {
@@ -561,7 +571,8 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
       });
       for (const p of [boxes, panels, dots, rings]) p.finish();
       const dstBox = viewCorners(opts).box;
-      const dstZoom = opts.zoom || 1;
+      lastZoom = opts.zoom || 1;
+      const dstZoom = lastZoom * view.freeZoom;
       let moving = false;
       if (!curBox || !opts.motion) {
         curBox = { ...dstBox };

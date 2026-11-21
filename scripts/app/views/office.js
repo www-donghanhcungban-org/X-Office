@@ -289,7 +289,9 @@ export async function render(main, { api, h, error }) {
             ? hit.label + " · " + (STATE_TEXT[hit.state] || hit.state) + (hit.task ? " (" + hit.task + ")" : "") + " — bấm tới bàn"
             : "▸ " + hit.label + " — bấm tới phòng";
           hoverHud.hidden = false;
-        }, (f) => zoomBy(f));
+        }, (pct) => {
+          zoomVal.textContent = pct + "%";
+        });
         rmsg.replaceChildren();
         canvas.hidden = true;
         three.canvas.setAttribute("aria-label", canvas.getAttribute("aria-label") || "Văn phòng");
@@ -368,8 +370,8 @@ export async function render(main, { api, h, error }) {
     el.addEventListener("change", changed);
   }
   const zoomBy = (f) => {
-    prefs.zoom = Math.min(8, Math.max(0.3, +(prefs.zoom * f).toFixed(2)));
-    zoomVal.textContent = Math.round(prefs.zoom * 100) + "%";
+    prefs.zoom = Math.min(4, Math.max(0.5, +(prefs.zoom * f).toFixed(2)));
+    zoomVal.textContent = Math.round(prefs.zoom * (three ? three.freeZoom() : 1) * 100) + "%";
     persist();
     panTo(view.pan.x, view.pan.y); // thu nhỏ thì biên dời hẹp lại — kẹp lại góc nhìn đang dời
     if (three) three.dirty = true;
