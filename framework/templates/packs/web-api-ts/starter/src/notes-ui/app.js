@@ -99,11 +99,16 @@ async function perform(target, task) {
     await task();
   } catch (error) {
     // Hết phiên đã đưa người dùng về màn đăng nhập: báo lỗi ở đó.
-    report(session ? target : loginStatus, error instanceof TypeError ? "Mất kết nối. Hãy kiểm tra mạng và tải lại." : error.message, true);
+    report(
+      session ? target : loginStatus,
+      error instanceof TypeError ? "Mất kết nối. Hãy kiểm tra mạng và tải lại." : error.message,
+      true,
+    );
   } finally {
     for (const button of buttons) button.disabled = false;
     const lost = !document.activeElement || document.activeElement === document.body;
-    if (lost && focused instanceof HTMLButtonElement && !focused.closest("[hidden]")) focused.focus({ preventScroll: true });
+    if (lost && focused instanceof HTMLButtonElement && !focused.closest("[hidden]"))
+      focused.focus({ preventScroll: true });
   }
 }
 
