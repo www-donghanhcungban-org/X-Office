@@ -907,6 +907,21 @@ class DoctorVersionTest(DoctorCase):
         want = ["gh", "api", "--hostname", "github.com", "repos/fork/khung/tags?per_page=100&page=1"]
         self.assertEqual(run.call_args[0][0], want)
 
+    def test_latest_tag_skips_legacy_line(self):
+        """ADR-9002: tag dòng kế thừa (v3.34.0) không thắng dòng mới khi tìm bản mới nhất; `--drift` báo bản mới."""
+        tags = [{"name": "v3.34.0"}, {"name": "v1.0.1"}, {"name": "v1.0.0"}, {"name": "v0.19.0"}]
+        with self.gh(out=json.dumps(tags)):
+            self.assertEqual(xt.latest_framework_tag(), (1, 0, 1))
+        with self.gh(out=json.dumps([{"name": "v3.34.0"}])):
+            self.assertIsNone(xt.latest_framework_tag())
+        self.write(".xtemplates/VERSION", "1.0.0 (abc1234)\n")
+        with self.gh(out=json.dumps(tags)):
+            label, want, found = xt._drift_version(self.base, None)
+        self.assertEqual((label, want, [d["state"] for d in found]), ("1.0.0 (abc1234)", "1.0.1", ["outdated"]))
+        self.write(".xtemplates/VERSION", "3.34.0 (abc1234)\n")  # bản cài cũ của dòng kế thừa: have > latest như cũ
+        with self.gh(out=json.dumps(tags)):
+            self.assertEqual(xt._drift_version(self.base, None)[2], [])
+
     def test_doctor_warns_only_when_installed_is_older(self):
         def msgs(latest):
             with unittest.mock.patch.object(xt, "latest_framework_tag", return_value=latest):

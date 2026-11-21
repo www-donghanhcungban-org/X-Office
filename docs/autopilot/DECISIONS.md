@@ -624,3 +624,10 @@
 - Chọn: A; sổ audit và nhật ký quyết định giữ nguyên làm bản ghi
 - Lý do (tiêu chí chất lượng cuối): Chủ dự án chỉ thị 2026-11-20: X-Office độc lập, hết đồng bộ; đảo AUD-DOC-309
 - Đường lùi: git revert commit đổi tên
+
+### D-9008 · 2026-11-21T03:25:02+00:00 · X-Office là dự án đích có dòng phát hành riêng: đánh số và chỉnh công cụ thế nào
+
+- Phương án: (1) A: bắt đầu dòng mới ở 1.0.0; công cụ nhận 'ranh giới dòng' (changelog-check, latest tag, registry) · giữ tag kế thừa · (2) B: tiếp 3.35.0 theo số X-Templates
+- Chọn: A: bắt đầu dòng mới ở 1.0.0; công cụ nhận 'ranh giới dòng' (changelog-check, latest tag, registry) · giữ tag kế thừa
+- Lý do (tiêu chí chất lượng cuối): Chủ dự án: dự án đích không cắt bản theo X-Templates và chọn 1.0.0; tiêu chí 1: công cụ phải đúng với số nhỏ hơn tag kế thừa v3.34.0
+- Đường lùi: Đặt VERSION về 3.34.0 và hoàn tác thay đổi công cụ

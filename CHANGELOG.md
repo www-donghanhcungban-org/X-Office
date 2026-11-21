@@ -8,6 +8,8 @@ Bản < 3.20.0: [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md) (T-3651; `changel
 
 ### Added
 
+- Dòng phát hành riêng của X-Office (ADR-9002): `changelog-check` nhận tiêu đề ranh giới `## Dòng kế thừa X-Templates (đến X.Y.Z)`, `latest_framework_tag` bỏ qua tag kế thừa, `registry` có trạng thái `legacy-line`.
+
 - Màn Văn phòng thêm tuỳ chọn **Quy mô**: nhóm nhỏ (1 phòng), công ty (khu 44×22 có lễ tân, giám đốc, phòng họp, server,
   pantry, ngủ trưa, khu làm việc mở 28 bàn, vườn hồ bơi, sân cỏ và hàng cây), tập đoàn (toà nhà 4 tầng mặt kính, mặt bằng
   công ty ở tầng thượng). Nút "Tới phòng" và "tới bàn" (bấm tên agent) đưa camera tới phòng/bàn ở cả 2D lẫn 3D; kéo để dời

@@ -2390,6 +2390,68 @@ class ChangelogArchiveTest(unittest.TestCase):
         self.assertIn("## [3.19.2]", archive)
 
 
+class ChangelogReleaseLineTest(unittest.TestCase):
+    """ADR-9002: ranh giới `## Dòng kế thừa X-Templates (đến X.Y.Z)` tách dòng phát hành mới khỏi dòng kế thừa — dưới ranh
+    giới "giảm dần" tính lại; bản mới nhất == VERSION chỉ xét dòng đầu; mục kế thừa vẫn kiểm dạng, ngày, nhóm."""
+
+    LINE = "## Dòng kế thừa X-Templates (đến 3.34.0)"
+    NEW = (
+        "## [Unreleased]\n\n## [1.0.1] - 2026-11-22\n\n### Fixed\n- a\n\n## [1.0.0] - 2026-11-21\n\n### Added\n- b\n\n"
+    )
+    OLD = "## [3.34.0] - 2026-11-20\n\n### Added\n- c\n\n## [3.33.0] - 2026-11-19\n"
+    ARCH = "## [3.19.2] - 2026-10-24\n\n### Fixed\n- d\n"
+
+    def check(self, text: str, version: str | None = "1.0.1", archive: str = "") -> list[str]:
+        return xt.changelog_check(text, version, archive)
+
+    def test_boundary_restarts_descending_chain(self):
+        self.assertEqual(self.check(self.NEW + self.LINE + "\n\n" + self.OLD, archive=self.ARCH), [])
+        other = self.LINE.replace("3.34.0", "2.0.0") + "\n\n## [2.0.0] - 2026-11-20\n"  # mọi X.Y.Z, không cứng một bản
+        self.assertEqual(self.check(self.NEW + other), [])
+        self.assertEqual(
+            self.check(self.NEW + self.OLD),
+            ["`## [3.34.0] - 2026-11-20`: phiên bản phải giảm dần (bản mới nhất trước)"],
+        )
+        self.assertEqual(  # dòng mới vẫn phải giảm dần; VERSION chỉ so dòng đầu
+            self.check(self.NEW.replace("1.0.1", "0.9.0") + self.LINE + "\n" + self.OLD, "3.34.0"),
+            [
+                "`## [1.0.0] - 2026-11-21`: phiên bản phải giảm dần (bản mới nhất trước)",
+                "VERSION = 3.34.0 nhưng bản mới nhất trong CHANGELOG là 0.9.0",
+            ],
+        )
+
+    def test_legacy_entries_still_checked(self):
+        old = self.OLD.replace("[3.33.0] - 2026-11-19", "[3.40.0] - 2026-11-19").replace("### Added", "### Misc")
+        old += "## 3.32.0\n\n## [3.31.0] - 2026-11-30\n"
+        self.assertEqual(
+            self.check(self.NEW + self.LINE + "\n" + old),
+            [
+                "## [3.34.0] - 2026-11-20: nhóm `### Misc` không thuộc Added/Changed/Deprecated/Removed/Fixed/Security",
+                "`## [3.40.0] - 2026-11-19`: phiên bản phải giảm dần (bản mới nhất trước)",
+                "`## 3.32.0`: phải dạng `## [X.Y.Z] - YYYY-MM-DD` (X.Y.Z không pre-release, ngày ISO 8601)",
+                "`## [3.31.0] - 2026-11-30`: ngày phải giảm dần theo bản (bản cũ không mới hơn bản mới)",
+            ],
+        )
+
+    def test_misplaced_or_malformed_boundary(self):
+        head = f"`{self.LINE}`"
+        on_top = self.check("## [Unreleased]\n\n" + self.LINE + "\n\n" + self.OLD, None)
+        self.assertEqual(on_top, [f"{head}: ranh giới dòng phát hành phải đứng sau ít nhất một bản của dòng mới"])
+        twice = self.check(self.NEW + self.LINE + "\n\n## [3.34.0] - 2026-11-20\n\n" + self.LINE + "\n\n" + self.OLD)
+        self.assertEqual(twice, [f"{head}: chỉ được một ranh giới dòng phát hành"])
+        below = f"{head}: phải đứng ngay trên `## [3.34.0] - YYYY-MM-DD` (bản cuối của dòng kế thừa)"
+        self.assertEqual(self.check(self.NEW + self.LINE + "\n\n" + self.OLD.replace("3.34.0", "3.34.1")), [below])
+        self.assertEqual(self.check(self.NEW + self.LINE + "\n"), [below])  # ranh giới là mục cuối
+        grouped = self.check(self.NEW + self.LINE + "\n\n### Added\n- x\n\n" + self.OLD)
+        self.assertEqual(grouped, [f"{head}: ranh giới không chứa nhóm `### …`"])
+        for bad in ("## Dòng kế thừa X-Templates", "## Dòng kế thừa X-Templates (đến 3.34)"):
+            with self.subTest(bad=bad):
+                self.assertEqual(
+                    self.check(self.NEW + bad + "\n\n" + self.OLD),
+                    [f"`{bad}`: ranh giới dòng phải đúng dạng `{xt.CHANGELOG_LINE_PREFIX} X-Templates (đến X.Y.Z)`"],
+                )
+
+
 class DecisionLogsTest(unittest.TestCase):
     """T-3651: DECISIONS.md tách theo tháng (`DECISIONS-YYYY-MM.md` cạnh sổ) — `prod_switch` (release-check/next-step) và
     tra D-NNN đọc cả bản tháng; `loop decide` vẫn ghi DECISIONS.md."""
