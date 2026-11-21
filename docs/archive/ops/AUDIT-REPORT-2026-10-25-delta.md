@@ -1,4 +1,4 @@
-# AUDIT-REPORT — X-Templates · 2026-10-25 (delta `e5ff88c..3ba5828`)
+# AUDIT-REPORT — X-Office · 2026-10-25 (delta `e5ff88c..3ba5828`)
 
 > Commit quét: `main` `3ba5828` (3.22.0) · Phạm vi: delta `e5ff88c..3ba5828` (#246–#253, D-161, D-168…D-172) — nhóm 1 ARCH, 2 SEC,
 > 3 CODE, 4 TEST, 8 CI, 9 DOC, 12 XFEAT, 13 HAR, kèm xác minh lại 64 bằng chứng blueprint · Lý do: `release-check` NO-GO, hàng

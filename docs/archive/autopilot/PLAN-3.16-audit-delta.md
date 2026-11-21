@@ -1,4 +1,4 @@
-# PLAN-3.16-audit-delta.md — Khung X-Templates · audit delta `0afa30d..HEAD` → `release-check` GO
+# PLAN-3.16-audit-delta.md — Khung X-Office · audit delta `0afa30d..HEAD` → `release-check` GO
 
 > Lập ngày 2026-10-22. Chủ repo gọi lại `/autopilot` sau PLAN-3.15.5 (done). `release-check` @ `e7a717b` NO-GO còn hai
 > blocker máy làm được: `review_debt` (88 file ngoài tài liệu đổi sau SHA quét — ADR-0031) và `audit` (nhóm 6 A11Y ghi N/A

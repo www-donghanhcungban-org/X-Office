@@ -1,4 +1,4 @@
-# AUDIT-REPORT — Khung X-Templates · 2026-10-27 (delta)
+# AUDIT-REPORT — Khung X-Office · 2026-10-27 (delta)
 
 > Commit quét: `137a0478824d6c842e8ad31b3f61272ea022930f` (`main`, sau #275, #276, #284–#288) · Chế độ: **delta** từ `e8c8d96` (SEC, DEP, CI, DOC, HAR có file đổi) · Quy trình: [`framework/00-method/audit.md`](../../../framework/00-method/audit.md)
 > Người quét: phiên chính + 2 subagent `reviewer` read-only (SEC/DEP/CI · DOC/HAR), lệnh `/complete` Bước 2 · Xác minh đối kháng: không cần (0 🔴/🟠)

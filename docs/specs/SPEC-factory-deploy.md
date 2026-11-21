@@ -45,7 +45,8 @@ trước. Trước khi tôi thiết lập gì, bản dev phải chạy được 
 Khung không biết container hay máy chủ nào: mọi thứ nằm trong lệnh của dự án. Lệnh nhận biến môi trường:
 `XT_DEPLOY_ENV`, `XT_DEPLOY_DIGEST` (= `subject.digest`), `XT_DEPLOY_ARTIFACTS` (đường artifact, cách nhau khoảng trắng),
 `XT_DEPLOY_PREVIOUS` (digest bản đang phục vụ trước đó, rỗng nếu chưa có), `XT_DEPLOY_STATE` (thư mục cục bộ của môi
-trường để lệnh giữ thứ cần cho quay lui).
+trường để lệnh giữ thứ cần cho quay lui), `XT_DEPLOY_KEEP` (digest của slot `current`/`previous` trước lần ghi đè, cách
+nhau khoảng trắng; adapter dọn ảnh cũ không được xoá các digest này, thiếu biến thì không dọn).
 
 ### 2.2 Lệnh
 | Lệnh | Việc | Exit |

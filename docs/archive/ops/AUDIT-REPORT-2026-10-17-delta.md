@@ -1,4 +1,4 @@
-# AUDIT-REPORT 2026-10-17 (delta #68–#80) — Khung X-Templates
+# AUDIT-REPORT 2026-10-17 (delta #68–#80) — Khung X-Office
 
 > Quét lại theo diff sau `541e81f`. SHA quét `main` `536584f`. Người quét: phiên chính + subagent `reviewer` (mã) + `Explore` (tài liệu).
 > Xác minh đối kháng: phiên chính chạy lại độc lập `guard.bash_decision` cho các 🟠 (SEC-033/034/035/038 tái hiện được); SEC-036 không tái hiện được nửa sau → hạ 🟢.

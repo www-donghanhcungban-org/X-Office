@@ -1,4 +1,4 @@
-# ADR-0078: Dùng một dòng Python 3.15 cho công cụ X-Templates
+# ADR-0078: Dùng một dòng Python 3.15 cho công cụ X-Office
 
 - **Trạng thái:** Đã chấp nhận ngày 2026-11-14 (D-485).
 - **Trạng thái triển khai:** Đã triển khai — merge ở #557 (cập nhật 2026-11-19, T-3958).

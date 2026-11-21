@@ -1,6 +1,6 @@
 # ADR-0083: Điều phối ba giai đoạn từ bằng chứng của dự án
 
-- **Trạng thái:** Đã chấp nhận ngày 2026-11-20 theo [D-521 của X-Templates](https://github.com/www-donghanhcungban-org/X-Templates/blob/3a1cd5471cb1f634656c62369559c4a489a58dcc/docs/autopilot/DECISIONS.md).
+- **Trạng thái:** Đã chấp nhận ngày 2026-11-20 theo [D-521 của X-Office](https://github.com/www-donghanhcungban-org/X-Templates/blob/3a1cd5471cb1f634656c62369559c4a489a58dcc/docs/autopilot/DECISIONS.md).
 
 ## Bối cảnh
 

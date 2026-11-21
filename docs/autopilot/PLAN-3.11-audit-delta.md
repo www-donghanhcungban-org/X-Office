@@ -1,4 +1,4 @@
-# PLAN-3.11-audit-delta.md — Khung X-Templates · audit delta `f36ea90..0afa30d` → `release-check` GO
+# PLAN-3.11-audit-delta.md — Khung X-Office · audit delta `f36ea90..0afa30d` → `release-check` GO
 
 > Lập ngày 2026-10-20. Chủ repo gọi `/autopilot` không kèm yêu cầu mới → nối tiếp PROGRESS "Tiếp theo 0": sau #185/#186
 > chạy `loop verify --all` rồi `release-check`. `release-check` tại `0afa30d` = NO-GO, hàng `review_debt` FAIL: 16 file

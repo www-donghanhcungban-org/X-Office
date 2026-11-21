@@ -1,4 +1,4 @@
-# PLAN-3.25-optimize.md — Khung X-Templates · `/optimize`, số field qua file, người ký một lần (ADR-0048) → bản 3.25.0
+# PLAN-3.25-optimize.md — Khung X-Office · `/optimize`, số field qua file, người ký một lần (ADR-0048) → bản 3.25.0
 
 > Lập ngày 2026-10-25. Chủ repo đề xuất dòng chảy build → complete → optimize → ký → production → số thật → optimize → ký;
 > chốt phương án B (D-180). Quyết định: ADR-0048. Phiên chính tự duyệt (ADR-0008).

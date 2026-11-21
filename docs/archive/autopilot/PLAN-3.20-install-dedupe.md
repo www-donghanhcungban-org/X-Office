@@ -1,4 +1,4 @@
-# PLAN-3.20-install-dedupe.md — Khung X-Templates · gom mệnh đề "Dự án đích" trùng của `install.py` → bản 3.18.3
+# PLAN-3.20-install-dedupe.md — Khung X-Office · gom mệnh đề "Dự án đích" trùng của `install.py` → bản 3.18.3
 
 > Lập ngày 2026-10-24. Chủ repo yêu cầu làm nợ 🟢 #191 (PROGRESS "Nợ 🟢"). Phiên chính tự duyệt (D-159).
 >

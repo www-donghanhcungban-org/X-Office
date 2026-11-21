@@ -2263,6 +2263,55 @@ class LedgerArchiveTest(unittest.TestCase):
         rows = xt.audit_findings(self.status)
         self.assertEqual([r["ID"] for r in rows], ["AUD-SEC-001", "AUD-SEC-003", "AUD-SEC-005", "AUD-SEC-002"])
 
+    def ids(self, text):
+        return [r["ID"] for r in xt.archive_tables(text).get("Phát hiện", [])]
+
+    def test_archive_tables_indented_rows_kept(self):
+        """AUD-HAR-451 (A): dòng bảng thụt lề (`md_tables` nhận qua lstrip) không bị mất."""
+        text = archive_text([self.FIXED]) + "  | " + self.FIXED.replace("001", "007") + " |\n"
+        self.assertEqual(self.ids(text), ["AUD-SEC-001", "AUD-SEC-007"])
+
+    def test_archive_tables_fenced_example_ignored(self):
+        """AUD-HAR-451 (C, D): bảng/heading trong code fence là ví dụ mẫu, không phải bảng thật."""
+        sample = "```md\n## Phát hiện\n" + FINDING_HEAD + "| AUD-XXX-999 | 🔴 | mở | m | e | g | n |\n```\n"
+        before = "# lưu trữ\n\n" + sample + "\n" + archive_text([self.FIXED])
+        self.assertEqual(self.ids(before), ["AUD-SEC-001"])
+        after = archive_text([self.FIXED]) + "\n~~~\n| AUD-XXX-998 | 🔴 | mở | m | e | g | n |\n~~~\n"
+        self.assertEqual(self.ids(after), ["AUD-SEC-001"])
+
+    def test_archive_tables_repeated_header_batch(self):
+        """AUD-HAR-451 (B): đợt dời lặp tiêu đề + phân cách không thành một phát hiện."""
+        text = (
+            archive_text([self.FIXED])
+            + "\n> Đợt 2\n\n"
+            + FINDING_HEAD
+            + "| "
+            + self.FIXED.replace("001", "002")
+            + " |\n"
+        )
+        self.assertEqual(self.ids(text), ["AUD-SEC-001", "AUD-SEC-002"])
+
+    def test_archive_tables_legend_table_ignored(self):
+        """AUD-HAR-451 (E): bảng chú giải ít cột hơn không báo nhầm; dòng nhiều ô hơn (ô chứa `|`) vẫn giữ."""
+        extra = "| " + self.FIXED.replace("001", "003") + " | thừa | ô |\n"
+        legend = "\n| Mức | Nghĩa |\n|---|---|\n| 🔴 | chặn |\n"
+        text = archive_text([self.FIXED]) + extra + legend
+        self.assertEqual(self.ids(text), ["AUD-SEC-001", "AUD-SEC-003"])
+
+    def test_archive_short_finding_row_still_checked(self):
+        """Dòng phát hiện thiếu ô rỗng cuối (6/7 ô) vẫn hiển thị trong GFM: phải bị kiểm `chỉ đã sửa`, ID và đếm — kể cả
+        nằm ngay sau bảng chú giải; dòng chú giải ít ô hơn vẫn bị bỏ."""
+        short = "| AUD-SEC-009 | 🔴 | mở | b | đo được: y | `t` |\n"
+        legend = "\n| Mức | Nghĩa |\n|---|---|\n| 🔴 | chặn |\n"
+        for text in (archive_text([self.FIXED]) + short, archive_text([self.FIXED]) + legend + "\n" + short):
+            with self.subTest(text=text):
+                self.assertEqual(self.ids(text), ["AUD-SEC-001", "AUD-SEC-009"])
+        self.books([], [self.FIXED])
+        (self.d / "AUDIT-STATUS-ARCHIVE.md").write_text(archive_text([self.FIXED]) + short, encoding="utf-8")
+        errors, counts = self.check()
+        self.assertEqual(errors, ["AUD-SEC-009: sổ lưu trữ AUDIT-STATUS-ARCHIVE.md chỉ nhận dòng `đã sửa` (đang `mở`)"])
+        self.assertEqual(counts["lưu trữ"], 2)
+
     def test_no_archive_keeps_counts(self):
         self.books([self.FIXED])
         errors, counts = self.check()

@@ -4322,10 +4322,35 @@ def audit_archive(status: Path) -> Path:
 
 
 def archive_tables(text: str) -> Dict[str, List[Dict[str, str]]]:
-    """Bảng của sổ lưu trữ (AUD-HAR-450): chỉ giữ dòng `## ` và dòng bảng `|` — ghi chú `> Đợt …` và dòng trống xen giữa
-    các đợt dời không được cắt bảng (`md_tables` coi dòng không phải bảng là hết bảng nên mọi dòng dời sau ghi chú đầu
-    tiên lọt khỏi kiểm ID duy nhất và `chỉ đã sửa`)."""
-    kept = [ln for ln in text.splitlines() if ln.startswith(("|", "## "))]
+    """Bảng của sổ lưu trữ (AUD-HAR-450/451): chỉ giữ dòng `## ` và dòng bảng `|` (kể cả thụt lề) — ghi chú `> Đợt …`
+    và dòng trống xen giữa các đợt dời không được cắt bảng (`md_tables` coi dòng không phải bảng là hết bảng nên mọi
+    dòng dời sau ghi chú đầu tiên lọt khỏi kiểm ID duy nhất và `chỉ đã sửa`). Nội dung trong code fence bị bỏ (ví dụ mẫu
+    không phải bảng thật). Mỗi heading chỉ có MỘT bảng: dòng lặp tiêu đề (đợt dời lặp) bị bỏ, dòng có ít ô hơn tiêu đề
+    (bảng chú giải `| Mức | Nghĩa |`) bị bỏ TRỪ khi ô đầu mở bằng `AUD-` — dòng phát hiện thiếu ô rỗng cuối vẫn hiển thị
+    trong GFM nên vẫn phải bị kiểm; dòng nhiều ô hơn (ô chứa `|` chưa thoát) vẫn giữ để không mất phát hiện."""
+    unfenced: List[str] = []
+    fence: Optional[str] = None
+    for ln in text.splitlines():
+        m = FENCE_RE.match(ln)
+        if m and (fence is None or m.group(1) == fence):
+            fence = None if fence else m.group(1)
+        elif not fence:
+            unfenced.append(ln)
+    kept: List[str] = []
+    header: Optional[List[str]] = None
+    for ln in unfenced:
+        is_row = ln.lstrip().startswith("|")
+        if ln.startswith("## "):
+            header = None
+        elif not is_row:
+            continue
+        elif header is None:
+            header = split_md_row(ln)
+        else:
+            cells = split_md_row(ln)
+            if cells == header or (len(cells) < len(header) and not cells[0].startswith("AUD-")):
+                continue
+        kept.append(ln)
     return md_tables("\n".join(kept))
 
 
@@ -14644,14 +14669,18 @@ class DevPreview:
     timeout: int
     subject: dict[str, Any]
     previous: str
+    keep: str = ""
 
     def invoke(self, action: str) -> tuple[dict[str, Any], Optional[str]]:
-        """digest đọc giá trị quan sát ở đích; không truyền sẵn đáp án. Sổ không giữ stdout/stderr."""
+        """digest đọc giá trị quan sát ở đích; không truyền sẵn đáp án. Sổ không giữ stdout/stderr.
+        XT_DEPLOY_KEEP = digest của slot trước khi ghi đè: adapter dọn ảnh cũ không được xoá bản sổ còn trỏ tới."""
         cmd = f"{DEV_DRIVER} {action}"
         env = {k: v for k, v in os.environ.items() if not k.startswith("XT_DEPLOY_")}
         env.update(XT_DEPLOY_ENV="dev", XT_DEPLOY_STATE=str(self.state), XT_DEPLOY_ARTIFACTS="dist/app.tgz")
         if action != "digest":
-            env.update(XT_DEPLOY_DIGEST=self.subject["digest"], XT_DEPLOY_PREVIOUS=self.previous)
+            env.update(
+                XT_DEPLOY_DIGEST=self.subject["digest"], XT_DEPLOY_PREVIOUS=self.previous, XT_DEPLOY_KEEP=self.keep
+            )
         with tempfile.TemporaryFile() as sink:
             rc = self.run(cmd.split(), env, sink)
             sink.seek(0)
@@ -14767,7 +14796,8 @@ def _dev_execute(base: Path, state: Path, timeout: int, explicit: bool) -> tuple
         target = current or previous
     prior_digest = target["subject"]["digest"] if target else ""
     receipt = _dev_receipt(subject, artifacts, prior_digest)
-    driver = DevPreview(base, state, timeout, subject, prior_digest)
+    keep = " ".join(entry["subject"]["digest"] for entry in (current, previous) if entry)
+    driver = DevPreview(base, state, timeout, subject, prior_digest, keep)
     if not explicit:
         check, _ = driver.invoke("candidate")
         if check["exit_code"]:

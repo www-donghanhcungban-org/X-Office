@@ -1,4 +1,4 @@
-# AUDIT-REPORT — X-Templates · 2026-10-22 (delta sau #186)
+# AUDIT-REPORT — X-Office · 2026-10-22 (delta sau #186)
 
 > Commit quét: `main` `1139662` (3.15.5) · Phạm vi: delta `0afa30d..1139662` (#187…#226 — 94 file mã/cấu hình, +15k
 > dòng: app cục bộ `xt.py app` + `scripts/xt_app`, pha build/harden ADR-0040…0042, CI mẫu ADR-0039, merge ghim head

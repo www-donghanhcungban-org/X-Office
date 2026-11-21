@@ -48,6 +48,21 @@ def login(page: Page, url: str, account: dict[str, str]) -> None:
     expect(page.locator("#note-form")).to_be_visible()
 
 
+def accessible_feedback(page: Page) -> None:
+    """Lỗi form phải nằm trong khung nhìn, gắn với ô nhập, và thao tác không làm mất focus bàn phím."""
+    body = page.locator("#note-body")
+    body.fill("   ")
+    page.locator("#note-form").get_by_role("button", name="Lưu ghi chú").click()
+    expect(page.locator("#note-status")).to_be_in_viewport(ratio=1)
+    expect(body).to_have_attribute("aria-invalid", "true")
+    expect(body).to_have_attribute("aria-describedby", "note-status")
+    body.fill("")
+    page.locator("#refresh").focus()
+    page.keyboard.press("Enter")
+    expect(page.locator("#list-status")).to_have_text("Đã tải lại danh sách.")
+    expect(page.locator("#refresh")).to_be_focused()
+
+
 def browser_flow(url: str, expected_digest: str, account: dict[str, str]) -> str:
     body = "Kiểm thử ghi chú " + uuid4().hex
     with sync_playwright() as pw:
@@ -59,6 +74,7 @@ def browser_flow(url: str, expected_digest: str, account: dict[str, str]) -> str
             require(observed == expected_digest, "Digest HTTP khác ứng viên")
             page = first.new_page()
             login(page, url, account)
+            accessible_feedback(page)
             page.locator("#note-body").fill(body)
             with page.expect_response(
                 lambda r: urlparse(r.url).path == "/v1/notes" and r.request.method == "POST"

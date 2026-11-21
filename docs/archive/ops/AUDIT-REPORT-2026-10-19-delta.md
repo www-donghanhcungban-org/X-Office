@@ -1,4 +1,4 @@
-# AUDIT-REPORT 2026-10-19 (delta #94–#157) — Khung X-Templates
+# AUDIT-REPORT 2026-10-19 (delta #94–#157) — Khung X-Office
 
 > Quét lại theo diff `11f2770..9433792` (64 commit, 105 file, +12.478/−609): guard không hỏi (ADR-0018…0026), merge theo làn
 > và PR steward (ADR-0024/0025/0027, D-045…063), ủy quyền production (ADR-0022), vòng tối ưu hiệu năng, cổng UI `contrast`/`vendor-check`.

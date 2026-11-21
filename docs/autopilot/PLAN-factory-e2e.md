@@ -40,7 +40,7 @@
 
 ## Bằng chứng ngày 2026-11-20
 
-[ADR-0083 của X-Templates](../adr/0083-factory-lifecycle-flow.md) nối ba giai đoạn. CI `pack-web-api` thử rollback và
+[ADR-0083 của X-Office](../adr/0083-factory-lifecycle-flow.md) nối ba giai đoạn. CI `pack-web-api` thử rollback và
 [pilot sửa chữa](../../research/2026-11-20-factory-repair-pilot.md). Artifact `pack-preview-evidence` chứa báo cáo
 và dữ liệu gốc cho cổng T-3847. `xt_flow.py` ghi rõ phần số liệu T-3854 còn thiếu.
 

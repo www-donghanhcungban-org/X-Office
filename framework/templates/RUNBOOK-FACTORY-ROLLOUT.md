@@ -6,7 +6,7 @@ updated: 2026-11-19
 
 # Từ bản dev được xác nhận đến bàn giao vận hành
 
-Trong dự án sản phẩm, `XT=.xtemplates/scripts/xt.py`. Trong repo X-Templates, dùng `XT=scripts/xt.py`. Các lệnh dưới đây dùng Python đúng phiên bản repo. Chạy chúng trong checkout của sản phẩm.
+Trong dự án sản phẩm, `XT=.xtemplates/scripts/xt.py`. Trong repo X-Office, dùng `XT=scripts/xt.py`. Các lệnh dưới đây dùng Python đúng phiên bản repo. Chạy chúng trong checkout của sản phẩm.
 
 ## Diễn tập trên bản dev
 
