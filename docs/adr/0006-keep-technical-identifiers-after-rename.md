@@ -6,7 +6,7 @@
 
 ## Bối cảnh
 
-Chủ repo đổi tên `seeker19110/X-stored` → `seeker19110/X-Templates` (GitHub trả 301 từ tên cũ, kiểm 2026-10-14). Tên cũ
+Chủ repo đổi tên `seeker19110/X-stored` → `www-donghanhcungban-org/X-Office` (GitHub trả 301 từ tên cũ, kiểm 2026-10-14). Tên cũ
 xuất hiện ở hai lớp khác nhau:
 - **Tên hiển thị**: tiêu đề tài liệu, docstring/`--help`, URL clone, chú thích harness — người đọc thấy, không máy nào phụ thuộc.
 - **Định danh kỹ thuật**: thư mục cài `.xstored/` trong dự án đích, `xs.py`, `xs.yaml`, biến `XS_*`, đuôi `.xstored-new`,

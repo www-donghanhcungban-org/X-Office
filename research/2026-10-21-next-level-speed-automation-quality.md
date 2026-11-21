@@ -107,7 +107,7 @@ là không có (P3, `LOOP-CI-001`).
 | `/goal`: model nhỏ chỉ đọc hội thoại, bản chất là Stop hook `prompt` phạm vi phiên; check-in 30 phút khi có việc nền | Vẫn là lời khai (`LOOP-DESIGN-004`) | <https://code.claude.com/docs/en/goal.md> |
 | Cảnh báo trạng thái: agent hook, agent teams, fast mode, scheduled tasks (`/fire` header beta), agent view, Trusted Devices đều preview/experimental/beta; `DISABLE_TELEMETRY`/`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` làm mất `Monitor` và đổi điều kiện vài tính năng | Khung chỉ dựa vào hook `command`, subagent, worktree (đã GA) | hooks.md; agent-teams.md; env-vars.md |
 
-### 4.2 GitHub (docs.github.com, github.blog/changelog, trang release — đọc 2026-10-21; repo `seeker19110/X-Templates`: public, `owner.type = User`, MIT, `allow_auto_merge` true)
+### 4.2 GitHub (docs.github.com, github.blog/changelog, trang release — đọc 2026-10-21; repo `www-donghanhcungban-org/X-Office`: public, `owner.type = User`, MIT, `allow_auto_merge` true)
 
 | Dữ kiện | Ảnh hưởng tới khung/đề xuất | Nguồn |
 |---|---|---|

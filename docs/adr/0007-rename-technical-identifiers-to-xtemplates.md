@@ -9,7 +9,7 @@
 
 ADR-0006 đổi tên hiển thị sang X-Office nhưng giữ định danh kỹ thuật của tên cũ X-stored: thư mục cài `.xstored/`,
 `xs.py`, `xs.yaml`, biến `XS_*`, đuôi `.xstored-new`. Chủ repo yêu cầu (2026-10-15) tên dự án đúng **ở mọi chỗ**, kể cả các
-định danh này. Tên repo trên GitHub đã kiểm cùng ngày: `seeker19110/X-Templates`.
+định danh này. Tên repo trên GitHub đã kiểm cùng ngày: `www-donghanhcungban-org/X-Office`.
 
 Ràng buộc từ ADR-0006 vẫn đúng: đổi `.xstored/` phá dự án đã cài nếu không có đường di chuyển — hook trỏ
 `.xstored/scripts/`, manifest hash nằm trong `.xstored/`, `dev-task.sh` chỉ đọc một tên file lệnh (thiếu file = cổng no-op).

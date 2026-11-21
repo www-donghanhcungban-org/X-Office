@@ -57,7 +57,7 @@
   2026-08-06; từ v4 là vỏ của `actions/attest` — README khuyên dùng `actions/attest` cho bản mới, chưa đổi vì vỏ vẫn được
   hỗ trợ; xác minh 2026-11-02). Quyền job: `id-token: write`, `attestations: write`; repo công khai dùng Sigstore
   public-good (chứng chỉ, bản ghi minh bạch công khai). Kiểm: `gh attestation verify X-Office-vX.Y.Z.tar.gz --repo
-  seeker19110/X-Templates`; tái tạo đúng byte bằng `git archive` ở máy khác: (chưa xác minh — gzip của git có thể khác
+  www-donghanhcungban-org/X-Office`; tái tạo đúng byte bằng `git archive` ở máy khác: (chưa xác minh — gzip của git có thể khác
   theo bản). Chưa chạy thật trên CI tới lần cắt bản kế.
 - Gói mới hoặc đổi license khi Dependabot nâng phiên bản: cập nhật bảng này trong cùng PR (`BASE-DEP-006`).
 - Máy kiểm: allowlist và ngoại lệ (`approved_by`, `expires`) ở [`license-allow.json`](../../license-allow.json);

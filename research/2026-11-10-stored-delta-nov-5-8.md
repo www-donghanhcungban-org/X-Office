@@ -41,7 +41,7 @@ Bổ sung cho [đợt mở rộng 28 chuyên mục](2026-11-02-stored-delta-28-s
 
 **Đề xuất SHOULD:** Khi dùng một server memory chung cho nhiều harness hoặc nhiều người, SHOULD: PROGRESS.md vẫn là nguồn bàn giao chính; handoff trong memory có chủ, trạng thái và chỉ được nhận một lần; server bind loopback hoặc có xác thực, token chỉ chủ sở hữu đọc; tri thức theo dự án tách khỏi handoff cá nhân; nguồn lưu ở dạng file đọc được (Markdown/git) để rà và khôi phục. Kiểm fixture hai phiên cùng nhận một handoff: chỉ một phiên nhận được, phiên kia thấy đã có chủ.
 
-**Đối chiếu khung:** [LOOP-HARNESS-019](https://github.com/seeker19110/X-Templates/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/11-autonomous-loop/harness-files.md#L330), [LOOP-HARNESS-021](https://github.com/seeker19110/X-Templates/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/11-autonomous-loop/harness-files.md#L332), [WF-DOC-016](https://github.com/seeker19110/X-Templates/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/10-workflow/documentation-workflow.md#L60).
+**Đối chiếu khung:** [LOOP-HARNESS-019](https://github.com/www-donghanhcungban-org/X-Office/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/11-autonomous-loop/harness-files.md#L330), [LOOP-HARNESS-021](https://github.com/www-donghanhcungban-org/X-Office/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/11-autonomous-loop/harness-files.md#L332), [WF-DOC-016](https://github.com/www-donghanhcungban-org/X-Office/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/10-workflow/documentation-workflow.md#L60).
 
 **Nguồn triển khai upstream:** [nguồn 1](https://github.com/akitaonrails/ai-memory/blob/fec76f18c15835bb2dc5c2be3081ce4db0c1270e/README.md) · [nguồn 2](https://github.com/akitaonrails/ai-memory/blob/fec76f18c15835bb2dc5c2be3081ce4db0c1270e/DATA_HANDLING.md).
 
@@ -55,7 +55,7 @@ Bổ sung cho [đợt mở rộng 28 chuyên mục](2026-11-02-stored-delta-28-s
 
 **Đề xuất SHOULD:** Với task có giao diện, SHOULD rà kế hoạch trước khi code theo danh sách mặt thiết kế cố định; mỗi mặt ghi điểm, lý do và điều kiện cụ thể để đạt mức tốt nhất; mỗi chỗ hở là một quyết định riêng ghi bằng loop decide, chỉ áp cách sửa đã chọn rồi chấm lại. Điểm là nhận định (asserted-not-measured), không thay Gate; mỗi chỗ hở đã chọn sửa phải đổi thành tiêu chí kiểm được trong PLAN. Kiểm: PLAN của task UI có bảng mặt thiết kế và mỗi dòng dưới mức tốt nhất có quyết định hoặc tiêu chí đi kèm.
 
-**Đối chiếu khung:** [LOOP-STOP-018](https://github.com/seeker19110/X-Templates/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/11-autonomous-loop/stop-points-and-escalation.md#L232), [WF-SDD-011](https://github.com/seeker19110/X-Templates/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/10-workflow/spec-driven-development.md#L52), [LOOP-DESIGN-021](https://github.com/seeker19110/X-Templates/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/11-autonomous-loop/loop-design.md#L82).
+**Đối chiếu khung:** [LOOP-STOP-018](https://github.com/www-donghanhcungban-org/X-Office/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/11-autonomous-loop/stop-points-and-escalation.md#L232), [WF-SDD-011](https://github.com/www-donghanhcungban-org/X-Office/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/10-workflow/spec-driven-development.md#L52), [LOOP-DESIGN-021](https://github.com/www-donghanhcungban-org/X-Office/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/11-autonomous-loop/loop-design.md#L82).
 
 **Nguồn triển khai upstream:** [nguồn 1](https://github.com/garrytan/gstack/blob/297f50c7e1d46aab1404f5f2e8a9584af76ad6b2/README.md) · [nguồn 2](https://github.com/garrytan/gstack/blob/297f50c7e1d46aab1404f5f2e8a9584af76ad6b2/plan-design-review/SKILL.md).
 
@@ -69,7 +69,7 @@ Bổ sung cho [đợt mở rộng 28 chuyên mục](2026-11-02-stored-delta-28-s
 
 **Xử lý:** chỉ thêm ví dụ/fixture vào ID hiện có, không cần ID mới.
 
-**Đối chiếu khung:** [UX-VISUAL-011](https://github.com/seeker19110/X-Templates/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/06-design-ux/motion-and-visual-quality.md#L61).
+**Đối chiếu khung:** [UX-VISUAL-011](https://github.com/www-donghanhcungban-org/X-Office/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/06-design-ux/motion-and-visual-quality.md#L61).
 
 **Nguồn triển khai upstream:** [nguồn 1](https://github.com/heydamir/unslop/blob/a6f121eee5f29c2f74976b75456feae8b66afb3a/README.md) · [nguồn 2](https://github.com/heydamir/unslop/blob/a6f121eee5f29c2f74976b75456feae8b66afb3a/skills/unslop/SKILL.md) · [nguồn 3](https://github.com/pbakaus/impeccable/blob/924bbd194d02e5e15a227e75b5901fb0d7a4ecad/README.md).
 
@@ -83,7 +83,7 @@ Bổ sung cho [đợt mở rộng 28 chuyên mục](2026-11-02-stored-delta-28-s
 
 **Xử lý:** chỉ thêm ví dụ/fixture vào ID hiện có, không cần ID mới.
 
-**Đối chiếu khung:** [LOOP-DESIGN-021](https://github.com/seeker19110/X-Templates/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/11-autonomous-loop/loop-design.md#L82).
+**Đối chiếu khung:** [LOOP-DESIGN-021](https://github.com/www-donghanhcungban-org/X-Office/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/11-autonomous-loop/loop-design.md#L82).
 
 **Liên quan đợt trước:** XT-H-061; chỉ giữ phần delta nêu trên.
 
@@ -99,7 +99,7 @@ Bổ sung cho [đợt mở rộng 28 chuyên mục](2026-11-02-stored-delta-28-s
 
 **Xử lý:** chỉ thêm ví dụ/fixture vào ID hiện có, không cần ID mới.
 
-**Đối chiếu khung:** [PRF-CLI-008](https://github.com/seeker19110/X-Templates/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/02-profiles/cli-tool.md#L63), [LOOP-HARNESS-025](https://github.com/seeker19110/X-Templates/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/11-autonomous-loop/harness-files.md#L336).
+**Đối chiếu khung:** [PRF-CLI-008](https://github.com/www-donghanhcungban-org/X-Office/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/02-profiles/cli-tool.md#L63), [LOOP-HARNESS-025](https://github.com/www-donghanhcungban-org/X-Office/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/11-autonomous-loop/harness-files.md#L336).
 
 **Liên quan đợt trước:** XT-H-046; chỉ giữ phần delta nêu trên.
 
@@ -115,7 +115,7 @@ Bổ sung cho [đợt mở rộng 28 chuyên mục](2026-11-02-stored-delta-28-s
 
 **Đề xuất SHOULD:** Với connector MCP của dịch vụ ngoài (chat, email, ghi chú, CRM), SHOULD khai trong repo từng connector: scope đã cấp, tool đọc và tool ghi, chế độ chỉ đọc hoặc nháp nếu có; ưu tiên chế độ nháp hoặc chỉ đọc cho phiên không người trực; tool gửi/đăng của connector được coi là hành động đối ngoại như LOOP-STOP-002. Kiểm fixture: phiên không người trực gọi tool gửi tin của connector phải bị chặn hoặc chỉ tạo nháp.
 
-**Đối chiếu khung:** [LOOP-STOP-002](https://github.com/seeker19110/X-Templates/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/11-autonomous-loop/stop-points-and-escalation.md#L216), [LOOP-STOP-014](https://github.com/seeker19110/X-Templates/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/11-autonomous-loop/stop-points-and-escalation.md#L228), [LOOP-STOP-023](https://github.com/seeker19110/X-Templates/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/11-autonomous-loop/stop-points-and-escalation.md#L237), [SEC-AI-007](https://github.com/seeker19110/X-Templates/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/12-security/ai-security.md#L59).
+**Đối chiếu khung:** [LOOP-STOP-002](https://github.com/www-donghanhcungban-org/X-Office/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/11-autonomous-loop/stop-points-and-escalation.md#L216), [LOOP-STOP-014](https://github.com/www-donghanhcungban-org/X-Office/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/11-autonomous-loop/stop-points-and-escalation.md#L228), [LOOP-STOP-023](https://github.com/www-donghanhcungban-org/X-Office/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/11-autonomous-loop/stop-points-and-escalation.md#L237), [SEC-AI-007](https://github.com/www-donghanhcungban-org/X-Office/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/12-security/ai-security.md#L59).
 
 **Nguồn triển khai upstream:** [nguồn 1](https://docs.slack.dev/ai/mcp-server/) · [nguồn 2](https://www.trykondo.com) · [nguồn 3](https://docs.granola.ai/help-center/sharing/integrations/mcp).
 
@@ -129,7 +129,7 @@ Bổ sung cho [đợt mở rộng 28 chuyên mục](2026-11-02-stored-delta-28-s
 
 **Đề xuất SHOULD:** Với dependency, MCP server và skill bên thứ ba, SHOULD ghim tên chuẩn hiện tại (owner/repo, tên package) và định kỳ so tên khai báo với tên API trả về; báo khi repo redirect, package đổi tên, hoặc README ghi deprecated/khuyên bản khác. Kiểm fixture: khai báo repo cũ đã redirect thì công cụ kiểm báo tên chuẩn mới.
 
-**Đối chiếu khung:** [SEC-SUPPLY-026](https://github.com/seeker19110/X-Templates/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/12-security/supply-chain.md#L72).
+**Đối chiếu khung:** [SEC-SUPPLY-026](https://github.com/www-donghanhcungban-org/X-Office/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/12-security/supply-chain.md#L72).
 
 **Liên quan đợt trước:** XT-H-030; chỉ giữ phần delta nêu trên.
 
@@ -145,7 +145,7 @@ Bổ sung cho [đợt mở rộng 28 chuyên mục](2026-11-02-stored-delta-28-s
 
 **Xử lý:** chỉ thêm ví dụ/fixture vào ID hiện có, không cần ID mới.
 
-**Đối chiếu khung:** [SEC-SUPPLY-026](https://github.com/seeker19110/X-Templates/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/12-security/supply-chain.md#L72).
+**Đối chiếu khung:** [SEC-SUPPLY-026](https://github.com/www-donghanhcungban-org/X-Office/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/12-security/supply-chain.md#L72).
 
 **Nguồn triển khai upstream:** [nguồn 1](https://github.com/garrytan/gstack/blob/297f50c7e1d46aab1404f5f2e8a9584af76ad6b2/README.md) · [nguồn 2](https://github.com/garrytan/gstack/blob/297f50c7e1d46aab1404f5f2e8a9584af76ad6b2/plan-design-review/SKILL.md) · [nguồn 3](https://github.com/charlie947/social-media-skills/blob/10ca79c0ec0be0f7654d19cd4f0c86b6fa6ed23b/LICENSE) · [nguồn 4](https://github.com/charlie947/social-media-skills/blob/10ca79c0ec0be0f7654d19cd4f0c86b6fa6ed23b/README.md).
 
@@ -159,7 +159,7 @@ Bổ sung cho [đợt mở rộng 28 chuyên mục](2026-11-02-stored-delta-28-s
 
 **Đề xuất SHOULD:** Với sản phẩm cho AI agent đọc/ghi dữ liệu nghiệp vụ, SHOULD có một mô hình miền máy đọc được (thực thể, thuộc tính, trạng thái, quan hệ) làm nguồn sinh glossary, schema hoặc tài liệu cho agent; luật nghiệp vụ quan trọng viết thành kiểm chạy được trên dữ liệu mẫu; KPI định nghĩa một lần trong code và dùng chung cho BI, API, agent. Kiểm: thêm một thuộc tính vào mô hình thì glossary/schema sinh lại khớp; bản ghi vi phạm một luật mẫu bị bộ kiểm báo.
 
-**Đối chiếu khung:** [PRF-DATA-002](https://github.com/seeker19110/X-Templates/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/02-profiles/data-ml.md#L63), [DB-MODEL-010](https://github.com/seeker19110/X-Templates/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/09-database/data-modeling.md#L58), [UX-CONTENT-008](https://github.com/seeker19110/X-Templates/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/06-design-ux/content-and-microcopy.md#L47).
+**Đối chiếu khung:** [PRF-DATA-002](https://github.com/www-donghanhcungban-org/X-Office/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/02-profiles/data-ml.md#L63), [DB-MODEL-010](https://github.com/www-donghanhcungban-org/X-Office/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/09-database/data-modeling.md#L58), [UX-CONTENT-008](https://github.com/www-donghanhcungban-org/X-Office/blob/aeb195c2b6ae5074d70efe592d218e9c1147c05e/framework/06-design-ux/content-and-microcopy.md#L47).
 
 **Nguồn triển khai upstream:** [nguồn 1](https://github.com/linkml/linkml/blob/5dcae0f60bb524b3aec2b8a488fcce3546da8149/README.md) · [nguồn 2](https://github.com/RDFLib/pySHACL/blob/df57bd4390bd397811d7c2d3b7cf0e49cd21c189/README.md) · [nguồn 3](https://github.com/dbt-labs/metricflow/blob/fe4b8c1ccb72a8ca77494b345777eff20a714119/README.md).
 

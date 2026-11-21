@@ -1049,7 +1049,7 @@ Mục checklist từ đợt rà `seeker19110/stored` 2026-10-18 (stored `10ecf8b
 ### Changed
 - **`xt.py doctor` cảnh báo khi khung đã cài cũ hơn bản phát hành mới nhất** (D-040; `LOOP-HARNESS-020` SHOULD, không đổi
   mức). Ở dự án đích, chế độ đầy đủ đọc tag `vX.Y.Z` mới nhất của repo khung qua `gh api repos/<repo>/tags` (mặc định
-  `seeker19110/X-Templates`, fork đặt `XT_FRAMEWORK_REPO`), so với đầu nhãn `.xtemplates/VERSION`; cũ hơn → cảnh báo
+  `www-donghanhcungban-org/X-Office`, fork đặt `XT_FRAMEWORK_REPO`), so với đầu nhãn `.xtemplates/VERSION`; cũ hơn → cảnh báo
   `version` "chạy lại `install.py`". Đọc mọi trang tag, ghim host `github.com`; nhãn pre-release (`3.0.0-rc1`) tính là cũ hơn bản cùng số. Fail-open: không có
   `gh`, lỗi mạng/quyền, thân không phải UTF-8/JSON (trang chặn của proxy), nhãn không phải SemVer → bỏ qua;
   `loop init` (chế độ nhanh) không gọi mạng; tag pre-release không tính. `AGENTS.md` §7 thêm luật cắt bản sớm khi thay
@@ -1319,7 +1319,7 @@ Mục checklist từ đợt rà `seeker19110/stored` 2026-10-18 (stored `10ecf8b
   từ bản mới — tự chép manifest hash, xoá `.xstored/`, đổi `xs.yaml` → `xt.yaml`, liệt kê file người dùng còn nhắc tên cũ
   (`*.md` gốc, `.claude/`, `.github/workflows/`) để sửa tay. Phần *Kiểm* của các mục nhắc `xs.py`/`.xstored` đổi theo
   (ID, mức giữ nguyên). Tài liệu lịch sử (`research/`, báo cáo audit đã ký, ADR-0001…0006, mục CHANGELOG cũ) giữ tên cũ.
-- Đổi tên repo `seeker19110/X-stored` → `seeker19110/X-Templates` (GitHub chuyển hướng 301 từ tên cũ): cập nhật tên khung,
+- Đổi tên repo `seeker19110/X-stored` → `www-donghanhcungban-org/X-Office` (GitHub chuyển hướng 301 từ tên cũ): cập nhật tên khung,
   URL clone trong README + bước CI chạy lệnh README, docstring/`--help` của `install.py`/`xs.py`, harness `.claude/`, mẫu dự án đích.
   Giữ nguyên để không phá dự án đã cài: thư mục `.xstored/`, `xs.py`, `xs.yaml`, biến `XS_*`, đuôi `.xstored-new`; giữ tên cũ
   ở tài liệu lịch sử (`research/`, báo cáo audit đã ký, trích dẫn "khung cũ X-stored") — ADR-0006.

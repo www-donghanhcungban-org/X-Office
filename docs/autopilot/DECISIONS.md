@@ -615,7 +615,7 @@
 
 - Phương án: (1) A: sửa tại X-Office · (2) B: giữ chấp nhận có hạn
 - Chọn: A: sửa tại X-Office (thay D-9004/D-9005)
-- Lý do (tiêu chí chất lượng cuối): Chủ dự án yêu cầu xử lý hết treo; tiêu chí 1: sửa lỗi thật
+- Lý do (tiêu chí chất lượng cuối): Chủ dự án yêu cầu xử lý hết treo; tiêu chí 1
 - Đường lùi: Revert PR sửa
 
 ### D-9007 · 2026-11-20T23:39:44+00:00 · X-Office là dự án đích độc lập, không còn làn X-Templates: xử lý mọi thông tin nhắc X-Templates

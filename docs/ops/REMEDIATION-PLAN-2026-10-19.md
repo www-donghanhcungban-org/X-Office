@@ -305,8 +305,8 @@ kết quả mong đợi, rồi mới bật ghi/merge.
 
 Liên kết mã ghim vào commit đánh giá để số dòng không trôi; nguồn ngoài đọc 2026-10-19.
 
-[baseline]: https://github.com/seeker19110/X-Templates/commit/943379215343a4eb537a880f1ed94231774ac1cd
-[quality-run]: https://github.com/seeker19110/X-Templates/actions/runs/39230998060/job/117988638558
+[baseline]: https://github.com/www-donghanhcungban-org/X-Office/commit/943379215343a4eb537a880f1ed94231774ac1cd
+[quality-run]: https://github.com/www-donghanhcungban-org/X-Office/actions/runs/39230998060/job/117988638558
 [checks-source]: https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches#require-status-checks-before-merging
 [queue-source]: https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-a-merge-queue
 [actions-source]: https://docs.github.com/en/actions/reference/security/secure-use
@@ -320,14 +320,14 @@ Liên kết mã ghim vào commit đánh giá để số dòng không trôi; ngu�
 [jwt-source]: https://www.rfc-editor.org/rfc/rfc8725
 [auth-source]: https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html
 
-Mã nguồn tại mốc `9433792`: [`same_command`](https://github.com/seeker19110/X-Templates/blob/943379215343a4eb537a880f1ed94231774ac1cd/scripts/xt.py#L1212-L1217) ·
-[`_verdict_blueprint`](https://github.com/seeker19110/X-Templates/blob/943379215343a4eb537a880f1ed94231774ac1cd/scripts/xt.py#L1145-L1152) ·
-[`merge_decision`](https://github.com/seeker19110/X-Templates/blob/943379215343a4eb537a880f1ed94231774ac1cd/scripts/xt.py#L3422-L3486) ·
-[`pr_next`](https://github.com/seeker19110/X-Templates/blob/943379215343a4eb537a880f1ed94231774ac1cd/scripts/xt.py#L5626-L5666) ·
-[`apply_policy`](https://github.com/seeker19110/X-Templates/blob/943379215343a4eb537a880f1ed94231774ac1cd/.claude/hooks/guard.py#L3965-L3973) ·
-[`carry_states`](https://github.com/seeker19110/X-Templates/blob/943379215343a4eb537a880f1ed94231774ac1cd/scripts/xt.py#L748-L776) ·
-[`audit_rescan`](https://github.com/seeker19110/X-Templates/blob/943379215343a4eb537a880f1ed94231774ac1cd/scripts/xt.py#L2280-L2300) ·
-[`_ci_buckets`](https://github.com/seeker19110/X-Templates/blob/943379215343a4eb537a880f1ed94231774ac1cd/scripts/xt.py#L3252-L3270) ·
-[`merge_permissions`](https://github.com/seeker19110/X-Templates/blob/943379215343a4eb537a880f1ed94231774ac1cd/scripts/install.py#L163-L182) ·
-[`_check_must_cap`](https://github.com/seeker19110/X-Templates/blob/943379215343a4eb537a880f1ed94231774ac1cd/scripts/xt.py#L411-L526) ·
-[Run Links đã kiểm](https://github.com/seeker19110/X-Templates/actions/runs/39233814093/job/117997920837).
+Mã nguồn tại mốc `9433792`: [`same_command`](https://github.com/www-donghanhcungban-org/X-Office/blob/943379215343a4eb537a880f1ed94231774ac1cd/scripts/xt.py#L1212-L1217) ·
+[`_verdict_blueprint`](https://github.com/www-donghanhcungban-org/X-Office/blob/943379215343a4eb537a880f1ed94231774ac1cd/scripts/xt.py#L1145-L1152) ·
+[`merge_decision`](https://github.com/www-donghanhcungban-org/X-Office/blob/943379215343a4eb537a880f1ed94231774ac1cd/scripts/xt.py#L3422-L3486) ·
+[`pr_next`](https://github.com/www-donghanhcungban-org/X-Office/blob/943379215343a4eb537a880f1ed94231774ac1cd/scripts/xt.py#L5626-L5666) ·
+[`apply_policy`](https://github.com/www-donghanhcungban-org/X-Office/blob/943379215343a4eb537a880f1ed94231774ac1cd/.claude/hooks/guard.py#L3965-L3973) ·
+[`carry_states`](https://github.com/www-donghanhcungban-org/X-Office/blob/943379215343a4eb537a880f1ed94231774ac1cd/scripts/xt.py#L748-L776) ·
+[`audit_rescan`](https://github.com/www-donghanhcungban-org/X-Office/blob/943379215343a4eb537a880f1ed94231774ac1cd/scripts/xt.py#L2280-L2300) ·
+[`_ci_buckets`](https://github.com/www-donghanhcungban-org/X-Office/blob/943379215343a4eb537a880f1ed94231774ac1cd/scripts/xt.py#L3252-L3270) ·
+[`merge_permissions`](https://github.com/www-donghanhcungban-org/X-Office/blob/943379215343a4eb537a880f1ed94231774ac1cd/scripts/install.py#L163-L182) ·
+[`_check_must_cap`](https://github.com/www-donghanhcungban-org/X-Office/blob/943379215343a4eb537a880f1ed94231774ac1cd/scripts/xt.py#L411-L526) ·
+[Run Links đã kiểm](https://github.com/www-donghanhcungban-org/X-Office/actions/runs/39233814093/job/117997920837).
