@@ -2196,7 +2196,8 @@ class InstallUpgradeTest(unittest.TestCase):
         files = self.files()
         for name in install.ROOT_TEMPLATES:
             self.assertEqual(files[name], stored(self.template(name)), name)
-        self.assertIn("[install] Bước làm tay từ CHANGELOG (3.7.1 (9433792) → t):\n", err)
+        # chỉ kiểm tiêu đề: có bước hay "không có" tuỳ nội dung [Unreleased] thật, không được làm test đỏ khi cắt bản
+        self.assertIn("[install] Bước làm tay từ CHANGELOG (3.7.1 (9433792) → t):", err)
 
     def test_infer_root_hashes_skips_missing_symlink_and_unreadable(self):
         old = self.target / ".xtemplates" / "framework" / "templates"

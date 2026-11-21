@@ -31,7 +31,7 @@ Chọn **2**.
 - Gỡ ở `install.py`: `split_release_line`, `crosses_release_line`, tham số `crossing` của `upgrade_steps`. Bản khung có
   số nhỏ hơn bản đã cài là hạ bản. `upgrade_steps` chỉ đọc CHANGELOG tới tiêu đề ranh giới dòng kế thừa
   (`LEGACY_HEAD_RE`, cùng tập dòng với `CHANGELOG_LINE_RE` của `xt.py`): mục 3.x số lớn hơn 1.x nhưng không bao giờ là bước
-  của dòng mới — không có giới hạn này, cài lại 1.0.0 in 248 bước cũ.
+  của dòng mới — không có giới hạn này, cài lại 1.0.0 in 246 bước cũ của 57 mục 3.x.
 - Giữ: `github_origin_slug` (dùng bởi `admin-plan`); so nhãn tiền phát hành và nhãn git describe của `install.py`
   (`PRERELEASE_RE`, `version_key`, AUD-HAR-453/454); tiêu đề ranh giới trong CHANGELOG và `changelog-check` đọc nó,
   `LEGACY_RELEASE_TAGS` trong `latest_framework_tag` (ADR-9002); `docs/ops/TARGETS.md` và cơ chế phản hồi ADR-0010.

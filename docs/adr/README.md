@@ -14,6 +14,6 @@ ADR mới nối tiếp dải `9001+`.
 | Số | Quyết định |
 |---|---|
 | [ADR-9001](9001-office-view-renderers.md) | Màn Văn phòng của `xt.py app`: Canvas 2D mặc định, three.js vendor tuỳ chọn (trước là ADR-0082) |
-| [ADR-9002](9002-release-line.md) | Dòng phát hành riêng từ 1.0.0: ranh giới CHANGELOG, `LEGACY_RELEASE_TAGS`, registry `legacy-line` |
+| [ADR-9002](9002-release-line.md) | Dòng phát hành riêng từ 1.0.0: ranh giới CHANGELOG, `LEGACY_RELEASE_TAGS`, registry `legacy-line` — registry và `legacy-line` bị thay một phần bởi ADR-9004 |
 | [ADR-9003](9003-release-line-upgrade.md) | Nâng bản qua ranh giới dòng (`install.py`); `legacy-line` vẫn là lệch — bị thay bởi ADR-9004 |
 | [ADR-9004](9004-remove-target-registry.md) | Gỡ registry sản phẩm đích (`xt.py registry`, màn Registry, `legacy-line`) và nâng bản qua ranh giới dòng |

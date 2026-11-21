@@ -61,7 +61,7 @@ và dữ liệu gốc cho cổng T-3847. `xt_flow.py` ghi rõ phần số liệu
 
 ### Lát 1 — Bản dev có receipt
 - [ ] `T-3842` xt.py: lệnh triển khai đọc khoá `xt.yaml`, ghi receipt (môi trường · digest · thời điểm · smoke), smoke đỏ thì quay lui; fixture âm sai digest, smoke đỏ, receipt cũ (sau: T-3841; topo: review) — Gate: `python3 -m unittest tests.test_deploy_receipt tests.test_deploy_run`
-- [x] `T-3843` `release-check` đối chiếu digest ở receipt với `subject.digest`; `registry` đọc receipt vào `environments`/`release` (sau: T-3842; topo: review) — Gate: `python3 -m unittest tests.test_deploy_release_row`
+- [x] `T-3843` `release-check` đối chiếu digest ở receipt với `subject.digest`; `registry` đọc receipt vào `environments`/`release` (phần `registry` đã gỡ ở ADR-9004) (sau: T-3842; topo: review) — Gate: `python3 -m unittest tests.test_deploy_release_row`
 - [x] `T-3844` Gói `web-api-ts`: ảnh + compose dev (app + Postgres), khoá triển khai dev ở `pack.json`; workflow gói: repo sạch → bản dev → receipt → quay lui, ca sai cố ý đỏ (sau: T-3842) — Gate: `python3 -m unittest tests.test_deploy_run tests.test_pack_ui` · CI `pack-acceptance (clean)`
 
 ### Lát 2 — Ý tưởng tới repo đang chạy
