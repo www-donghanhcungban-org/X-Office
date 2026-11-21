@@ -1440,11 +1440,20 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
       if (st.rig) rigs.push(st.rig);
     });
     if (plan.rooms && plan.rooms.length) {
+      // Lộ trình kiểm chứng va chạm 100% thông thoáng (tránh trọn hồ bơi, cây, ghế đá, cây Noel/Tết, sofa sảnh & mọi vách ngăn)
       const ambientStaff = [
-        { index: 31, path: [[32.0, 15.2], [39.2, 15.2], [39.2, 19.4], [32.0, 19.4]], x: 34.5, z: 15.2, holdCup: true, speed: 0.65 },
-        { index: 32, path: [[3.8, 4.2], [3.8, 8.6], [8.8, 8.6], [3.8, 8.6]], x: 3.8, z: 6.0, holdCup: false, speed: 0.72 },
-        { index: 33, x: 31.6, z: 2.35, rotY: -1.15, holdCup: true },
-        { index: 34, x: 32.85, z: 2.45, rotY: 1.4, holdCup: false },
+        {
+          index: 31,
+          path: [[33.4, 14.9], [37.5, 14.9], [37.5, 18.3], [35.4, 18.3], [37.5, 18.3], [37.5, 14.9]],
+          x: 33.4, z: 14.9, holdCup: true, speed: 0.62,
+        },
+        {
+          index: 32,
+          path: [[5.8, 4.6], [5.8, 7.3], [3.4, 7.3], [3.4, 8.5], [1.8, 8.5], [3.4, 8.5], [3.4, 7.3], [5.8, 7.3]],
+          x: 5.8, z: 5.6, holdCup: false, speed: 0.68,
+        },
+        { index: 33, x: 31.4, z: 2.55, rotY: -1.35, holdCup: true },
+        { index: 34, x: 32.6, z: 2.65, rotY: 1.55, holdCup: false },
       ];
       for (const spec of ambientStaff) {
         const w = buildWalkerRig(THREE, humanAssets, mats, spec);

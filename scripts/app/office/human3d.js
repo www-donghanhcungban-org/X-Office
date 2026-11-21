@@ -850,8 +850,12 @@ export function animateWalkerRig(w, t, motion) {
     const px = a[0] + (b[0] - a[0]) * u;
     const pz = a[1] + (b[1] - a[1]) * u;
     w.root.position.set(px, 0, pz);
-    // Mặt nhân vật hướng -Z cục bộ → xoay hướng di chuyển (dx, dz)
-    w.root.rotation.y = Math.atan2(-(b[0] - a[0]), -(b[1] - a[1]));
+    // Xoay mượt hướng đi ở các góc cua (không giật đột ngột)
+    const targetYaw = Math.atan2(-(b[0] - a[0]), -(b[1] - a[1]));
+    let diff = targetYaw - w.root.rotation.y;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    w.root.rotation.y += diff * 0.18;
 
     const stride = Math.sin(t * 5.4 + i);
     w.body.position.y = 0.835 + Math.abs(Math.cos(t * 5.4 + i)) * 0.032;
