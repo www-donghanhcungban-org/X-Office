@@ -2387,6 +2387,48 @@ class LedgerArchiveTest(unittest.TestCase):
         (self.d / "AUDIT-STATUS-ARCHIVE.md").write_text(archive_text([self.FIXED]) + legend, encoding="utf-8")
         self.assertEqual(self.check()[0], [])
 
+    def test_archive_short_and_pipeless_rule_rows_accepted(self):
+        """AUD-HAR-454 (2): dòng phân cách GFM `|--|`/`|-|` (một `-` là đủ) và dòng phân cách không có `|` đầu
+        (`---|---`) vẫn là dòng phân cách — đọc được bảng như trước #31 (không báo "thiếu bảng"), dòng phân cách không
+        thành phát hiện; đợt dời lặp với phân cách ngắn vẫn bỏ dòng lặp tiêu đề; `---` không có `|` (đường kẻ ngang)
+        hay dòng phân cách không `|` ở dòng ba không nối vào bảng."""
+        head = FINDING_HEAD.splitlines()[0]
+        for rule in ("|--|--|--|--|--|--|--|", "|-|:-:|-|-|-|-|-|", "---|---|---|---|---|---|---", ":--|--"):
+            with self.subTest(rule=rule):
+                text = "## Phát hiện\n\n" + head + "\n" + rule + "\n| " + self.OPEN + " |\n"
+                batch = "\n> Đợt 2\n\n" + head + "\n" + rule + "\n| " + self.FIXED + " |\n"
+                self.assertEqual(self.ids(text + batch), ["AUD-SEC-002", "AUD-SEC-001"])
+                self.books([])
+                (self.d / "AUDIT-STATUS-ARCHIVE.md").write_text(text, encoding="utf-8")
+                self.assertEqual(
+                    self.check()[0],
+                    ["AUD-SEC-002: sổ lưu trữ AUDIT-STATUS-ARCHIVE.md chỉ nhận dòng `đã sửa` (đang `mở`)"],
+                )
+        self.assertTrue(xt._is_rule_row("--"))
+        self.assertFalse(xt._is_rule_row("| -- | x |"))
+        hr = "## Phát hiện\n\n" + head + "\n---\n| " + self.FIXED + " |\n"
+        self.assertEqual(self.ids(hr), [])  # `---` cắt khối: khối sau không có tiêu đề riêng → bỏ (fail-closed)
+        third = archive_text([self.FIXED]) + "---|---\n| " + self.OPEN + " |\n"
+        self.assertEqual(self.ids(third), ["AUD-SEC-001", "AUD-SEC-002"])  # dòng ba: cắt khối, dòng sau vẫn giữ
+
+    def test_archive_table_without_rule_reported_clearly(self):
+        """AUD-HAR-454 (2): heading chỉ có khối `|` không dòng phân cách (bảng chú giải hay bảng sổ quên `|---|`) không
+        đọc được cột — `audit check` báo rõ lý do thay cho "thiếu bảng `## Phát hiện`" (vẫn fail-closed); khối như vậy
+        đứng trước bảng chính có phân cách thì bỏ im lặng như cũ; khối trước mọi heading không báo."""
+        missing = f"AUDIT-STATUS-ARCHIVE.md: `## Phát hiện`: {xt.NO_RULE_ERROR}"
+        for body in ("| Mức | Nghĩa |\n| 🔴 | chặn |\n", FINDING_HEAD.splitlines()[0] + "\n| " + self.FIXED + " |\n"):
+            with self.subTest(body=body):
+                self.books([])
+                (self.d / "AUDIT-STATUS-ARCHIVE.md").write_text("## Phát hiện\n\n" + body, encoding="utf-8")
+                self.assertEqual(self.check()[0], [missing])
+        errors: list[str] = []
+        stray = "| a | b |\n\n## Phát hiện\n\n| Mức | Nghĩa |\n\n" + FINDING_HEAD + "| " + self.FIXED + " |\n"
+        self.assertEqual([r["ID"] for r in xt.archive_tables(stray, errors)["Phát hiện"]], ["AUD-SEC-001"])
+        self.assertEqual(errors, [])
+        nfd = unicodedata.normalize("NFD", "## Phát hiện\n\n| Mức | Nghĩa |\n\n| x | y |\n")
+        self.assertEqual(xt.archive_tables(nfd, errors), {})
+        self.assertEqual(errors, [f"`## Phát hiện`: {xt.NO_RULE_ERROR}"])  # một lỗi mỗi heading, tên NFC
+
     def test_no_archive_keeps_counts(self):
         self.books([self.FIXED])
         errors, counts = self.check()

@@ -5,6 +5,8 @@
 > Repo không còn dùng khung: xoá dòng. Repo private vẫn đọc được nếu phiên có quyền; báo cáo chỉ trích nội dung đã qua `redact`.
 > Bản máy đọc (core/gói/owner/release/ngoại lệ — ADR-0068 lát E): [`registry.json`](registry.json), kiểm bằng
 > `python3 scripts/xt.py registry`; đổi phiên bản ở đây thì sửa cả hai (`tests/test_registry.py` đối chiếu).
+> Dự án đích còn ở dòng kế thừa X-Templates (3.34.0) nhận dòng X-Office 1.x bằng cách chạy lại `install.py`
+> (registry báo `legacy-line`, ADR-9003).
 
 ## Danh sách
 

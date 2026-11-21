@@ -4341,8 +4341,8 @@ def _row_blocks(lines: List[str]) -> Iterator[List[str]]:
     """Dòng `## ` thành khối một dòng; dòng bảng `|` (kể cả thụt lề) liền nhau gom thành một khối; dòng khác cắt khối."""
     block: List[str] = []
     for ln in lines:
-        if ln.lstrip().startswith("|"):
-            block.append(ln)
+        if ln.lstrip().startswith("|") or (len(block) == 1 and "|" in ln and _is_rule_row(ln)):
+            block.append(ln)  # dòng phân cách ngay dưới tiêu đề được bỏ `|` đầu (`---|---`, GFM) — AUD-HAR-454
             continue
         if block:
             yield block
@@ -4353,10 +4353,14 @@ def _row_blocks(lines: List[str]) -> Iterator[List[str]]:
         yield block
 
 
+GFM_RULE_CELL_RE = re.compile(r":?-+:?")  # GFM: ô phân cách chỉ cần MỘT `-` (`|--|`, `|-|`) — AUD-HAR-454
+
+
 def _is_rule_row(line: str) -> bool:
-    """Dòng phân cách GFM `|---|:---:|` (cùng luật ô với `md_tables`)."""
+    """Dòng phân cách GFM `|---|:---:|`, `|--|`, `---|---` (không `|` đầu) của sổ lưu trữ. Rộng hơn `md_tables`
+    (`-{3,}`) nên `_archive_block` không chuyển dòng này cho `md_tables` — chỉ dòng tiêu đề."""
     cells = split_md_row(line)
-    return any(cells) and all(MD_RULE_CELL_RE.fullmatch(c) for c in cells if c)
+    return any(cells) and all(GFM_RULE_CELL_RE.fullmatch(c) for c in cells if c)
 
 
 def _header_cells(line: str) -> List[str]:
@@ -4389,7 +4393,7 @@ def _archive_block(
     if own is None and header is None:
         return None, [], None
     main = own if header is None else header
-    head = block[:2] if header is None else []
+    head = block[:1] if header is None else []  # chỉ dòng tiêu đề: `md_tables` không cần dòng phân cách
     rows = block[2:] if own is not None else block
     return main, head + [ln for ln in rows if _header_cells(ln) not in (main, own)], odd
 
@@ -4400,23 +4404,38 @@ def archive_tables(text: str, errors: Optional[List[str]] = None) -> Dict[str, L
     chú đầu tiên lọt khỏi kiểm ID duy nhất và `chỉ đã sửa`). Nội dung trong code fence bị bỏ (ví dụ mẫu không phải bảng
     thật). Mỗi heading chỉ có MỘT bảng, xét theo khối bảng (`_archive_block`): dòng lặp tiêu đề bị bỏ, bảng chú giải bị
     bỏ, dòng nối tiếp ít/nhiều ô hơn tiêu đề vẫn giữ để không mất phát hiện; bảng kiểu sổ khác tiêu đề giữ dòng và ghi
-    lỗi vào `errors` (nếu có)."""
+    lỗi vào `errors` (nếu có). Heading chỉ có khối `|` không dòng phân cách (bảng không có tiêu đề cột) ghi lỗi rõ
+    `NO_RULE_ERROR` thay vì để người đọc chỉ thấy "thiếu bảng" (AUD-HAR-454)."""
     kept: List[str] = []
+    found: List[str] = []
+    bare: List[str] = []  # heading có khối `|` bị bỏ vì chưa có dòng phân cách nào
     header: Optional[List[str]] = None
     heading = ""
     for block in _row_blocks(_unfenced_lines(text)):
         if block[0].startswith("## "):
-            header, heading = None, block[0][3:].strip()
+            header, heading = None, unicodedata.normalize("NFC", block[0][3:].strip())
             kept += block
             continue
         header, rows, odd = _archive_block(block, header)
         kept += rows
-        if odd is not None and errors is not None:
-            errors.append(
+        if header is None and heading:
+            bare.append(heading)
+        if odd is not None:
+            found.append(
                 f"`## {heading}`: bảng khác tiêu đề bảng chính (`| {' | '.join(odd)} |`) — dòng vẫn kiểm theo cột của"
                 " bảng chính; sửa tiêu đề cho khớp"
             )
-    return md_tables("\n".join(kept))
+    tables = md_tables("\n".join(kept))
+    found += [f"`## {h}`: {NO_RULE_ERROR}" for h in dict.fromkeys(bare) if h not in tables]
+    if errors is not None:
+        errors += found
+    return tables
+
+
+NO_RULE_ERROR = (
+    "có dòng bảng `|` nhưng không có dòng phân cách (`|---|`) ngay dưới dòng tiêu đề — không đọc được cột nên"
+    " không có bảng; thêm dòng phân cách"
+)
 
 
 def audit_findings(status: Path) -> List[Dict[str, str]]:
@@ -4704,7 +4723,7 @@ def _audit_archive_rows(status: Path, errors: List[str], counts: Dict[str, int])
     odd: List[str] = []
     tables = archive_tables(archive.read_text(encoding="utf-8"), odd)
     errors += [f"{archive.name}: {e}" for e in odd]
-    if "Phát hiện" not in tables:
+    if "Phát hiện" not in tables and f"`## Phát hiện`: {NO_RULE_ERROR}" not in odd:  # đã báo rõ lý do (AUD-HAR-454)
         errors.append(f"{archive.name}: thiếu bảng `## Phát hiện`")
     rows = tables.get("Phát hiện", [])
     counts["lưu trữ"] = len(rows)
