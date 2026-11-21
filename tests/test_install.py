@@ -2447,8 +2447,15 @@ class InstallUpgradeTest(unittest.TestCase):
         )
         out = self.report("1.0.0", "1.1.0", log.encode())  # trong dòng mới: chỉ bản > 1.0.0
         self.assertEqual(out.splitlines()[1:], ["[install]   [1.1.0]", "[install]   - Dự án đích: bước mới"])
-        out = self.report("1.1.0", "1.0.0", log.encode())  # hạ bản trong dòng mới
+        no_new = log.replace("## [1.1.0]\n- a Dự án đích: bước mới\n", "")  # nguồn thật 1.0.0: không có mục 1.1.0
+        out = self.report("1.1.0", "1.0.0", no_new.encode())  # hạ bản trong dòng mới (since không có ở hai dòng)
         self.assertIn("(hạ bản)", out)
+        self.assertEqual(len(out.splitlines()), 1, out)
+        dup = (
+            log + "## [1.0.0]\n- e Dự án đích: bước kế thừa trùng số\n"
+        )  # số trùng giữa hai dòng: phân loại theo vị trí
+        out = self.report("3.5.0", "1.1.0", dup.encode())
+        self.assertNotIn("bước kế thừa trùng số", out)  # mục kế thừa 1.0.0 ≤ 3.5.0
 
     def test_xt_yaml_new_keys_appended_as_comments_idempotent(self):
         """xt.yaml của dự án (`kept-own`): khoá của mẫu mà dự án chưa có (`khoá:` lẫn `# khoá:`) nối cuối file dạng chú

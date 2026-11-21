@@ -235,22 +235,22 @@ class DriftTest(unittest.TestCase):
         self.assertEqual({r["repo"]: r["core_drift"] for r in got["products"]}, {**expect, "o/unk": "unknown"})
         self.assertEqual((got["drift"], got["expired"]), (5, 0))
 
-    def test_legacy_line_core_is_not_drift(self) -> None:
-        """ADR-9002: lõi ở tag dòng kế thừa (3.34.0) khi khung đã sang dòng mới (1.x) là `legacy-line`, không đỏ; lệch
-        trong dòng mới vẫn đỏ; khung còn ở 3.34.0 thì như cũ."""
+    def test_legacy_line_core_is_drift(self) -> None:
+        """ADR-9002: lõi ở tag dòng kế thừa (3.34.0) khi khung đã sang dòng mới (1.x) là `legacy-line` — nhãn riêng
+        nhưng vẫn là lệch (chưa nhận bản dòng mới); khung còn ở 3.34.0 thì như cũ."""
         cores = {"o/leg": "3.34.0", "o/old": "3.32.0", "o/cur": "1.0.0", "o/maj": "0.9.9"}
         pack = {"id": "web-api-ts", "version": "3.34.0"}
         with Sandbox(version="1.0.0", packs=["web-api-ts"]) as sb:
             rows = [product(repo=r, core=c) for r, c in cores.items()]
             got = sb.report(registry(*rows, product(repo="o/pk", core="1.0.0", pack=pack)))
-            sb.write(registry(rows[0], rows[2]))
+            sb.write(registry(rows[2]))
             self.assertEqual(sb.run("--strict")[0], 0)
-            sb.write(registry(*rows))
+            sb.write(registry(rows[0], rows[2]))
             self.assertEqual(sb.run("--strict")[0], 1)
         expect = {"o/leg": "legacy-line", "o/old": "ahead", "o/cur": "current", "o/maj": "major", "o/pk": "current"}
         self.assertEqual({r["repo"]: r["core_drift"] for r in got["products"]}, expect)
         self.assertEqual(got["products"][-1]["pack_drift"], "legacy-line")
-        self.assertEqual(got["drift"], 2)
+        self.assertEqual(got["drift"], 4)  # leg, old, maj và o/pk (gói ở dòng kế thừa)
         new = ("1.0.0", (1, 0, 0), False)
         self.assertEqual(xt._reg_drift("3.34.0", ("3.34.0", (3, 34, 0), False)), "current")  # khung còn ở 3.34.0
         self.assertEqual(xt._reg_drift("3.34.0", new), "legacy-line")
@@ -470,12 +470,9 @@ class RealRegistryTest(unittest.TestCase):
         # số lệch tính độc lập từ registry.json + VERSION: core hoặc gói khác VERSION khung (dữ kiện thật đổi theo dự án
         # đích — không giả định "mọi dự án đều cũ"; review #461)
         data = json.loads((ROOT / "docs" / "ops" / "registry.json").read_text(encoding="utf-8"))
-
-        def lagging(version: str) -> bool:  # tag dòng kế thừa (ADR-9002) không tính lệch khi khung đã sang dòng mới
-            return version != got["version"] and tuple(map(int, version.split("."))) not in xt.LEGACY_RELEASE_TAGS
-
         want = sum(
-            lagging(p["core"]) or (p["pack"] is not None and lagging(p["pack"]["version"])) for p in data["products"]
+            p["core"] != got["version"] or (p["pack"] is not None and p["pack"]["version"] != got["version"])
+            for p in data["products"]
         )
         self.assertEqual(want, got["drift"])
 

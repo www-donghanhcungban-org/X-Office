@@ -2468,20 +2468,26 @@ def step_clauses(block: list[str]) -> list[str]:
 LEGACY_HEAD_RE = re.compile(r"^## Dòng kế thừa X-Templates \(đến \d+\.\d+\.\d+\)\s*$", re.M)  # ADR-9002
 
 
-def new_line_names(text: str) -> set[str]:
-    """Tên các mục `X.Y.Z` của dòng phát hành riêng (đứng trước tiêu đề ranh giới dòng kế thừa); rỗng khi không có ranh
-    giới (ADR-9002)."""
+def split_release_line(text: str) -> tuple[list[tuple[str, list[str]]], list[tuple[str, list[str]]]]:
+    """(mục dòng phát hành riêng, mục dòng kế thừa) theo VỊ TRÍ so với tiêu đề ranh giới (ADR-9002); không có ranh giới →
+    mọi mục thuộc dòng kế thừa (hành vi cũ). Phân loại theo vị trí, không theo tên: số bản có thể trùng giữa hai dòng."""
     m = LEGACY_HEAD_RE.search(text)
     if not m:
-        return set()
-    return {name for name, _ in changelog_sections(text[: m.start()]) if name and name != "Unreleased"}
+        return [], changelog_sections(text)
+    return changelog_sections(text[: m.start()]), changelog_sections(text[m.end() :])
+
+
+def _names(sections: list[tuple[str, list[str]]]) -> set[str]:
+    return {name for name, _ in sections if name and name != "Unreleased"}
 
 
 def crosses_release_line(text: str, since: tuple[int, int, int], now: tuple[int, int, int]) -> bool:
-    """Nâng từ dòng kế thừa (`since` không phải mục của dòng mới) sang dòng phát hành riêng (`now` là mục của dòng mới):
-    số bản nhỏ hơn nhưng không phải hạ bản (ADR-9002)."""
-    names = new_line_names(text)
-    return ".".join(map(str, since)) not in names and ".".join(map(str, now)) in names
+    """Nâng từ dòng kế thừa (`since` là mục sau ranh giới, không phải mục dòng mới) sang dòng phát hành riêng (`now` là
+    mục dòng mới): số bản nhỏ hơn nhưng không phải hạ bản. `since` không có ở cả hai dòng (vd. 1.0.1 khi nguồn là
+    1.0.0) → so số như thường, tức hạ bản (ADR-9002)."""
+    new, old = split_release_line(text)
+    label = ".".join(map(str, since))
+    return label in _names(old) and label not in _names(new) and ".".join(map(str, now)) in _names(new)
 
 
 def upgrade_steps(text: str, since: tuple[int, int, int], crossing: bool = False) -> list[tuple[str, list[str]]]:
@@ -2490,25 +2496,28 @@ def upgrade_steps(text: str, since: tuple[int, int, int], crossing: bool = False
     `crossing` (sang dòng phát hành riêng): mọi mục của dòng mới tính là mới hơn `since` dù số nhỏ hơn."""
     out: list[tuple[str, list[str]]] = []
     seen: set[str] = set()
-    new = new_line_names(text)
-    since_in_new = ".".join(map(str, since)) in new
-    for name, lines in changelog_sections(text):
-        version = parse_version(name)
-        older = version is None or version <= since
-        if name == "Unreleased":
-            skip = False
-        elif name in new:
-            skip = older and not crossing
-        else:
-            skip = older or since_in_new  # đang ở dòng mới: mục kế thừa không phải bước của họ
-        if skip:
-            continue
-        clauses = [
-            c for c in dict.fromkeys(c for block in text_blocks(lines) for c in step_clauses(block)) if c not in seen
-        ]
-        seen.update(clauses)
-        if clauses:
-            out.append((name, clauses))
+    new, old = split_release_line(text)
+    since_in_new = ".".join(map(str, since)) in _names(new)
+    for in_new, sections in ((True, new), (False, old)):
+        for name, lines in sections:
+            version = parse_version(name)
+            older = version is None or version <= since
+            if name == "Unreleased":
+                skip = False
+            elif in_new:
+                skip = older and not crossing
+            else:
+                skip = older or since_in_new  # đang ở dòng mới: mục kế thừa không phải bước của họ
+            if skip:
+                continue
+            clauses = [
+                c
+                for c in dict.fromkeys(c for block in text_blocks(lines) for c in step_clauses(block))
+                if c not in seen
+            ]
+            seen.update(clauses)
+            if clauses:
+                out.append((name, clauses))
     return out
 
 

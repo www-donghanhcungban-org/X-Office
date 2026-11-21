@@ -12297,12 +12297,12 @@ def _reg_version(framework: Path) -> Optional[Tuple[str, Tuple[int, int, int], b
     return (m[0], (int(m[1]), int(m[2]), int(m[3])), bool(m[4])) if m else None
 
 
-REG_DRIFT_OK = ("current", "legacy-line")  # trạng thái không tính là lệch (`--strict` không đỏ)
+REG_DRIFT_OK = ("current",)  # trạng thái không tính là lệch (`--strict` không đỏ); `legacy-line` vẫn là lệch (ADR-9002)
 
 
 def _reg_drift(have: Optional[str], ver: Optional[Tuple[str, Tuple[int, int, int], bool]]) -> str:
     """Lệch của bản `have` (X.Y.Z) so với VERSION khung: current · patch · minor · major · ahead · legacy-line ·
-    unknown. `legacy-line` (ADR-9002): `have` là tag dòng kế thừa, khung đã sang dòng mới (số nhỏ hơn) — không lệch."""
+    unknown. `legacy-line` (ADR-9002): `have` là tag dòng kế thừa, khung đã sang dòng mới (số nhỏ hơn) — vẫn là lệch: cần chạy lại install.py."""
     if have is None or ver is None:
         return "unknown"
     h, v = tuple(int(x) for x in have.split(".")), ver[1]
@@ -12336,12 +12336,12 @@ def registry_report(data: Dict[str, Any], framework: Path, today: _dt.date) -> D
 
 def _registry_text(out: Dict[str, Any], file: str) -> str:
     lines = [f"registry {file} — khung {out['version'] or 'không rõ VERSION'}"]
-    lines.append(f"  {'repo':<32} {'core':<8} {'lệch':<7} {'gói':<24} {'lệch':<7} ngoại lệ hết hạn")
+    lines.append(f"  {'repo':<32} {'core':<8} {'lệch':<11} {'gói':<24} {'lệch':<11} ngoại lệ hết hạn")
     for r in out["products"]:
         pack = f"{r['pack']['id']}@{r['pack']['version']}" if r["pack"] else "—"
         expired = ", ".join(r["expired"]) or "—"
         lines.append(
-            f"  {r['repo']:<32} {r['core'] or '—':<8} {r['core_drift']:<7} {pack:<24} {r['pack_drift'] or '—':<7} {expired}"
+            f"  {r['repo']:<32} {r['core'] or '—':<8} {r['core_drift']:<11} {pack:<24} {r['pack_drift'] or '—':<11} {expired}"
         )
     n = len(out["products"])
     lines.append(f"{n} sản phẩm · lệch {out['drift']} · ngoại lệ hết hạn {out['expired']}")
