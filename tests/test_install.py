@@ -2457,6 +2457,91 @@ class InstallUpgradeTest(unittest.TestCase):
         out = self.report("3.5.0", "1.1.0", dup.encode())
         self.assertNotIn("bước kế thừa trùng số", out)  # mục kế thừa 1.0.0 ≤ 3.5.0
 
+    def test_upgrade_steps_prerelease_older_than_release(self):
+        """AUD-HAR-453 (3), SemVer §11: nhãn `1.0.0-rc1 (sha)` cũ hơn 1.0.0 — nâng lên 1.0.0 in bước của mục [1.0.0] (trước
+        đây đọc thành 1.0.0 nên im lặng như cài lại); 1.0.0 → 1.0.0-rc2 là hạ bản; rc1 → rc2 cùng số không bước thì im."""
+        self.assertEqual(
+            [install.version_key(s) for s in ("1.0.0-rc1 (abc)", "v1.2.3-beta.2", "3.7.1 (9433792)", "1.0.0+b", "x")],
+            [(1, 0, 0, 0), (1, 2, 3, 0), (3, 7, 1, 1), (1, 0, 0, 1), None],
+        )
+        log = (
+            "## [Unreleased]\n## [1.0.0]\n- b Dự án đích: bước đầu\n"
+            "## Dòng kế thừa X-Templates (đến 3.6.0)\n## [3.6.0]\n- c Dự án đích: bước cũ\n"
+        )
+        self.assertEqual(install.upgrade_steps(log, (1, 0, 0)), [])
+        self.assertEqual(install.upgrade_steps(log, (1, 0, 0), pre=True), [("1.0.0", ["Dự án đích: bước đầu"])])
+        out = self.report("1.0.0-rc1 (abc)", "1.0.0", log.encode())
+        self.assertEqual(
+            out.splitlines(),
+            [
+                "[install] Bước làm tay từ CHANGELOG (1.0.0-rc1 (abc) → mới):",
+                "[install]   [1.0.0]",
+                "[install]   - Dự án đích: bước đầu",
+            ],
+        )
+        out = self.report("1.0.0 (abc)", "1.0.0-rc2\n", log.encode())
+        self.assertEqual(
+            out,
+            "[install] Bước làm tay từ CHANGELOG (1.0.0 (abc) → mới): bỏ qua — bản khung 1.0.0-rc2 cũ hơn bản đã cài"
+            " (hạ bản)\n",
+        )
+        self.assertEqual(self.report("1.0.0-rc1", "1.0.0-rc2", b"## [Unreleased]\n- a\n"), "")
+
+    def test_prerelease_upgrade_without_steps_and_across_release_line(self):
+        """AUD-HAR-453 (review): `1.0.0-rc1` → `1.0.0` không có bước vẫn là nâng bản → "không có", không im lặng như cài
+        lại (đột biến so `now[:3] == since` phải đỏ); `3.34.0-rc1` (dòng kế thừa) → 1.0.0 gồm cả mục [3.34.0] — bản
+        chính của rc đã cài — nhưng không gồm mục cũ hơn; `3.34.0` → 1.0.0 thì không gồm [3.34.0]."""
+        self.assertEqual(
+            self.report("1.0.0-rc1", "1.0.0", b"## [Unreleased]\n## [1.0.0]\n- a\n"),
+            "[install] Bước làm tay từ CHANGELOG (1.0.0-rc1 → mới): không có\n",
+        )
+        log = (
+            "## [Unreleased]\n## [1.0.0]\n- b Dự án đích: bước đầu\n"
+            "## Dòng kế thừa X-Templates (đến 3.34.0)\n## [3.34.0]\n- c Dự án đích: bước 3.34\n"
+            "## [3.33.0]\n- d Dự án đích: bước 3.33\n"
+        ).encode()
+        head = ["[install]   [1.0.0]", "[install]   - Dự án đích: bước đầu"]
+        self.assertEqual(
+            self.report("3.34.0-rc1 (abc)", "1.0.0", log).splitlines(),
+            [
+                "[install] Bước làm tay từ CHANGELOG (3.34.0-rc1 (abc) → mới):",
+                *head,
+                "[install]   [3.34.0]",
+                "[install]   - Dự án đích: bước 3.34",
+            ],
+        )
+        self.assertEqual(
+            self.report("3.34.0 (abc)", "1.0.0", log).splitlines(),
+            ["[install] Bước làm tay từ CHANGELOG (3.34.0 (abc) → mới):", *head],
+        )
+
+    def test_changelog_unreleased_has_no_stray_target_steps(self):
+        """Ghi chú về dòng kế thừa trong `[Unreleased]` của CHANGELOG thật không được thành bước "Dự án đích" mà
+        `install.py` in cho người đang nâng (review): mọi mệnh đề của mục là bước thật, không nhắc `doctor --drift`."""
+        text = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        unreleased = dict(install.changelog_sections(text)).get("Unreleased", [])
+        clauses = [c for block in install.text_blocks(unreleased) for c in install.step_clauses(block)]
+        self.assertFalse([c for c in clauses if "doctor --drift" in c or "dòng kế thừa" in c], clauses)
+
+    def test_legacy_boundary_regex_same_as_xt(self):
+        """AUD-HAR-453 (1): `install.LEGACY_HEAD_RE` và `xt.CHANGELOG_LINE_RE` (hai script độc lập, không import nhau) nhận
+        đúng cùng một tập tiêu đề ranh giới, kể cả CHANGELOG.md thật."""
+        samples = [
+            "## Dòng kế thừa X-Templates (đến 3.34.0)",
+            "## Dòng kế thừa X-Templates (đến 2.0.0)  ",
+            "## Dòng kế thừa X-Templates (đến 3.34)",
+            "## Dòng kế thừa X-Templates",
+            "## Dòng kế thừa X-Templates (đến 3.34.0) thêm",
+            " ## Dòng kế thừa X-Templates (đến 3.34.0)",
+        ]
+        samples += (ROOT / "CHANGELOG.md").read_text(encoding="utf-8").splitlines()
+        for line in samples:
+            with self.subTest(line=line):
+                self.assertEqual(
+                    bool(install.LEGACY_HEAD_RE.fullmatch(line)), bool(xt.CHANGELOG_LINE_RE.fullmatch(line.rstrip()))
+                )
+        self.assertTrue(install.LEGACY_HEAD_RE.fullmatch(samples[0]))
+
     def test_xt_yaml_new_keys_appended_as_comments_idempotent(self):
         """xt.yaml của dự án (`kept-own`): khoá của mẫu mà dự án chưa có (`khoá:` lẫn `# khoá:`) nối cuối file dạng chú
         thích sau MỘT dòng đánh dấu; dòng cũ giữ nguyên byte; khoá có hiệu lực không đổi; `--plan` chỉ báo; cài lần hai

@@ -1,7 +1,7 @@
 ---
 title: Gói web-api-ts — API nhiều tenant trên Node 24 + Postgres
 kind: index
-updated: 2026-11-20
+updated: 2026-11-21
 ---
 
 # Gói `web-api-ts`
@@ -55,7 +55,15 @@ Mở <http://127.0.0.1:4317/> trên máy chạy Docker. Lấy tài khoản `owne
 
 `node scripts/dev-preview.mjs verify` dựng lại artifact trong thư mục tạm, so với receipt và `/healthz`, rồi kiểm trang HTML. `python3 .xtemplates/scripts/xt.py deploy rollback --env dev --json` nạp ảnh ứng dụng đã lưu của lần triển khai trước. Migration và tài khoản demo chạy ở bước một lần `setup` của `ops/dev/compose.yaml` trước khi ứng dụng khởi động; tiến trình ứng dụng không nhận mật khẩu demo. Khi quay lui (cả quay lui tự động sau smoke đỏ), adapter đặt `XT_SKIP_MIGRATE=1` nên ảnh cũ không chạy `migrate up` trên volume mà bản mới đã migrate (migrator của ảnh cũ từ chối migration nó không biết). Vì vậy rollback chỉ an toàn khi migration của bản mới là dạng expand mà mã cũ vẫn chạy được (thêm bảng/cột cho phép rỗng; chưa xoá hay đổi tên). Cơ chế này cần cả hai bản được dựng từ gói có bước `setup`. `node scripts/dev-preview.mjs stop` dừng dịch vụ và giữ volume.
 
-Ảnh dùng để quay lui và thông tin truy cập dev nằm trong `.git/xt-preview/dev`. Sau mỗi lần `up` thành công, adapter xoá `<digest>.image.tar`, `<digest>.compose.yaml` và tag Docker của các bản mà sổ `docs/ops/DEPLOYS.json` không còn cần: giữ bản đang chạy, bản trước (`previous`) và các digest `xt.py` truyền qua `XT_DEPLOY_KEEP` (slot trước lần ghi đè); thiếu biến này, ví dụ gọi adapter tay, thì không dọn gì. Không xoá `preview-access.json`: mật khẩu PostgreSQL trong đó đã ghi vào volume. Nếu tệp này mất trong khi volume `<project>_db` còn, lần triển khai sau dừng và hướng dẫn xoá dữ liệu dev bằng `docker compose -p <project> down -v`. Lý do này chỉ in ở stderr của adapter, receipt chỉ ghi exit code.
+Ảnh dùng để quay lui và thông tin truy cập dev nằm trong `.git/xt-preview/dev`. Sau mỗi lần `up` thành công, adapter xoá `<digest>.image.tar`, `<digest>.compose.yaml` và tag Docker của các bản mà sổ `docs/ops/DEPLOYS.json` không còn cần: giữ bản đang chạy, bản trước (`previous`) và các digest `xt.py` truyền qua `XT_DEPLOY_KEEP` (slot trước lần ghi đè); thiếu biến này, ví dụ gọi adapter tay, thì không dọn gì. Không xoá `preview-access.json`: mật khẩu PostgreSQL trong đó đã ghi vào volume. Nếu tệp này mất trong khi volume `<project>_db` còn, lần triển khai sau dừng và hướng dẫn xoá dữ liệu dev bằng `docker compose -p <project> down -v`. Với mỗi bước adapter thất bại, `xt.py deploy` in tối đa 5 dòng cuối stderr của bước đó (dòng `  adapter <bước> (exit N): …`, đã che bí mật) ra stderr của lệnh; receipt trong sổ chỉ ghi exit code, nên `xt.py deploy status` không nhắc lại lý do.
+
+Tên `<project>` là `xtdev` nối 16 ký tự hex đầu của SHA-256 đường dẫn tuyệt đối mà `git rev-parse --absolute-git-dir` in ra (không kèm xuống dòng), nên mỗi checkout và mỗi worktree có project riêng. Lấy tên từ gốc repo sản phẩm (trên macOS thay `sha256sum` bằng `shasum -a 256`):
+
+```bash
+printf 'xtdev%s\n' "$(git rev-parse --absolute-git-dir | tr -d '\n' | sha256sum | cut -c1-16)"
+```
+
+Kiểm bằng `docker volume ls --filter name=<project>_db` trước khi chạy `docker compose -p <project> down -v`. Lệnh này xoá vĩnh viễn ghi chú và tài khoản của bản dev; lần triển khai sau tạo sổ mật khẩu và volume mới.
 
 Để dựng và nghiệm thu bằng Chromium từ gốc repo sản phẩm, chạy `bash tests_e2e/preview.sh`. Kết quả ở `dist/preview-browser.json` sau khi một phiên mới đọc lại ghi chú đã tạo. Workflow `dev-preview` của starter chạy cùng lệnh trên PR và khi chọn **Run workflow**. Mã bài kiểm thuộc dự án. Xem hướng dẫn đổi đường dẫn bằng chứng trong `tests_e2e/README.md` của repo sản phẩm.
 

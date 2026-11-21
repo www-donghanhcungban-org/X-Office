@@ -3,6 +3,7 @@
 Docker giả là tiến trình thật trên PATH; adapter chạy bằng Node thật. Không cần Docker daemon.
 """
 
+import gzip
 import hashlib
 import io
 import json
@@ -95,14 +96,16 @@ class AdapterCase(unittest.TestCase):
             "ops/dev/compose.yaml": COMPOSE.read_text(),
         }
         buffer = io.BytesIO()
-        with tarfile.open(fileobj=buffer, mode="w:gz") as tar:
+        with tarfile.open(fileobj=buffer, mode="w") as tar:
             for name, text in files.items():
                 data = text.encode()
                 info = tarfile.TarInfo(name)
                 info.size = len(data)
                 tar.addfile(info, io.BytesIO(data))
-        (dist / "app.tgz").write_bytes(buffer.getvalue())
-        raw = hashlib.sha256(buffer.getvalue()).hexdigest()
+        # mtime=0: tiêu đề gzip của `tarfile` ghi giờ hiện tại — hai lần dựng cùng nhãn qua ranh giới giây sẽ khác digest
+        packed = gzip.compress(buffer.getvalue(), mtime=0)
+        (dist / "app.tgz").write_bytes(packed)
+        raw = hashlib.sha256(packed).hexdigest()
         return hashlib.sha256(f"dist/app.tgz\0{raw}\n".encode()).hexdigest()
 
     def ledger(self, current=None, previous=None, events=()):
@@ -297,7 +300,7 @@ class CoordinatorPruneTest(AdapterCase):
         self.enterContext(unittest.mock.patch.object(xt.DevPreview, "run", self.fake_run))
         self.enterContext(unittest.mock.patch.object(xt, "_dev_candidate", lambda base: self.candidate))
 
-    def fake_run(self, argv, env, sink):
+    def fake_run(self, argv, env, sink, errors):
         """Deploy/rollback chạy adapter node; smoke đỏ với digest `bad`; digest đọc bản đang phục vụ."""
         action = argv[-1]
         if action in ("deploy", "rollback"):
@@ -364,6 +367,17 @@ class AccessVolumeTest(AdapterCase):
         self.assertIn(f"docker compose -p {self.project} down -v", run.stderr)
         self.assertFalse((self.state / "preview-access.json").exists())
         self.assertFalse([line for line in self.trace() if line.startswith(("build", "compose"))])
+
+    def test_readme_recipe_prints_project_named_in_adapter_message(self):
+        """Lệnh lấy tên project trong README gói phải ra đúng tên adapter in ở hướng dẫn `down -v`."""
+        if not shutil.which("sha256sum"):
+            self.skipTest("cần sha256sum (README nêu shasum -a 256 cho macOS)")
+        readme = (PACK / "README.md").read_text(encoding="utf-8")
+        recipe = re.search(r"```bash\n(printf 'xtdev[^\n]*)\n```", readme)
+        self.assertIsNotNone(recipe, "README gói thiếu lệnh lấy tên project")
+        printed = subprocess.run(["bash", "-c", recipe[1]], cwd=self.repo, capture_output=True, text=True, check=True)
+        run = self.run_adapter("deploy", self.archive("recipe"), "", FAKE_VOLUME=f"{self.project}_db")
+        self.assertIn(f"docker compose -p {printed.stdout.strip()} down -v", run.stderr)
 
     def test_new_password_book_with_unrelated_or_no_volume_deploys(self):
         for volume in ("", f"{self.project}_db2", f"x{self.project}_db"):

@@ -631,3 +631,10 @@
 - Chọn: A: bắt đầu dòng mới ở 1.0.0; công cụ nhận 'ranh giới dòng' (changelog-check, latest tag, registry) · giữ tag kế thừa
 - Lý do (tiêu chí chất lượng cuối): Chủ dự án: dự án đích không cắt bản theo X-Templates và chọn 1.0.0; tiêu chí 1: công cụ phải đúng với số nhỏ hơn tag kế thừa v3.34.0
 - Đường lùi: Đặt VERSION về 3.34.0 và hoàn tác thay đổi công cụ
+
+### D-9009 · 2026-11-21T08:28:04+00:00 · Lý do lỗi adapter dev-preview có vào deploy status không (AUD-A11Y-009)?
+
+- Phương án: (1) Giữ giao ước sổ: lý do chỉ in lúc deploy run/rollback · (2) Thêm trường stderr_tail đã che vào bước của receipt (đổi schema, SPEC, có thể ADR) · (3) Ghi tệp last-error cục bộ trong .git/xt-preview/dev
+- Chọn: Giữ giao ước sổ: lý do chỉ in lúc deploy run/rollback
+- Lý do (tiêu chí chất lượng cuối): Đúng và an toàn trước: sổ không giữ stdout/stderr là chủ ý, đổi schema chạm dự án đích; lý do đã tới người dùng ở lần chạy lỗi nên mục tiêu nợ đạt; phương án 2 và 3 thêm trạng thái mới không có nhu cầu đo được
+- Đường lùi: Thêm stderr_tail ở ADR mới kèm đổi _validate_deploy_ledger và SPEC-factory-deploy
