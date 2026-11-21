@@ -10,8 +10,12 @@ Bản < 3.20.0: [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md) (T-3651; `changel
 
 - `xt.py deploy run|rollback --env dev` in tối đa 5 dòng cuối stderr của adapter cho mỗi bước thất bại (đã che bí mật, mỗi dòng ≤ 200 ký tự), nên lời hướng dẫn như `docker compose -p <project> down -v` tới người dùng; sổ `DEPLOYS.json` vẫn chỉ ghi exit code (AUD-A11Y-009). Starter `web-api-ts`: notes-ui chỉ gắn `aria-invalid`/`aria-describedby` cho lỗi dữ liệu (rỗng, 400/422), không cho lỗi mạng/503; README gói nêu cách lấy tên project Compose. **Dự án đích**: chạy lại `install.py` để nhận `xt.py` mới; mã starter chỉ chép vào repo mới, dự án có sẵn tự ghép notes-ui nếu muốn.
 - Repo cài khung ở dòng kế thừa (≤ 3.34.0) không được `doctor --drift` nhắc lên 1.x, vì lệnh này chạy `xt.py` đã cài của chính repo đó; đường nâng là chạy lại `install.py` từ bản khung mới (AUD-HAR-453).
+- Mẫu `AGENTS.md` (dòng mở đầu) và `install.py` (`--help`, `.xtemplates/README.md`) gọi tên thống nhất "bộ khung `xt`" thay "khung X-Office" (AUD-DOC-312); `AGENTS.md` mẫu chỉ chép khi dự án chưa có, repo có sẵn tự sửa câu đó nếu muốn.
 
 ### Fixed
+
+- `install.py`: nhãn git describe (`1.0.0-3-gabc123`) là bản chính cùng số, không phải tiền phát hành — nâng lên 1.0.1 không in thừa mục [1.0.0] (AUD-HAR-454).
+- `audit check`: sổ lưu trữ nhận dòng phân cách GFM `|--|` và dòng phân cách không có `|` đầu; heading chỉ có bảng không dòng phân cách báo rõ lý do thay cho "thiếu bảng" (AUD-HAR-454).
 
 - `install.py`: nhãn tiền phát hành (`1.0.0-rc1 (sha)`) cũ hơn bản chính cùng số (SemVer §11) — nâng lên 1.0.0 in bước của mục [1.0.0] thay vì im lặng như cài lại; 1.0.0 → 1.0.0-rc2 là hạ bản (AUD-HAR-453).
 - `audit check`: sổ lưu trữ xét theo khối bảng — dòng thiếu ô có ô ID dị dạng (rỗng, trong backtick, in đậm, chữ thường) vẫn bị kiểm, bảng chú giải khác tiêu đề bỏ cả khối kể cả dòng mở bằng `AUD-` (AUD-HAR-452).

@@ -2515,13 +2515,61 @@ class InstallUpgradeTest(unittest.TestCase):
             ["[install] Bước làm tay từ CHANGELOG (3.34.0 (abc) → mới):", *head],
         )
 
+    def test_git_describe_label_is_release_not_prerelease(self):
+        """AUD-HAR-454 (1): nhãn git describe `1.0.0-3-gabc123` (3 commit sau tag 1.0.0) là bản chính cùng số, không phải
+        tiền phát hành — `→ 1.0.0` im lặng như cài lại, `→ 1.0.1` chỉ in mục [1.0.1], không in thừa [1.0.0]; `-rc1`,
+        `-beta2`, `-rc1-3-g…` (describe của tag tiền phát hành), `-3` và `-3-gamma` (không phải hex) vẫn là tiền phát hành."""
+        labels = ("1.0.0-3-gabc123", "v1.0.0-12-g0a1b2c3 (0a1b2c3)", "1.0.0-rc1", "1.0.0-beta2", "1.0.0-rc1-3-gabc")
+        self.assertEqual(
+            [install.version_key(s) for s in (*labels, "1.0.0-3", "1.0.0-3-gamma")],
+            [(1, 0, 0, 1), (1, 0, 0, 1), (1, 0, 0, 0), (1, 0, 0, 0), (1, 0, 0, 0), (1, 0, 0, 0), (1, 0, 0, 0)],
+        )
+        log = "## [Unreleased]\n## [1.0.1]\n- a Dự án đích: bước vá\n## [1.0.0]\n- b Dự án đích: bước đầu\n"
+        released = log.replace("## [1.0.1]\n- a Dự án đích: bước vá\n", "")  # nguồn 1.0.0: chưa có mục 1.0.1
+        self.assertEqual(self.report("1.0.0-3-gabc123", "1.0.0", released.encode()), "")
+        self.assertIn("[install]   [1.0.0]", self.report("1.0.0-rc1", "1.0.0", released.encode()).splitlines())
+        self.assertEqual(
+            self.report("1.0.0-3-gabc123", "1.0.1", log.encode()).splitlines(),
+            [
+                "[install] Bước làm tay từ CHANGELOG (1.0.0-3-gabc123 → mới):",
+                "[install]   [1.0.1]",
+                "[install]   - Dự án đích: bước vá",
+            ],
+        )
+        self.assertIn("[install]   [1.0.0]", self.report("1.0.0-beta2", "1.0.1", log.encode()).splitlines())
+
     def test_changelog_unreleased_has_no_stray_target_steps(self):
-        """Ghi chú về dòng kế thừa trong `[Unreleased]` của CHANGELOG thật không được thành bước "Dự án đích" mà
-        `install.py` in cho người đang nâng (review): mọi mệnh đề của mục là bước thật, không nhắc `doctor --drift`."""
-        text = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        unreleased = dict(install.changelog_sections(text)).get("Unreleased", [])
-        clauses = [c for block in install.text_blocks(unreleased) for c in install.step_clauses(block)]
-        self.assertFalse([c for c in clauses if "doctor --drift" in c or "dòng kế thừa" in c], clauses)
+        """Ghi chú về dòng kế thừa trong `[Unreleased]` không được thành bước "Dự án đích" mà `install.py` in cho người
+        đang nâng (review #31): chỉ mệnh đề mở bằng "Dự án đích" là bước; ghi chú viết dạng "Repo cài khung ở dòng kế
+        thừa …" hay nhắc tên `"Dự án đích"` trong nháy không lọt ra. CHANGELOG tổng hợp (AUD-HAR-454 (3)): CHANGELOG
+        thật sau mỗi lần cắt bản có `[Unreleased]` rỗng nên không kiểm được gì."""
+        note = (
+            "- Repo cài khung ở dòng kế thừa (≤ 3.34.0) không được `doctor --drift` nhắc lên 1.x; đường nâng là chạy lại"
+            " `install.py` (AUD-HAR-453)."
+        )
+        quoted = '- Mệnh đề "Dự án đích còn ở dòng kế thừa: chạy `doctor --drift`" chỉ là tên mẫu, không phải bước.'
+        log = (
+            "## [Unreleased]\n\n### Changed\n\n"
+            + "- `xt.py` mới. **Dự án đích**: chạy lại `install.py` để nhận `xt.py` mới.\n"
+            + note
+            + "\n"
+            + quoted
+            + "\n\n## [1.0.0] - 2026-11-21\n- b Dự án đích: bước đầu\n"
+        )
+        self.assertEqual(
+            install.upgrade_steps(log, (1, 0, 0)),
+            [("Unreleased", ["Dự án đích: chạy lại `install.py` để nhận `xt.py` mới."])],
+        )
+        out = self.report("1.0.0 (abc)", "1.0.0", log.encode())
+        self.assertEqual(
+            out.splitlines(),
+            [
+                "[install] Bước làm tay từ CHANGELOG (1.0.0 (abc) → mới):",
+                "[install]   [Unreleased]",
+                "[install]   - Dự án đích: chạy lại `install.py` để nhận `xt.py` mới.",
+            ],
+        )
+        self.assertNotIn("doctor --drift", out)
 
     def test_legacy_boundary_regex_same_as_xt(self):
         """AUD-HAR-453 (1): `install.LEGACY_HEAD_RE` và `xt.CHANGELOG_LINE_RE` (hai script độc lập, không import nhau) nhận

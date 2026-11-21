@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""install.py — cài khung X-Office vào một dự án đích (mọi hệ điều hành, cần CPython 3.15.x).
+"""install.py — cài bộ khung `xt` vào một dự án đích (mọi hệ điều hành, cần CPython 3.15.x).
 
 Kết quả trong dự án đích:
   .xtemplates/framework/        bản sao thư viện yêu cầu (chỉ đọc; cập nhật bằng cách chạy lại install)
@@ -874,7 +874,7 @@ def install_framework(xt_dir: Path, label: str | None, office_3d: bool = False) 
         drop_symlink(xt_dir / f)
     (xt_dir / "VERSION").write_text(version + "\n", encoding="utf-8")
     (xt_dir / "README.md").write_text(
-        "# .xtemplates/\n\nBản sao khung X-Office (chỉ đọc). Cập nhật: chạy lại `install.py` từ bản khung mới.\n"
+        "# .xtemplates/\n\nBản sao bộ khung `xt` (chỉ đọc). Cập nhật: chạy lại `install.py` từ bản khung mới.\n"
         "Ghép blueprint: `python3 .xtemplates/scripts/xt.py compose --profile <p> --scale <S|M|L> --out BLUEPRINT.md`.\n",
         encoding="utf-8",
     )
@@ -2389,12 +2389,15 @@ def parse_version(label: str | None) -> tuple[int, int, int] | None:
     return (int(m[1]), int(m[2]), int(m[3])) if m else None
 
 
-PRERELEASE_RE = re.compile(r"^v?\d+\.\d+\.\d+-[0-9A-Za-z]")  # SemVer §9: `1.0.0-rc1 (sha)`, `1.0.0-beta.2`
+# SemVer §9: `1.0.0-rc1 (sha)`, `1.0.0-beta.2`; hậu tố git describe `-<số>-g<hex>` (`1.0.0-3-gabc123`: 3 commit SAU tag
+# 1.0.0) không phải tiền phát hành (AUD-HAR-454)
+PRERELEASE_RE = re.compile(r"^v?\d+\.\d+\.\d+-(?!\d+-g[0-9a-f]+(?:\s|$))[0-9A-Za-z]")
 
 
 def version_key(label: str | None) -> tuple[int, int, int, int] | None:
     """Khoá so bản theo SemVer §11 (AUD-HAR-453): bản tiền phát hành (`1.0.0-rc1`) CŨ HƠN bản chính cùng số (`1.0.0`);
-    các bản tiền phát hành cùng số coi là bằng nhau (không so định danh). None khi nhãn không đọc được X.Y.Z."""
+    các bản tiền phát hành cùng số coi là bằng nhau (không so định danh). Nhãn git describe (`1.0.0-3-gabc123`) là bản
+    chính cùng số (AUD-HAR-454). None khi nhãn không đọc được X.Y.Z."""
     v = parse_version(label)
     return None if v is None else (*v, 0 if PRERELEASE_RE.match((label or "").strip()) else 1)
 
@@ -3112,7 +3115,7 @@ def sync_flags_error(args: argparse.Namespace) -> bool:
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(description="Cài khung X-Office vào dự án đích (cần CPython 3.15.x)")
+    p = argparse.ArgumentParser(description="Cài bộ khung `xt` vào dự án đích (cần CPython 3.15.x)")
     p.add_argument("target", help="thư mục gốc dự án đích")
     p.add_argument("--new", action="store_true", help="tạo dự án git mới từ thư mục trống, không cần mạng")
     p.add_argument("--idea", help="ý tưởng gốc (dữ liệu, 1…4000 ký tự), bắt buộc cùng --new")
