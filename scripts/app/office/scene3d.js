@@ -7,7 +7,7 @@
 import { inkOn, shade } from "./iso.js";
 import { planFor } from "./plans.js";
 import { STATE_TEXT, roomLabelAt, wallSegments } from "./scene.js";
-import { buildHumanRig, animateHumanRig } from "./human3d.js";
+import { buildHumanRig, animateHumanRig, buildWalkerRig, animateWalkerRig } from "./human3d.js";
 import {
   buildBench, buildBollard, buildCar, buildFence, buildFlowerbed, buildInstancedLawn, buildPlant,
   buildPool, buildRock, buildSeasonTree, buildStreetlamp, buildTree, buildUmbrella,
@@ -370,9 +370,9 @@ function buildOutdoor(THREE, sceneAssets, natureAssets, mats, plan, anim) {
 
   // Vỉa hè bê tông + đại lộ nhựa + vạch qua đường + 2 xe ô tô điện bóng clearcoat đỗ gọn trước văn phòng
   const streetZ = plan.D + pad;
-  const swMat = mats.standard("#dedad2", { roughness: 0.82, tex: "sidewalk", normal: 0.55 });
-  const roadMat = mats.standard("#ffffff", { roughness: 0.78, tex: "road", normal: 0.65 });
-  const curbCol = mats.standard("#a8a29e", { roughness: 0.8, tex: "stone", normal: 0.45 });
+  const swMat = mats.standard("#dedad2", { roughness: 0.85, tex: "sidewalk", normal: 0.55 });
+  const roadMat = mats.standard("#cfd4dc", { roughness: 0.86, tex: "road", normal: 0.65, roughMap: true });
+  const curbCol = mats.standard("#a8a29e", { roughness: 0.82, tex: "stone", normal: 0.5, roughMap: true });
   const swW = plan.W + pad + 12;
   const swX = (plan.W + pad - 1.5) / 2;
 
@@ -391,8 +391,16 @@ function buildOutdoor(THREE, sceneAssets, natureAssets, mats, plan, anim) {
   road.receiveShadow = true;
   group.add(road);
 
-  // Vạch kẻ người đi bộ qua đường thẳng trục lối vào sảnh
+  // Vạch phân làn đứt nét giữa đại lộ + vạch kẻ người đi bộ qua đường thẳng trục lối vào sảnh
   const stripeMat = mats.standard("#f1f5f9", { roughness: 0.72, polygonOffset: true, offsetUnits: -2 });
+  for (let dx = -4; dx < plan.W + pad + 4; dx += 4.2) {
+    if (dx > 2.0 && dx < 7.8) continue;
+    const ln = new THREE.Mesh(g.unitPlane, stripeMat);
+    ln.rotation.x = -Math.PI / 2;
+    ln.position.set(dx, -0.016, streetZ + 5.9);
+    ln.scale.set(2.1, 0.16, 1);
+    group.add(ln);
+  }
   for (let k = 0; k < 5; k++) {
     const st = new THREE.Mesh(g.unitPlane, stripeMat);
     st.rotation.x = -Math.PI / 2;
@@ -1401,8 +1409,11 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
     floorRoot.add(buildBollard(THREE, natureAssets, mats, 32.1, 14.4));
     floorRoot.add(buildBollard(THREE, natureAssets, mats, 41.2, 14.4));
     floorRoot.add(buildInstancedLawn(THREE, natureAssets, mats, {
-      x0: 30.4, x1: 43.6, y0: 8.4, y1: 21.6, count: 340, flowers: 48,
-    }, [[32.3, 8.9, 41.7, 14.7], [40.8, 10.6, 43.8, 13.8]]));
+      x0: 30.4, x1: 43.6, y0: 8.4, y1: 21.6, count: 360, flowers: 44,
+    }, [
+      [32.3, 8.9, 41.7, 14.7], [40.8, 10.6, 43.8, 13.8],
+      [31.1, 15.5, 32.9, 17.3], [41.9, 15.1, 43.7, 16.9], [36.3, 19.5, 38.1, 21.3],
+    ]));
   }
 
   // 5 bàn agent thật
@@ -1417,7 +1428,8 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
     agentStations.push(st);
   });
 
-  // Bàn nhân viên minh hoạ (Công ty / Tập đoàn)
+  // Bàn nhân viên minh hoạ & đồng nghiệp đi dạo / trò chuyện (Công ty / Tập đoàn)
+  const walkers = [];
   if (opts.npc !== false) {
     plan.extraDesks.forEach(([x, y], k) => {
       const seated = npcAt(k);
@@ -1427,6 +1439,19 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
       floorRoot.add(st.root);
       if (st.rig) rigs.push(st.rig);
     });
+    if (plan.rooms && plan.rooms.length) {
+      const ambientStaff = [
+        { index: 31, path: [[32.0, 15.2], [39.2, 15.2], [39.2, 19.4], [32.0, 19.4]], x: 34.5, z: 15.2, holdCup: true, speed: 0.65 },
+        { index: 32, path: [[3.8, 4.2], [3.8, 8.6], [8.8, 8.6], [3.8, 8.6]], x: 3.8, z: 6.0, holdCup: false, speed: 0.72 },
+        { index: 33, x: 31.6, z: 2.35, rotY: -1.15, holdCup: true },
+        { index: 34, x: 32.85, z: 2.45, rotY: 1.4, holdCup: false },
+      ];
+      for (const spec of ambientStaff) {
+        const w = buildWalkerRig(THREE, humanAssets, mats, spec);
+        floorRoot.add(w.root);
+        walkers.push(w);
+      }
+    }
   }
 
   // Đồ trang trí mùa Noel / Tết
@@ -1442,6 +1467,30 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
     cutaway,
     updateSeats(nextSeats) {
       (nextSeats || []).slice(0, agentStations.length).forEach((s, i) => agentStations[i].update(s));
+    },
+    setMood(mood) {
+      for (const wm of anim.waters) {
+        if (!wm.uniforms) continue;
+        if (wm.uniforms.uSkyTop) {
+          wm.uniforms.uDark.value = mood === "night" ? 1 : 0;
+          if (mood === "sunset") {
+            wm.uniforms.uSkyTop.value.set("#1e3a8a");
+            wm.uniforms.uSkyHorizon.value.set("#fb923c");
+            wm.uniforms.uSunDir.value.set(0.85, 0.36, 0.38).normalize();
+          } else if (mood === "night") {
+            wm.uniforms.uSkyTop.value.set("#0c1938");
+            wm.uniforms.uSkyHorizon.value.set("#1e3a5f");
+            wm.uniforms.uSunDir.value.set(0.45, 0.65, 0.52).normalize();
+          } else {
+            wm.uniforms.uSkyTop.value.set("#2563eb");
+            wm.uniforms.uSkyHorizon.value.set("#bae6fd");
+            wm.uniforms.uSunDir.value.set(0.65, 0.72, 0.44).normalize();
+          }
+        }
+        if (wm.uniforms.uIntensity) {
+          wm.uniforms.uIntensity.value = mood === "night" ? 0.34 : mood === "sunset" ? 0.56 : 0.64;
+        }
+      }
     },
     getTags(curOpts) {
       const tags = [];
@@ -1469,6 +1518,7 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
     },
     animate(t, motion) {
       for (const rig of rigs) animateHumanRig(rig, t, motion);
+      for (const w of walkers) animateWalkerRig(w, t, motion);
       for (const st of agentStations) {
         if (st.orb.visible) {
           const sc = motion ? 1 + Math.sin(t * 4.5 + st.index) * 0.14 : 1;

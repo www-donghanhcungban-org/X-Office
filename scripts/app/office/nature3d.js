@@ -103,9 +103,9 @@ export function createNatureAssets(THREE) {
   });
   carBodyGeo.translate(0, 0, -0.81);
 
-  // Bụi cỏ 3D 3 lá đan chéo (dùng với InstancedMesh — hàng trăm bụi cỏ chỉ 1 draw call!)
-  const grassGeo = new THREE.ConeGeometry(0.055, 0.22, 3);
-  grassGeo.translate(0, 0.11, 0);
+  // Bụi cỏ 3D mảnh tự nhiên (dùng với InstancedMesh — hoà quyện mượt với nền cỏ chụp thật)
+  const grassGeo = new THREE.ConeGeometry(0.022, 0.13, 3);
+  grassGeo.translate(0, 0.065, 0);
 
   const geos = {
     unitBox: new THREE.BoxGeometry(1, 1, 1),
@@ -907,12 +907,12 @@ export function buildInstancedLawn(THREE, assets, mats, bounds, excludeBoxes = [
   if (pts.length) {
     const inst = new THREE.InstancedMesh(g.grassTuft, grassMat, pts.length);
     inst.receiveShadow = true;
-    const greens = ["#4d8b3e", "#5fa04a", "#72b358", "#3f7a34", "#84c268"];
+    const greens = ["#385e27", "#446e30", "#4d7a36", "#2f5221", "#57843e"];
     pts.forEach(([gx, gz, seed], idx) => {
       dummy.position.set(gx, 0.008, gz);
-      dummy.rotation.set((rnd(seed + 1) - 0.5) * 0.42, rnd(seed + 2) * Math.PI * 2, (rnd(seed + 3) - 0.5) * 0.42);
-      const sc = 0.65 + rnd(seed + 4) * 0.85;
-      dummy.scale.set(sc, sc * (0.8 + rnd(seed + 5) * 0.6), sc);
+      dummy.rotation.set((rnd(seed + 1) - 0.5) * 0.45, rnd(seed + 2) * Math.PI * 2, (rnd(seed + 3) - 0.5) * 0.45);
+      const sc = 0.7 + rnd(seed + 4) * 0.65;
+      dummy.scale.set(sc, sc * (0.75 + rnd(seed + 5) * 0.5), sc);
       dummy.updateMatrix();
       inst.setMatrixAt(idx, dummy.matrix);
       col.set(greens[seed % greens.length]);

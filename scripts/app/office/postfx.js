@@ -150,14 +150,27 @@ precision highp float;
 uniform sampler2D tScene;
 uniform sampler2D tAo;
 uniform sampler2D tBloom;
+uniform sampler2D tDepth;
 uniform vec2 uTexel;
+uniform float uNear;
+uniform float uFar;
+uniform float uIsOrtho;
+uniform float uFocusDist;
+uniform float uDofStrength;
 uniform float uExposure;
 uniform float uAoStrength;
 uniform float uBloomStrength;
 uniform float uDark;
+uniform float uSunset;
 varying vec2 vUv;
 
 float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
+
+float linDepth(float d) {
+  if (uIsOrtho > 0.5) return uNear + d * (uFar - uNear);
+  float z = d * 2.0 - 1.0;
+  return (2.0 * uNear * uFar) / max(0.0001, (uFar + uNear - z * (uFar - uNear)));
+}
 
 // ACES Filmic chuẩn điện ảnh (Narkowicz)
 vec3 aces(vec3 x) {
@@ -193,9 +206,32 @@ void main() {
     col = (lB < lMin || lB > lMax) ? rgbA : rgbB;
   }
 
-  // Làm sắc vi chi tiết (micro-sharpen nhẹ tăng độ nét vân gỗ, tóc, mặt)
+  // Xoá phông quang học Bokeh (Depth of Field) tinh tế khi phóng cận cảnh ở chế độ Phối cảnh 3D
+  float coc = 0.0;
+  if (uDofStrength > 0.01 && uIsOrtho < 0.5) {
+    float d0 = texture2D(tDepth, vUv).r;
+    if (d0 < 0.9999) {
+      float z0 = linDepth(d0);
+      coc = clamp((abs(z0 - uFocusDist) - 2.6) / max(uFocusDist * 0.5, 5.5), 0.0, 1.0) * uDofStrength;
+      if (coc > 0.02) {
+        float rad = coc * 4.2;
+        vec3 acc = col;
+        vec2 taps[8];
+        taps[0] = vec2( 1.0,  0.0); taps[1] = vec2(-1.0,  0.0);
+        taps[2] = vec2( 0.0,  1.0); taps[3] = vec2( 0.0, -1.0);
+        taps[4] = vec2( 0.71,  0.71); taps[5] = vec2(-0.71,  0.71);
+        taps[6] = vec2( 0.71, -0.71); taps[7] = vec2(-0.71, -0.71);
+        for (int i = 0; i < 8; i++) {
+          acc += texture2D(tScene, vUv + taps[i] * rad * uTexel).rgb;
+        }
+        col = mix(col, acc / 9.0, clamp(coc * 1.15, 0.0, 0.85));
+      }
+    }
+  }
+
+  // Làm sắc vi chi tiết (chỉ áp cho vùng lấy nét rõ, không làm gắt vùng bokeh)
   vec3 blurAvg = (cNW + cNE + cSW + cSE) * 0.25;
-  col = max(vec3(0.0), col + (col - blurAvg) * 0.16);
+  col = max(vec3(0.0), col + (col - blurAvg) * (0.16 * (1.0 - coc)));
 
   // Nhân SSAO bóng tiếp xúc sâu
   float ao = texture2D(tAo, vUv).r;
@@ -205,8 +241,9 @@ void main() {
   vec3 bloom = texture2D(tBloom, vUv).rgb;
   col += bloom * uBloomStrength;
 
-  // Cân bằng màu kiến trúc ấm áp (ngày nắng) / sâu trong (đêm neon)
-  col *= uDark > 0.5 ? vec3(0.99, 1.0, 1.04) : vec3(1.02, 1.005, 0.985);
+  // Cân bằng màu kiến trúc theo thời điểm trong ngày (Nắng sáng / Hoàng hôn vàng / Đêm neon)
+  vec3 tint = uSunset > 0.5 ? vec3(1.06, 0.99, 0.9) : (uDark > 0.5 ? vec3(0.98, 1.0, 1.05) : vec3(1.015, 1.005, 0.99));
+  col *= tint;
   col = aces(col * uExposure);
   col = toSRGB(col);
 
@@ -270,11 +307,18 @@ export function createPostFX(THREE, renderer) {
     tScene: { value: null },
     tAo: { value: null },
     tBloom: { value: null },
+    tDepth: { value: null },
     uTexel: { value: new THREE.Vector2(1 / 800, 1 / 540) },
+    uNear: { value: 0.2 },
+    uFar: { value: 240 },
+    uIsOrtho: { value: 0 },
+    uFocusDist: { value: 18 },
+    uDofStrength: { value: 0 },
     uExposure: { value: 1.06 },
     uAoStrength: { value: 0.62 },
     uBloomStrength: { value: 0.28 },
     uDark: { value: 0 },
+    uSunset: { value: 0 },
   });
 
   const mkRT = (w, h, type, withDepth = false) => {
@@ -389,15 +433,22 @@ export function createPostFX(THREE, renderer) {
         kawaseMat.uniforms.uSpread.value = 1.5;
         pass(kawaseMat, bHalfB);
 
-        // 4. Tổng hợp điện ảnh cuối cùng ra màn hình
+        // 4. Tổng hợp điện ảnh cuối cùng (FXAA + DoF Bokeh + SSAO + Bloom + ACES Filmic) ra màn hình
         compMat.uniforms.tScene.value = sceneRT.texture;
         compMat.uniforms.tAo.value = aoBlurRT.texture;
         compMat.uniforms.tBloom.value = bHalfB.texture;
+        compMat.uniforms.tDepth.value = sceneRT.depthTexture;
         compMat.uniforms.uTexel.value.set(1 / curW, 1 / curH);
+        compMat.uniforms.uNear.value = camera.near;
+        compMat.uniforms.uFar.value = camera.far;
+        compMat.uniforms.uIsOrtho.value = camera.isOrthographicCamera ? 1 : 0;
+        compMat.uniforms.uFocusDist.value = opts.focusDist || 18;
+        compMat.uniforms.uDofStrength.value = opts.dofStrength || 0;
         compMat.uniforms.uExposure.value = opts.exposure || 1.06;
         compMat.uniforms.uAoStrength.value = opts.aoStrength !== undefined ? opts.aoStrength : 0.58;
-        compMat.uniforms.uBloomStrength.value = opts.dark ? 0.42 : 0.24;
+        compMat.uniforms.uBloomStrength.value = opts.dark ? 0.42 : (opts.sunset ? 0.3 : 0.24);
         compMat.uniforms.uDark.value = opts.dark ? 1 : 0;
+        compMat.uniforms.uSunset.value = opts.sunset ? 1 : 0;
         pass(compMat, null);
         renderer.toneMapping = prevTM;
       } catch {

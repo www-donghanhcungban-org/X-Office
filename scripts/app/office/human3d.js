@@ -185,10 +185,10 @@ export function buildHumanRig(THREE, assets, mats, opts) {
 
   const skinMat = mats.physical(skinCol, { roughness: 0.56, metalness: 0.0, sheen: 0.38, sheenRoughness: 0.72, sheenColor: "#ffb396" });
   const hairMat = mats.physical(hairCol, { roughness: 0.44, metalness: 0.08, clearcoat: 0.24, sheen: 0.36, sheenColor: "#e2e8f0", tex: "hair", normal: 0.55 });
-  const topMat = mats.physical(outfit.top, { roughness: 0.82, metalness: 0.02, sheen: 0.52, sheenRoughness: 0.76, sheenColor: "#f8fafc", tex: "fabric", normal: 0.35 });
-  const innerMat = mats.physical(outfit.inner, { roughness: 0.78, metalness: 0.01, sheen: 0.4, sheenRoughness: 0.8, tex: "fabric", normal: 0.25 });
-  const pantsMat = mats.physical(outfit.pants, { roughness: 0.84, metalness: 0.02, sheen: 0.45, sheenRoughness: 0.78, tex: "fabric", normal: 0.3 });
-  const chairMat = mats.physical(theme.chair, { roughness: 0.76, metalness: 0.04, sheen: 0.48, sheenRoughness: 0.75, tex: "fabric", normal: 0.35 });
+  const topMat = mats.physical(outfit.top, { roughness: 0.88, metalness: 0.02, sheen: 0.52, sheenRoughness: 0.76, sheenColor: "#f8fafc", tex: "fabric", normal: 0.35, roughMap: true });
+  const innerMat = mats.physical(outfit.inner, { roughness: 0.84, metalness: 0.01, sheen: 0.4, sheenRoughness: 0.8, tex: "fabric", normal: 0.25, roughMap: true });
+  const pantsMat = mats.physical(outfit.pants, { roughness: 0.9, metalness: 0.02, sheen: 0.45, sheenRoughness: 0.78, tex: "fabric", normal: 0.3, roughMap: true });
+  const chairMat = mats.physical(theme.chair, { roughness: 0.82, metalness: 0.04, sheen: 0.48, sheenRoughness: 0.75, tex: "fabric", normal: 0.35, roughMap: true });
   const chairDark = mats.standard("#1e293b", { roughness: 0.38, metalness: 0.42 });
   const chromeMat = mats.standard("#e2e8f0", { roughness: 0.14, metalness: 0.94 });
   const shoeMat = mats.physical(i % 2 ? "#1e293b" : "#442c1e", { roughness: 0.34, metalness: 0.06, clearcoat: 0.48 });
@@ -657,5 +657,215 @@ export function animateHumanRig(rig, t, motion, state) {
     rig.leftArm.elbow.rotation.set(0.04, 0.1, 0);
     rig.rightArm.shoulder.rotation.set(0.14, 0, -0.1);
     rig.rightArm.elbow.rotation.set(0.04, -0.1, 0);
+  }
+}
+
+// ---------------------------------------------------------------- Nhân viên đứng trò chuyện & đi dạo tự nhiên trong khuôn viên
+export function buildWalkerRig(THREE, assets, mats, opts) {
+  const { index: i, path, x = 0, z = 0, rotY = 0, holdCup = false, speed = 0.72 } = opts;
+  const g = assets.geos;
+  const root = new THREE.Group();
+  root.position.set(x, 0, z);
+  root.rotation.y = rotY;
+
+  const skinCol = SKIN[i % SKIN.length];
+  const hairCol = HAIR[(i * 3 + 1) % HAIR.length];
+  const irisCol = IRIS[(i * 2 + 1) % IRIS.length];
+  const outfit = OUTFIT[(i + 2) % OUTFIT.length];
+
+  const skinMat = mats.physical(skinCol, { roughness: 0.56, sheen: 0.38, sheenRoughness: 0.72, sheenColor: "#ffb396" });
+  const faceMat = mats.physical("#ffffff", { roughness: 0.54, sheen: 0.4, sheenRoughness: 0.7, sheenColor: "#ffb396", tex: "face:" + skinCol });
+  const hairMat = mats.physical(hairCol, { roughness: 0.44, metalness: 0.08, clearcoat: 0.24, sheen: 0.36, tex: "hair", normal: 0.55 });
+  const topMat = mats.physical(outfit.top, { roughness: 0.88, sheen: 0.5, tex: "fabric", normal: 0.35, roughMap: true });
+  const innerMat = mats.physical(outfit.inner, { roughness: 0.84, sheen: 0.4, tex: "fabric", roughMap: true });
+  const pantsMat = mats.physical(outfit.pants, { roughness: 0.9, sheen: 0.45, tex: "fabric", normal: 0.3, roughMap: true });
+  const shoeMat = mats.physical(i % 2 ? "#1e293b" : "#442c1e", { roughness: 0.34, clearcoat: 0.48 });
+  const soleMat = mats.standard("#f1f5f9", { roughness: 0.68 });
+  const whiteMat = mats.physical("#ffffff", { roughness: 0.06, clearcoat: 1.0 });
+  const irisMat = mats.physical("#ffffff", { roughness: 0.06, clearcoat: 1.0, tex: "iris:" + irisCol });
+  const lipMat = mats.physical("#bd6960", { roughness: 0.38, clearcoat: 0.3 });
+
+  const sh = new THREE.Mesh(g.shadowDisc, mats.shadow());
+  sh.rotation.x = -Math.PI / 2;
+  sh.position.y = 0.018;
+  sh.scale.setScalar(0.85);
+  root.add(sh);
+
+  const body = new THREE.Group();
+  body.position.y = 0.835;
+  root.add(body);
+
+  const hip = new THREE.Mesh(g.hip, pantsMat);
+  hip.scale.set(1.06, 0.65, 0.84);
+  hip.castShadow = true;
+  body.add(hip);
+
+  // Hai chân đứng khớp hông (xoay bước đi tự nhiên)
+  const makeLeg = (side) => {
+    const leg = new THREE.Group();
+    leg.position.set(side * 0.115, -0.02, 0);
+    body.add(leg);
+    const thigh = new THREE.Mesh(g.thigh, pantsMat);
+    thigh.position.set(0, -0.22, 0);
+    thigh.castShadow = true;
+    const shin = new THREE.Mesh(g.shin, pantsMat);
+    shin.position.set(0, -0.54, 0);
+    shin.castShadow = true;
+    const shoe = new THREE.Mesh(g.shoe, shoeMat);
+    shoe.position.set(0, -0.75, -0.05);
+    shoe.rotation.x = Math.PI / 2;
+    shoe.scale.set(0.95, 0.95, 0.82);
+    shoe.castShadow = true;
+    const sole = new THREE.Mesh(g.sole, soleMat);
+    sole.position.set(0, -0.805, -0.05);
+    leg.add(thigh, shin, shoe, sole);
+    return leg;
+  };
+  const leftLeg = makeLeg(-1);
+  const rightLeg = makeLeg(1);
+
+  const chest = new THREE.Group();
+  chest.position.y = 0.04;
+  body.add(chest);
+  const torso = new THREE.Mesh(g.torso, topMat);
+  torso.scale.set(1.08, 1.0, 0.72);
+  torso.castShadow = torso.receiveShadow = true;
+  const collar = new THREE.Mesh(g.collar, innerMat);
+  collar.position.set(0, 0.532, -0.008);
+  collar.rotation.x = Math.PI / 2 + 0.12;
+  chest.add(torso, collar);
+
+  const head = new THREE.Group();
+  head.position.set(0, 0.555, -0.01);
+  chest.add(head);
+  const neck = new THREE.Mesh(g.neck, skinMat);
+  neck.position.y = 0.055;
+  const skull = new THREE.Mesh(g.head, faceMat);
+  skull.position.y = 0.085;
+  skull.castShadow = true;
+  head.add(neck, skull);
+
+  const eyelids = [];
+  for (const side of [-1, 1]) {
+    const ex = side * 0.052, ey = 0.278, ez = -0.132;
+    const eye = new THREE.Mesh(g.eye, whiteMat);
+    eye.position.set(ex, ey, ez);
+    const iris = new THREE.Mesh(g.iris, irisMat);
+    iris.position.set(ex, ey, ez - 0.0222);
+    iris.rotation.y = Math.PI;
+    const lid = new THREE.Mesh(g.lid, skinMat);
+    lid.position.set(ex, ey, ez);
+    lid.rotation.x = 0.56;
+    eyelids.push(lid);
+    const brow = new THREE.Mesh(g.brow, hairMat);
+    brow.position.set(ex, ey + 0.04, ez - 0.01);
+    brow.rotation.set(0, 0, Math.PI / 2 + side * 0.08);
+    head.add(eye, iris, lid, brow);
+  }
+  const lip = new THREE.Mesh(g.lip, lipMat);
+  lip.position.set(0, 0.178, -0.145);
+  lip.rotation.z = Math.PI / 2;
+  head.add(lip);
+
+  const crown = new THREE.Mesh(g.hairCrown, hairMat);
+  crown.position.set(0, 0.33, -0.002);
+  crown.scale.set(1.01, 0.92, 1.06);
+  crown.castShadow = true;
+  const fringe = new THREE.Mesh(g.hairFringe, hairMat);
+  fringe.position.set(i % 2 ? -0.02 : 0.02, 0.375, -0.106);
+  fringe.rotation.set(0.18, i % 2 ? 0.15 : -0.15, Math.PI / 2 + (i % 2 ? 0.14 : -0.14));
+  head.add(crown, fringe);
+  if (i % 2 === 1) {
+    const drape = new THREE.Mesh(g.hairBack, hairMat);
+    drape.position.set(0, 0.21, 0.085);
+    drape.scale.set(1.04, 1.0, 0.66);
+    head.add(drape);
+  }
+
+  const makeArm = (side) => {
+    const arm = new THREE.Group();
+    arm.position.set(side * 0.22, 0.47, -0.01);
+    chest.add(arm);
+    const cap = new THREE.Mesh(g.shoulderCap, topMat);
+    const upper = new THREE.Mesh(g.upperArm, topMat);
+    upper.position.set(side * 0.01, -0.14, 0);
+    upper.castShadow = true;
+    const fore = new THREE.Mesh(g.forearm, outfit.blazer ? topMat : skinMat);
+    fore.position.set(side * 0.01, -0.37, -0.03);
+    fore.rotation.x = 0.22;
+    fore.castShadow = true;
+    const hand = new THREE.Mesh(g.hand, skinMat);
+    hand.position.set(side * 0.01, -0.51, -0.06);
+    arm.add(cap, upper, fore, hand);
+    if (holdCup && side > 0) {
+      const cup = new THREE.Mesh(g.neck, mats.physical("#ffffff", { roughness: 0.15, clearcoat: 0.85 }));
+      cup.position.set(0.01, -0.5, -0.14);
+      cup.scale.set(0.8, 0.9, 0.8);
+      arm.add(cup);
+    }
+    return arm;
+  };
+  const leftArm = makeArm(-1);
+  const rightArm = makeArm(1);
+
+  return { root, body, chest, head, eyelids, leftLeg, rightLeg, leftArm, rightArm, path: path || null, speed, holdCup, index: i };
+}
+
+export function animateWalkerRig(w, t, motion) {
+  const i = w.index;
+  if (!motion) {
+    w.body.position.y = 0.835;
+    w.leftLeg.rotation.x = w.rightLeg.rotation.x = 0;
+    w.leftArm.rotation.x = 0.08;
+    w.rightArm.rotation.x = w.holdCup ? 0.65 : 0.08;
+    w.head.rotation.set(0, 0, 0);
+    for (const lid of w.eyelids) lid.rotation.x = 0.56;
+    return;
+  }
+
+  const blinkPhase = (t + i * 1.7) % 4.3;
+  const blink = blinkPhase < 0.14 ? Math.sin((blinkPhase / 0.14) * Math.PI) : 0;
+  for (const lid of w.eyelids) lid.rotation.x = 0.56 - blink * 0.84;
+  w.chest.scale.y = 1 + Math.sin(t * 2.2 + i) * 0.016;
+
+  if (w.path && w.path.length >= 2) {
+    // Đi bộ tuần hoàn mượt qua các điểm mốc (dọc sân vườn hồ bơi / hành lang)
+    const segs = w.path.length;
+    let total = 0;
+    const lens = [];
+    for (let k = 0; k < segs; k++) {
+      const a = w.path[k], b = w.path[(k + 1) % segs];
+      const d = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      lens.push(d);
+      total += d;
+    }
+    let dist = (t * w.speed + i * 3.1) % total;
+    let seg = 0;
+    while (seg < segs - 1 && dist > lens[seg]) {
+      dist -= lens[seg];
+      seg++;
+    }
+    const a = w.path[seg], b = w.path[(seg + 1) % segs];
+    const u = lens[seg] > 1e-4 ? dist / lens[seg] : 0;
+    const px = a[0] + (b[0] - a[0]) * u;
+    const pz = a[1] + (b[1] - a[1]) * u;
+    w.root.position.set(px, 0, pz);
+    // Mặt nhân vật hướng -Z cục bộ → xoay hướng di chuyển (dx, dz)
+    w.root.rotation.y = Math.atan2(-(b[0] - a[0]), -(b[1] - a[1]));
+
+    const stride = Math.sin(t * 5.4 + i);
+    w.body.position.y = 0.835 + Math.abs(Math.cos(t * 5.4 + i)) * 0.032;
+    w.leftLeg.rotation.x = stride * 0.42;
+    w.rightLeg.rotation.x = -stride * 0.42;
+    w.leftArm.rotation.x = -stride * 0.34;
+    w.rightArm.rotation.x = w.holdCup ? 0.65 + stride * 0.06 : stride * 0.34;
+    w.head.rotation.set(0, Math.sin(t * 0.9 + i) * 0.14, 0);
+  } else {
+    // Đứng trò chuyện tự nhiên tại quầy Pantry / Sảnh
+    w.body.position.y = 0.835;
+    w.leftLeg.rotation.x = w.rightLeg.rotation.x = 0;
+    w.head.rotation.set(Math.sin(t * 1.4 + i) * 0.05, Math.sin(t * 0.8 + i * 2) * 0.2, 0);
+    w.leftArm.rotation.x = 0.12 + Math.sin(t * 2.1 + i) * 0.12;
+    w.rightArm.rotation.x = w.holdCup ? 0.68 + Math.sin(t * 1.2 + i) * 0.08 : 0.14 - Math.sin(t * 1.8 + i) * 0.1;
   }
 }

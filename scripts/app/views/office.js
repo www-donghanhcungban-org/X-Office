@@ -9,6 +9,12 @@ import { SCALES, planFor } from "../office/plans.js";
 const PREF_KEY = "xt-office";
 const POLL_MS = 10000;
 const RENDERERS = [{ id: "2d", name: "2D isometric (nhẹ)" }, { id: "3d", name: "3D three.js (kéo để xoay)" }];
+const LIGHTS = [
+  { id: "auto", name: "Tự động" },
+  { id: "day", name: "Nắng sáng (HDRI)" },
+  { id: "sunset", name: "Hoàng hôn vàng (HDRI)" },
+  { id: "night", name: "Ban đêm (HDRI)" },
+];
 
 function loadPrefs() {
   try {
@@ -51,14 +57,14 @@ function seatRows(h, seats, goSeat) {
 export async function render(main, { api, h, error }) {
   const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const prefs = {
-    renderer: "2d", scale: "team", layout: "open", theme: "night", season: "auto", names: true, npc: true, motion: true,
+    renderer: "2d", scale: "team", layout: "open", theme: "night", season: "auto", light: "auto", names: true, npc: true, motion: true,
     quality: "high", zoom: 1, ...loadPrefs(),
   };
   const view = { focus: null, seat: null, pan: { x: 0, y: 0 } }; // không lưu: mở lại màn là toàn cảnh
   // Giá trị đã lưu không còn trong danh sách (bản cũ/sửa tay) → mặc định: ô chọn, mặt bằng và luật hiệu năng (chỉ nhóm nhỏ
   // bật quầng sáng/bóng) cùng thấy một quy mô.
   for (const [k, list, d] of [["scale", SCALES, "team"], ["layout", LAYOUTS, "open"], ["theme", THEMES, "night"],
-    ["season", SEASONS, "auto"], ["renderer", RENDERERS, "2d"]]) {
+    ["season", SEASONS, "auto"], ["light", LIGHTS, "auto"], ["renderer", RENDERERS, "2d"]]) {
     if (!list.some((o) => o.id === prefs[k])) prefs[k] = d;
   }
   if (reduce) prefs.motion = false; // hệ thống xin giảm chuyển động thắng lựa chọn đã lưu; bật lại tay chỉ cho phiên này
@@ -67,6 +73,7 @@ export async function render(main, { api, h, error }) {
   const [layoutLabel, layoutSel] = select(h, "office-layout", "Bố cục", LAYOUTS, prefs.layout);
   const [themeLabel, themeSel] = select(h, "office-theme", "Kiểu văn phòng", THEMES, prefs.theme);
   const [seasonLabel, seasonSel] = select(h, "office-season", "Mùa", SEASONS, prefs.season);
+  const [lightLabel, lightSel] = select(h, "office-light", "Ánh sáng", LIGHTS, prefs.light);
   const [qualityLabel, qualitySel] = select(h, "office-quality", "Chất lượng",
     [{ id: "high", name: "Cao" }, { id: "low", name: "Thấp (máy yếu)" }], prefs.quality);
   const [namesBox, namesLabel] = check(h, "office-names", "Nhãn tên", prefs.names);
@@ -101,7 +108,7 @@ export async function render(main, { api, h, error }) {
     h("p", { class: "muted" }, "Trạng thái suy ra từ bằng chứng trên đĩa (PLAN, .autopilot/runs.jsonl, việc chờ người) — không phải tín hiệu thời gian thực."),
     h("div", { class: "office-bar", role: "group", "aria-label": "Tuỳ chọn văn phòng" },
       h("span", null, rendererLabel, rendererSel), h("span", null, scaleLabel, scaleSel), h("span", null, layoutLabel, layoutSel),
-      h("span", null, themeLabel, themeSel), h("span", null, seasonLabel, seasonSel), h("span", null, qualityLabel, qualitySel),
+      h("span", null, themeLabel, themeSel), h("span", null, seasonLabel, seasonSel), h("span", null, lightLabel, lightSel), h("span", null, qualityLabel, qualitySel),
       h("span", null, namesBox, namesLabel), h("span", null, npcBox, npcLabel), h("span", null, motionBox, motionLabel),
       h("span", { class: "office-actions" }, zoomOut, zoomVal, zoomIn, resetView, projBtn, fullBtn, refresh)),
     rooms, msg, rmsg, stage, keys, counters, summary,
@@ -191,7 +198,7 @@ export async function render(main, { api, h, error }) {
 
   function sceneOpts(t) {
     return {
-      theme: themeById(prefs.theme), season: resolveSeason(prefs.season), scale: prefs.scale, layout: prefs.layout,
+      theme: themeById(prefs.theme), season: resolveSeason(prefs.season), light: prefs.light, scale: prefs.scale, layout: prefs.layout,
       seats: data.seats, names: prefs.names, npc: prefs.npc, motion: prefs.motion, t, zoom: prefs.zoom, pan: view.pan,
       focus: view.focus, focusSeat: view.seat, quality: prefs.quality,
     };
@@ -296,12 +303,14 @@ export async function render(main, { api, h, error }) {
         rmsg.replaceChildren();
         canvas.hidden = true;
         projBtn.hidden = false;
+        lightSel.disabled = false;
         projBtn.setAttribute("aria-pressed", String(three.perspective()));
         three.canvas.setAttribute("aria-label", canvas.getAttribute("aria-label") || "Văn phòng");
       } catch (e) {
         three = null;
         prefs.renderer = rendererSel.value = "2d";
         projBtn.hidden = true;
+        lightSel.disabled = true;
         persist(); // không thử lại 3D mỗi lần mở màn
         rmsg.replaceChildren(h("p", { class: "state error", role: "alert" },
           "Không bật được 3D (" + ((e && e.message) || "WebGL không khả dụng") + ") — dùng bản 2D. Ở dự án đích, bản 3D cần cài bằng `install.py --with-office-3d`."));
@@ -311,7 +320,10 @@ export async function render(main, { api, h, error }) {
       three = null;
       hoverHud.hidden = true;
       projBtn.hidden = true;
+      lightSel.disabled = true;
       canvas.hidden = false;
+    } else {
+      lightSel.disabled = !three;
     }
     size();
     frame(last / 1000);
@@ -365,6 +377,7 @@ export async function render(main, { api, h, error }) {
     }
     prefs.theme = themeSel.value;
     prefs.season = seasonSel.value;
+    prefs.light = lightSel.value;
     prefs.quality = qualitySel.value;
     prefs.names = namesBox.checked;
     prefs.motion = motionBox.checked;
@@ -373,7 +386,7 @@ export async function render(main, { api, h, error }) {
     await useRenderer();
     label();
   }
-  for (const el of [rendererSel, scaleSel, layoutSel, themeSel, seasonSel, qualitySel, namesBox, npcBox, motionBox]) {
+  for (const el of [rendererSel, scaleSel, layoutSel, themeSel, seasonSel, lightSel, qualitySel, namesBox, npcBox, motionBox]) {
     el.addEventListener("change", changed);
   }
   const zoomBy = (f) => {

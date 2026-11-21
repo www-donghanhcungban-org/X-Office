@@ -52,6 +52,8 @@ CONTENT_TYPES: Dict[str, str] = {
     ".json": "application/json",
     ".svg": "image/svg+xml",
     ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".hdr": "application/octet-stream",
     ".woff2": "font/woff2",
 }
 
