@@ -100,11 +100,11 @@ function plant(p, out) {
   out.push(box(p.x + 0.04, p.y + 0.04, 0, 0.52, 0.52, 0.44, "#b45309", { shape: "taper" }));
   out.push(box(p.x, p.y, 0.42, 0.6, 0.6, 0.1, "#c26a3b", { shape: "cyl" }));
   out.push(box(p.x + 0.06, p.y + 0.06, 0.48, 0.48, 0.48, 0.06, "#3f2e21", { shape: "cyl" }));
-  out.push(box(p.x + 0.25, p.y + 0.25, 0.52, 0.1, 0.1, 0.48, "#6b4423", { shape: "cyl" }));
-  out.push(box(p.x - 0.12, p.y - 0.08, 0.72, 0.56, 0.56, 0.52, shade(leaf, -0.08), { shape: "ico" }));
-  out.push(box(p.x + 0.14, p.y - 0.06, 0.82, 0.54, 0.54, 0.5, leaf, { shape: "ico" }));
-  out.push(box(p.x - 0.02, p.y + 0.14, 0.78, 0.52, 0.52, 0.5, shade(leaf, 0.08), { shape: "ico" }));
-  out.push(box(p.x + 0.04, p.y + 0.04, 1.06, 0.48, 0.48, 0.46, shade(leaf, 0.18), { shape: "ico" }));
+  out.push(box(p.x + 0.25, p.y + 0.25, 0.52, 0.1, 0.1, 0.48, "#6b4423", { shape: "cyl", tex: "bark" }));
+  out.push(box(p.x - 0.14, p.y - 0.08, 0.72, 0.56, 0.56, 0.52, shade(leaf, -0.08), { shape: "ico", tex: "foliage" }));
+  out.push(box(p.x + 0.16, p.y - 0.06, 0.82, 0.54, 0.54, 0.5, leaf, { shape: "ico", tex: "foliage" }));
+  out.push(box(p.x - 0.04, p.y + 0.16, 0.78, 0.52, 0.52, 0.5, shade(leaf, 0.08), { shape: "ico", tex: "foliage" }));
+  out.push(box(p.x + 0.04, p.y + 0.04, 1.08, 0.48, 0.48, 0.46, shade(leaf, 0.18), { shape: "ico", tex: "foliage" }));
 }
 
 function shelf(p, out) {
@@ -123,12 +123,12 @@ function shelf(p, out) {
 
 function sofa(p, out) {
   const c = p.color || "#475569";
-  out.push(box(p.x, p.y, 0, 3.2, 1.2, 0.48, c));
-  out.push(box(p.x, p.y, 0.48, 3.2, 0.35, 0.58, shade(c, -0.1)));
-  out.push(box(p.x, p.y + 0.35, 0.48, 0.34, 0.85, 0.36, c, { shape: "cyl", rx: Math.PI / 2 }));
-  out.push(box(p.x + 2.86, p.y + 0.35, 0.48, 0.34, 0.85, 0.36, c, { shape: "cyl", rx: Math.PI / 2 }));
-  out.push(box(p.x + 0.52, p.y + 0.36, 0.5, 0.36, 0.24, 0.34, "#f8fafc", { shape: "sphere" }));
-  out.push(box(p.x + 2.32, p.y + 0.36, 0.5, 0.36, 0.24, 0.34, "#fde68a", { shape: "sphere" }));
+  out.push(box(p.x, p.y, 0, 3.2, 1.2, 0.48, c, { tex: "fabric" }));
+  out.push(box(p.x, p.y, 0.48, 3.2, 0.35, 0.58, shade(c, -0.1), { tex: "fabric" }));
+  out.push(box(p.x, p.y + 0.35, 0.48, 0.34, 0.85, 0.36, c, { shape: "cyl", rx: Math.PI / 2, tex: "fabric" }));
+  out.push(box(p.x + 2.86, p.y + 0.35, 0.48, 0.34, 0.85, 0.36, c, { shape: "cyl", rx: Math.PI / 2, tex: "fabric" }));
+  out.push(box(p.x + 0.52, p.y + 0.36, 0.5, 0.36, 0.24, 0.34, "#f8fafc", { shape: "sphere", tex: "fabric" }));
+  out.push(box(p.x + 2.32, p.y + 0.36, 0.5, 0.36, 0.24, 0.34, "#fde68a", { shape: "sphere", tex: "fabric" }));
 }
 
 function lamp(p, out) {
@@ -147,7 +147,7 @@ function rack(p, out, th, t, motion) {
 }
 
 function counter(p, out) {
-  out.push(box(p.x, p.y, 0, 3.4, 1.0, 1.1, "#6f4e37", { top: "#e7d5bd" }));
+  out.push(box(p.x, p.y, 0, 3.4, 1.0, 1.1, "#6f4e37", { top: "#e7d5bd", tex: "wood" }));
   out.push(box(p.x + 0.3, p.y + 0.2, 1.1, 0.6, 0.5, 0.7, "#9ca3af"));
   out.push(box(p.x + 1.4, p.y + 0.3, 1.1, 0.24, 0.24, 0.24, "#ffffff", { shape: "cyl" }));
   out.push(box(p.x + 1.9, p.y + 0.3, 1.1, 0.24, 0.24, 0.24, "#ffffff", { shape: "cyl" }));
@@ -157,10 +157,10 @@ function counter(p, out) {
 function cafetable(p, out, th, t, motion) {
   out.push(box(p.x + 0.22, p.y + 0.22, 0, 0.36, 0.36, 0.06, "#374151", { shape: "cyl" }));
   out.push(box(p.x + 0.35, p.y + 0.35, 0.06, 0.1, 0.1, 0.64, "#4b3621", { shape: "cyl" }));
-  out.push(box(p.x - 0.08, p.y - 0.08, 0.7, 0.96, 0.96, 0.08, "#d9b38c", { shape: "cyl" }));
+  out.push(box(p.x - 0.08, p.y - 0.08, 0.7, 0.96, 0.96, 0.08, "#d9b38c", { shape: "cyl", tex: "wood" }));
   out.push(box(p.x + 0.3, p.y + 0.3, 0.78, 0.2, 0.2, 0.2, "#ffffff", { shape: "cyl" }));
-  out.push(box(p.x - 0.7, p.y + 0.15, 0, 0.5, 0.5, 0.45, th.chair, { shape: "cyl" }));
-  out.push(box(p.x + 1.0, p.y + 0.15, 0, 0.5, 0.5, 0.45, th.chair, { shape: "cyl" }));
+  out.push(box(p.x - 0.7, p.y + 0.15, 0, 0.5, 0.5, 0.45, th.chair, { shape: "cyl", tex: "fabric" }));
+  out.push(box(p.x + 1.0, p.y + 0.15, 0, 0.5, 0.5, 0.45, th.chair, { shape: "cyl", tex: "fabric" }));
   if (motion) {
     for (let k = 0; k < 3; k++) {
       const z = 1.0 + ((t * 0.6 + k / 3) % 1) * 0.9;
@@ -238,45 +238,67 @@ function meeting(p, out, th) {
 
 function tree(p, out) {
   const leaf = p.color || "#2f855a";
-  const pine = p.pine || rnd(p.x * 3 + p.y * 5) > 0.68;
-  out.push(box(p.x + 0.72, p.y + 0.72, 0, 0.56, 0.56, 0.28, "#5c3a21", { shape: "taper" }));
-  out.push(box(p.x + 0.82, p.y + 0.82, 0.24, 0.36, 0.36, 1.35, "#7c4a32", { shape: "taper" }));
+  const pine = p.pine || rnd(p.x * 3 + p.y * 5) > 0.72;
+  out.push(box(p.x + 0.45, p.y + 0.45, 0, 1.1, 1.1, 0.08, "#57412f", { shape: "cyl" }));
+  out.push(box(p.x + 0.35, p.y + 0.65, 0.02, 0.28, 0.24, 0.16, "#78716c", { shape: "ico", tex: "stone" }));
+  if (p.palm) {
+    for (let s = 0; s < 5; s++) {
+      const sz = 0.34 - s * 0.03;
+      out.push(box(p.x + 0.8 + s * 0.05, p.y + 0.8 + s * 0.02, 0.06 + s * 0.56, sz, sz, 0.62, "#8b5a3c", { shape: "taper", tex: "bark", rx: 0.08, rz: -0.06 }));
+    }
+    const tx = p.x + 1.05, ty = p.y + 0.9;
+    out.push(box(tx - 0.12, ty - 0.12, 2.75, 0.22, 0.22, 0.2, "#5c3a21", { shape: "sphere" }));
+    out.push(box(tx + 0.06, ty - 0.08, 2.75, 0.2, 0.2, 0.2, "#4a2f1d", { shape: "sphere" }));
+    for (let k = 0; k < 6; k++) {
+      const a = (k * Math.PI) / 3;
+      out.push(box(tx - 0.14 + Math.cos(a) * 0.62, ty - 0.14 + Math.sin(a) * 0.62, 2.78, 1.15, 0.34, 0.16, k % 2 ? shade(leaf, 0.12) : leaf, { shape: "ico", tex: "foliage", rz: a, ry: 0.38 }));
+    }
+    return;
+  }
+  out.push(box(p.x + 0.68, p.y + 0.68, 0.04, 0.64, 0.64, 0.32, "#5c3a21", { shape: "taper", tex: "bark" }));
+  out.push(box(p.x + 0.8, p.y + 0.8, 0.32, 0.4, 0.4, 1.42, "#7c4a32", { shape: "taper", tex: "bark" }));
   if (pine) {
-    out.push(box(p.x + 0.1, p.y + 0.1, 1.2, 1.8, 1.8, 1.15, shade(leaf, -0.08), { shape: "cone" }));
-    out.push(box(p.x + 0.28, p.y + 0.28, 2.0, 1.44, 1.44, 1.0, leaf, { shape: "cone" }));
-    out.push(box(p.x + 0.46, p.y + 0.46, 2.75, 1.08, 1.08, 0.85, shade(leaf, 0.15), { shape: "cone" }));
+    out.push(box(p.x + 0.05, p.y + 0.05, 1.15, 1.9, 1.9, 1.05, shade(leaf, -0.1), { shape: "cone", tex: "foliage" }));
+    out.push(box(p.x + 0.22, p.y + 0.22, 1.85, 1.56, 1.56, 0.95, leaf, { shape: "cone", tex: "foliage" }));
+    out.push(box(p.x + 0.38, p.y + 0.38, 2.52, 1.24, 1.24, 0.85, shade(leaf, 0.12), { shape: "cone", tex: "foliage" }));
+    out.push(box(p.x + 0.56, p.y + 0.56, 3.12, 0.88, 0.88, 0.72, shade(leaf, 0.24), { shape: "cone", tex: "foliage" }));
   } else {
-    out.push(box(p.x + 0.56, p.y + 0.74, 1.15, 0.18, 0.18, 0.68, "#7c4a32", { shape: "cyl", rx: 0.45, rz: 0.4 }));
-    out.push(box(p.x + 1.15, p.y + 1.02, 1.2, 0.16, 0.16, 0.62, "#7c4a32", { shape: "cyl", rx: -0.4, rz: -0.35 }));
-    out.push(box(p.x - 0.05, p.y + 0.2, 1.45, 1.35, 1.35, 1.2, shade(leaf, -0.1), { shape: "ico" }));
-    out.push(box(p.x + 0.65, p.y - 0.05, 1.55, 1.3, 1.3, 1.15, leaf, { shape: "ico" }));
-    out.push(box(p.x + 0.6, p.y + 0.65, 1.6, 1.35, 1.35, 1.2, shade(leaf, 0.08), { shape: "ico" }));
-    out.push(box(p.x + 0.25, p.y + 0.25, 2.15, 1.45, 1.45, 1.15, shade(leaf, 0.16), { shape: "ico" }));
-    out.push(box(p.x + 0.52, p.y + 0.48, 2.75, 0.95, 0.95, 0.75, shade(leaf, 0.24), { shape: "ico" }));
+    out.push(box(p.x + 0.54, p.y + 0.72, 1.18, 0.2, 0.2, 0.76, "#7c4a32", { shape: "cyl", tex: "bark", rx: 0.48, rz: 0.42 }));
+    out.push(box(p.x + 1.18, p.y + 1.02, 1.24, 0.18, 0.18, 0.72, "#7c4a32", { shape: "cyl", tex: "bark", rx: -0.42, rz: -0.38 }));
+    out.push(box(p.x + 0.72, p.y + 1.16, 1.28, 0.16, 0.16, 0.64, "#7c4a32", { shape: "cyl", tex: "bark", rx: -0.45, rz: 0.32 }));
+    const blobs = [
+      [-0.12, 0.16, 1.48, 1.25, -0.14], [0.72, -0.08, 1.56, 1.2, -0.08], [0.68, 0.72, 1.52, 1.25, -0.05],
+      [0.02, 0.76, 1.58, 1.15, 0.04], [0.22, 0.16, 1.98, 1.35, 0.08], [0.58, 0.32, 2.08, 1.25, 0.14],
+      [0.12, 0.42, 2.25, 1.15, 0.18], [0.44, 0.12, 2.48, 1.05, 0.2], [0.46, 0.46, 2.82, 0.86, 0.26],
+    ];
+    for (const [dx, dy, z, s, sh] of blobs) {
+      out.push(box(p.x + dx, p.y + dy, z, s, s, s * 0.88, shade(leaf, sh), { shape: "ico", tex: "foliage" }));
+    }
   }
 }
 
 function bench(p, out) {
   out.push(box(p.x + 0.14, p.y + 0.12, 0, 0.12, 0.36, 0.4, "#334155"));
   out.push(box(p.x + 1.74, p.y + 0.12, 0, 0.12, 0.36, 0.4, "#334155"));
-  out.push(box(p.x, p.y, 0.4, 2.0, 0.6, 0.1, "#a16207", { top: "#ca8a04" }));
-  out.push(box(p.x, p.y, 0.5, 2.0, 0.1, 0.48, "#92400e", { top: "#b45309" }));
+  out.push(box(p.x, p.y, 0.4, 2.0, 0.6, 0.1, "#a16207", { top: "#ca8a04", tex: "wood" }));
+  out.push(box(p.x, p.y, 0.5, 2.0, 0.1, 0.48, "#92400e", { top: "#b45309", tex: "wood" }));
   out.push(box(p.x, p.y + 0.04, 0.5, 0.1, 0.54, 0.22, "#334155"));
   out.push(box(p.x + 1.9, p.y + 0.04, 0.5, 0.1, 0.54, 0.22, "#334155"));
 }
 
 function umbrella(p, out) {
-  out.push(box(p.x + 0.25, p.y + 0.25, 0, 0.5, 0.5, 0.14, "#94a3b8", { shape: "cyl" }));
+  out.push(box(p.x - 1.0, p.y + 1.15, 0.01, 2.1, 2.1, 0.08, "#a16207", { tex: "wood" })); // sàn gỗ teak bên hồ bơi
+  out.push(box(p.x + 0.25, p.y + 0.25, 0, 0.5, 0.5, 0.14, "#94a3b8", { shape: "cyl", tex: "stone" }));
   out.push(box(p.x + 0.45, p.y + 0.45, 0.14, 0.1, 0.1, 2.1, "#e5e7eb", { shape: "cyl" }));
-  out.push(box(p.x - 0.55, p.y - 0.55, 2.05, 2.1, 2.1, 0.65, "#0ea5e9", { shape: "cone", top: "#38bdf8" }));
+  out.push(box(p.x - 0.55, p.y - 0.55, 2.05, 2.1, 2.1, 0.65, "#0ea5e9", { shape: "cone", top: "#38bdf8", tex: "fabric" }));
   out.push(box(p.x + 0.42, p.y + 0.42, 2.68, 0.16, 0.16, 0.16, "#f8fafc", { shape: "sphere" }));
   // hai ghế phơi nắng dọc trục y, có tựa lưng nghiêng và gối đầu
-  out.push(box(p.x - 0.8, p.y + 1.4, 0.2, 0.6, 1.6, 0.12, "#f8fafc"));
-  out.push(box(p.x - 0.8, p.y + 1.38, 0.3, 0.6, 0.55, 0.1, "#e2e8f0", { rx: -0.48 }));
-  out.push(box(p.x - 0.72, p.y + 1.42, 0.42, 0.44, 0.2, 0.16, "#38bdf8", { shape: "cyl", rz: Math.PI / 2 }));
-  out.push(box(p.x + 0.2, p.y + 1.4, 0.2, 0.6, 1.6, 0.12, "#fde68a"));
-  out.push(box(p.x + 0.2, p.y + 1.38, 0.3, 0.6, 0.55, 0.1, "#fcd34d", { rx: -0.48 }));
-  out.push(box(p.x + 0.28, p.y + 1.42, 0.42, 0.44, 0.2, 0.16, "#ffffff", { shape: "cyl", rz: Math.PI / 2 }));
+  out.push(box(p.x - 0.8, p.y + 1.4, 0.2, 0.6, 1.6, 0.12, "#f8fafc", { tex: "fabric" }));
+  out.push(box(p.x - 0.8, p.y + 1.38, 0.3, 0.6, 0.55, 0.1, "#e2e8f0", { rx: -0.48, tex: "fabric" }));
+  out.push(box(p.x - 0.72, p.y + 1.42, 0.42, 0.44, 0.2, 0.16, "#38bdf8", { shape: "cyl", rz: Math.PI / 2, tex: "fabric" }));
+  out.push(box(p.x + 0.2, p.y + 1.4, 0.2, 0.6, 1.6, 0.12, "#fde68a", { tex: "fabric" }));
+  out.push(box(p.x + 0.2, p.y + 1.38, 0.3, 0.6, 0.55, 0.1, "#fcd34d", { rx: -0.48, tex: "fabric" }));
+  out.push(box(p.x + 0.28, p.y + 1.42, 0.42, 0.44, 0.2, 0.16, "#ffffff", { shape: "cyl", rz: Math.PI / 2, tex: "fabric" }));
 }
 
 function fence(p, out) {
@@ -289,8 +311,8 @@ function fence(p, out) {
     const y = p.axis === "x" ? p.y : p.y + u;
     const w = p.axis === "x" ? l - 0.06 : 0.7;
     const d = p.axis === "x" ? 0.7 : l - 0.06;
-    out.push(box(x, y, 0, w, d, 0.22, "#9ca3af", { top: "#cbd5e1" }));
-    out.push(box(x - 0.05, y - 0.05, 0.18, w + 0.1, d + 0.1, 0.62, idx % 2 ? "#3f7d3a" : "#4d9443", { shape: "ico" }));
+    out.push(box(x, y, 0, w, d, 0.22, "#9ca3af", { top: "#cbd5e1", tex: "stone" }));
+    out.push(box(x - 0.05, y - 0.05, 0.18, w + 0.1, d + 0.1, 0.62, idx % 2 ? "#3f7d3a" : "#4d9443", { shape: "ico", tex: "foliage" }));
     if (idx % 3 === 1) {
       out.push(box(x + w * 0.35, y + d * 0.35, 0.68, 0.22, 0.22, 0.2, flowers[idx % flowers.length], { shape: "sphere" }));
     }
@@ -298,11 +320,16 @@ function fence(p, out) {
 }
 
 function flowerbed(x, y, c, out) {
-  out.push(box(x, y, 0, 0.9, 0.9, 0.16, "#78716c", { shape: "cyl" }));
-  out.push(box(x + 0.08, y + 0.08, 0.14, 0.74, 0.74, 0.38, "#3f7d3a", { shape: "ico" }));
+  out.push(box(x, y, 0, 0.9, 0.9, 0.16, "#78716c", { shape: "cyl", tex: "stone" }));
+  out.push(box(x + 0.08, y + 0.08, 0.14, 0.74, 0.74, 0.38, "#3f7d3a", { shape: "ico", tex: "foliage" }));
   out.push(box(x + 0.18, y + 0.24, 0.42, 0.22, 0.22, 0.2, c, { shape: "sphere" }));
   out.push(box(x + 0.48, y + 0.18, 0.44, 0.2, 0.2, 0.18, shade(c, 0.2), { shape: "sphere" }));
   out.push(box(x + 0.32, y + 0.5, 0.42, 0.22, 0.22, 0.2, c, { shape: "sphere" }));
+}
+
+function rock(x, y, s, out) {
+  out.push(box(x, y, 0, s, s * 0.85, s * 0.65, "#94a3b8", { shape: "ico", tex: "stone" }));
+  out.push(box(x + s * 0.55, y + s * 0.25, 0, s * 0.6, s * 0.55, s * 0.45, "#64748b", { shape: "ico", tex: "stone" }));
 }
 
 function streetlamp(p, out) {
@@ -314,13 +341,15 @@ function streetlamp(p, out) {
 
 function poolProps(p, out) {
   const rim = "#d6d3d1";
-  out.push(box(p.x - 0.35, p.y - 0.35, 0, p.w + 0.7, 0.35, 0.14, rim, { top: "#e7e5e4" }));
-  out.push(box(p.x - 0.35, p.y + p.d, 0, p.w + 0.7, 0.35, 0.14, rim, { top: "#e7e5e4" }));
-  out.push(box(p.x - 0.35, p.y, 0, 0.35, p.d, 0.14, rim, { top: "#e7e5e4" }));
-  out.push(box(p.x + p.w, p.y, 0, 0.35, p.d, 0.14, rim, { top: "#e7e5e4" }));
+  out.push(box(p.x - 0.35, p.y - 0.35, 0, p.w + 0.7, 0.35, 0.14, rim, { top: "#e7e5e4", tex: "stone" }));
+  out.push(box(p.x - 0.35, p.y + p.d, 0, p.w + 0.7, 0.35, 0.14, rim, { top: "#e7e5e4", tex: "stone" }));
+  out.push(box(p.x - 0.35, p.y, 0, 0.35, p.d, 0.14, rim, { top: "#e7e5e4", tex: "stone" }));
+  out.push(box(p.x + p.w, p.y, 0, 0.35, p.d, 0.14, rim, { top: "#e7e5e4", tex: "stone" }));
   out.push(box(p.x + 0.6, p.y + 0.05, 0.08, 0.08, 0.08, 0.65, "#cbd5e1", { shape: "cyl" }));
   out.push(box(p.x + 1.1, p.y + 0.05, 0.08, 0.08, 0.08, 0.65, "#cbd5e1", { shape: "cyl" }));
   out.push(box(p.x + p.w * 0.28, p.y + p.d * 0.48, 0.04, 0.42, 0.42, 0.42, "#facc15", { shape: "sphere" }));
+  out.push(box(p.x + 1.6, p.y + p.d * 0.2, 0.01, 0.35, 0.25, 0.04, "#7dd3fc", { glow: "#38bdf8" }));
+  out.push(box(p.x + p.w - 1.8, p.y + p.d * 0.2, 0.01, 0.35, 0.25, 0.04, "#7dd3fc", { glow: "#38bdf8" }));
 }
 
 const BOX_PROPS = {
@@ -369,9 +398,9 @@ function flatProp(iso, p, th, plan, t, motion) {
     }
   }
   if (p.kind === "pool") {
-    iso.panel({ plane: "floor", c: 0.01, a: p.x - 0.4, b: p.y - 0.4, w: p.w + 0.8, h: p.d + 0.8, color: "#e7e5e4" });
-    iso.panel({ plane: "floor", c: 0.02, a: p.x, b: p.y, w: p.w, h: p.d, color: "#38bdf8" });
-    iso.panel({ plane: "floor", c: 0.025, a: p.x + 0.3, b: p.y + 0.3, w: p.w - 0.6, h: p.d * 0.45, color: "#7dd3fc" });
+    iso.panel({ plane: "floor", c: 0.01, a: p.x - 0.4, b: p.y - 0.4, w: p.w + 0.8, h: p.d + 0.8, color: "#e7e5e4", tex: "stone" });
+    iso.panel({ plane: "floor", c: 0.02, a: p.x, b: p.y, w: p.w, h: p.d, color: "#38bdf8", tex: "water" });
+    iso.panel({ plane: "floor", c: 0.025, a: p.x + 0.3, b: p.y + 0.3, w: p.w - 0.6, h: p.d * 0.45, color: "#7dd3fc", tex: "water" });
     for (let k = 0; k < 5; k++) {
       const off = motion ? (t * 0.4 + k / 5) % 1 : k / 5;
       iso.panel({ plane: "floor", c: 0.03, a: p.x + 0.4 + off * (p.w - 1.6), b: p.y + 0.6 + (k % 3) * 1.2, w: 0.8, h: 0.06, color: "rgba(255,255,255,0.7)" });
@@ -383,10 +412,10 @@ function flatProp(iso, p, th, plan, t, motion) {
 // ---------------------------------------------------------------- ngoại cảnh + toà nhà
 function drawGround(iso, plan) {
   const g = plan.levels ? 6 : 4;
-  iso.panel({ plane: "floor", c: -0.02, a: -1.5, b: -1.5, w: plan.W + g + 1.5, h: plan.D + g + 1.5, color: "#7fb069" });
-  iso.panel({ plane: "floor", c: -0.012, a: -0.6, b: -0.6, w: plan.W + g - 0.4, h: plan.D + g - 0.4, color: "#93c47d" });
-  iso.panel({ plane: "floor", c: -0.008, a: 2.8, b: plan.D, w: 4.4, h: g, color: "#a8a29e" }); // viền đá lối vào
-  iso.panel({ plane: "floor", c: -0.004, a: 3.05, b: plan.D, w: 3.9, h: g, color: "#e7e5e4" }); // lối vào
+  iso.panel({ plane: "floor", c: -0.02, a: -1.5, b: -1.5, w: plan.W + g + 1.5, h: plan.D + g + 1.5, color: "#7fb069", tex: "grass" });
+  iso.panel({ plane: "floor", c: -0.012, a: -0.6, b: -0.6, w: plan.W + g - 0.4, h: plan.D + g - 0.4, color: "#93c47d", tex: "grass" });
+  iso.panel({ plane: "floor", c: -0.008, a: 2.8, b: plan.D, w: 4.4, h: g, color: "#a8a29e", tex: "stone" }); // viền đá lối vào
+  iso.panel({ plane: "floor", c: -0.004, a: 3.05, b: plan.D, w: 3.9, h: g, color: "#e7e5e4", tex: "stone" }); // lối vào
   for (let s = 0; s < g - 0.5; s += 1.2) {
     iso.panel({ plane: "floor", c: -0.001, a: 3.2, b: plan.D + 0.25 + s, w: 3.6, h: 0.08, color: "#cbd5e1" });
   }
@@ -397,10 +426,12 @@ function outdoorProps(plan, out) {
   fence({ axis: "x", x: 7.4, y: plan.D + g - 1.0, len: plan.W - 7.4 + g - 1 }, out);
   fence({ axis: "y", x: plan.W + g - 1.0, y: -1.0, len: plan.D + g - 1 }, out);
   fence({ axis: "x", x: -1.0, y: plan.D + g - 1.0, len: 3.8 }, out);
-  for (let x = 9; x < plan.W; x += 7) tree({ x, y: plan.D + 1.0, color: x % 2 ? "#2f855a" : "#3b8f4f", pine: x % 14 === 9 }, out);
+  for (let x = 9; x < plan.W; x += 7) tree({ x, y: plan.D + 1.0, color: x % 2 ? "#2f855a" : "#3b8f4f", pine: x % 14 === 9, palm: x >= 30 }, out);
   for (let y = 2; y < plan.D; y += 7) tree({ x: plan.W + 1.0, y, color: y % 2 ? "#2f855a" : "#40916c" }, out);
   flowerbed(1.6, plan.D + 0.35, "#f43f5e", out);
   flowerbed(7.4, plan.D + 0.35, "#facc15", out);
+  rock(31.2, 20.4, 0.8, out);
+  rock(42.2, 18.8, 0.7, out);
   streetlamp({ x: 2.6, y: plan.D + 1.5 }, out);
   streetlamp({ x: 7.4, y: plan.D + 1.5 }, out);
 }
@@ -443,13 +474,13 @@ function lift(sink, dz) {
 
 // ---------------------------------------------------------------- bàn + nhân vật
 function deskBoxes(th, x, y, seat, out, t, motion) {
-  out.push(box(x, y, 0.72, 2.8, 1.1, 0.1, th.desk, { glow: th.edge ? th.edge : null }));
+  out.push(box(x, y, 0.72, 2.8, 1.1, 0.1, th.desk, { tex: th.edge ? null : "wood", glow: th.edge ? th.edge : null }));
   for (const [dx, dy] of [[0.12, 0.12], [2.58, 0.12], [0.12, 0.88], [2.58, 0.88]]) {
     out.push(box(x + dx, y + dy, 0, 0.1, 0.1, 0.72, th.leg, { shape: "cyl" }));
   }
   const lit = seat.state === "npc" ? shade(th.glow, -0.35) : QUIET.has(seat.state) ? shade(th.screen, 0.1) : STATE_COLOR[seat.state];
   const flick = motion && seat.state === "work" ? 0.1 * Math.sin(t * 9) : 0;
-  out.push(box(x + 0.7, y + 0.15, 0.88, 1.4, 0.08, 0.78, "#111827", { front: shade(lit, -0.35 + flick), glow: QUIET.has(seat.state) ? null : lit }));
+  out.push(box(x + 0.7, y + 0.15, 0.88, 1.4, 0.08, 0.78, "#111827", { front: shade(lit, -0.35 + flick), tex: "screen", glow: QUIET.has(seat.state) ? null : lit }));
   out.push(box(x + 1.32, y + 0.2, 0.82, 0.16, 0.1, 0.12, "#374151", { shape: "cyl" }));
   out.push(box(x + 1.2, y + 0.22, 0.82, 0.4, 0.22, 0.04, "#374151"));
   out.push(box(x + 0.8, y + 0.55, 0.82, 1.1, 0.35, 0.03, "#4b5563"));
@@ -467,47 +498,66 @@ function person(th, x, y, i, seat, out, t, motion, season) {
   const jump = motion && seat.state === "done" ? Math.abs(Math.sin(t * 4)) * 0.22 : 0;
   const busy = seat.state === "work" || seat.state === "npc";
   const bob = motion && busy ? Math.sin(t * 6 + i) * 0.03 : 0;
+  const breathe = motion ? Math.sin(t * 2.4 + i) * 0.015 : 0;
+  const look = motion && busy ? Math.sin(t * 1.4 + i * 2) * 0.08 : 0;
   const skin = SKIN[i % SKIN.length];
   const shirt = SHIRT[i % SHIRT.length];
   const hair = HAIR[(i * 3) % HAIR.length];
   const pants = i % 2 ? "#1e293b" : "#334155";
 
-  // Ghế xoay công thái học (chân đế, trụ nâng, đệm ngồi tròn, tay vịn, tựa lưng)
+  // Ghế xoay công thái học (chân đế, trụ nâng, đệm ngồi tròn, tay vịn, tựa lưng bọc nỉ)
   out.push(box(cx + 0.15, cy + 0.12, 0, 0.6, 0.6, 0.07, "#334155", { shape: "cyl" }));
   out.push(box(cx + 0.39, cy + 0.36, 0.07, 0.12, 0.12, 0.36, "#475569", { shape: "cyl" }));
-  out.push(box(cx - 0.06, cy - 0.02, 0.43, 1.02, 0.86, 0.1, th.chair, { shape: "cyl" }));
+  out.push(box(cx - 0.06, cy - 0.02, 0.43, 1.02, 0.86, 0.1, th.chair, { shape: "cyl", tex: "fabric" }));
   out.push(box(cx - 0.12, cy + 0.12, 0.53, 0.1, 0.5, 0.22, "#334155"));
   out.push(box(cx + 0.92, cy + 0.12, 0.53, 0.1, 0.5, 0.22, "#334155"));
 
   const bx = cx + shake, bz = 0.53 + jump;
-  // Chân + giày đặt dưới gầm bàn
+  // Đùi + đầu gối gập + cẳng chân + giày đặt dưới gầm bàn
+  out.push(box(bx + 0.16, cy - 0.22, 0.42, 0.2, 0.36, 0.18, pants, { shape: "cyl", rx: Math.PI / 2 }));
+  out.push(box(bx + 0.54, cy - 0.22, 0.42, 0.2, 0.36, 0.18, pants, { shape: "cyl", rx: Math.PI / 2 }));
   out.push(box(bx + 0.16, cy - 0.36, 0.1, 0.2, 0.2, 0.44, pants, { shape: "cyl" }));
   out.push(box(bx + 0.54, cy - 0.36, 0.1, 0.2, 0.2, 0.44, pants, { shape: "cyl" }));
   out.push(box(bx + 0.14, cy - 0.46, 0.0, 0.22, 0.3, 0.12, "#0f172a", { shape: "sphere" }));
   out.push(box(bx + 0.52, cy - 0.46, 0.0, 0.22, 0.3, 0.12, "#0f172a", { shape: "sphere" }));
 
-  // Thân người bo tròn + vai + cổ áo/thẻ tên
-  out.push(box(bx + 0.1, cy + 0.06, bz, 0.7, 0.5, 0.62, shirt, { shape: "cyl", bias: 0.02 }));
-  out.push(box(bx + 0.04, cy + 0.12, bz + 0.42, 0.26, 0.28, 0.24, shirt, { shape: "sphere", bias: 0.02 }));
-  out.push(box(bx + 0.6, cy + 0.12, bz + 0.42, 0.26, 0.28, 0.24, shirt, { shape: "sphere", bias: 0.02 }));
+  // Thân người bo tròn + thắt lưng + cổ áo sơ mi + vai + thẻ tên
+  out.push(box(bx + 0.1, cy + 0.06, bz, 0.7, 0.5, 0.08, "#1f2937", { shape: "cyl", bias: 0.02 }));
+  out.push(box(bx + 0.39, cy + 0.04, bz + 0.01, 0.12, 0.06, 0.06, "#cbd5e1", { bias: 0.02 }));
+  out.push(box(bx + 0.1, cy + 0.06, bz + 0.07, 0.7, 0.5, 0.55 + breathe, shirt, { shape: "cyl", tex: "fabric", bias: 0.02 }));
+  out.push(box(bx + 0.33, cy + 0.04, bz + 0.54, 0.24, 0.12, 0.1, "#f8fafc", { bias: 0.03 }));
+  out.push(box(bx + 0.04, cy + 0.12, bz + 0.42, 0.26, 0.28, 0.24, shirt, { shape: "sphere", tex: "fabric", bias: 0.02 }));
+  out.push(box(bx + 0.6, cy + 0.12, bz + 0.42, 0.26, 0.28, 0.24, shirt, { shape: "sphere", tex: "fabric", bias: 0.02 }));
   if (seat.label) {
-    out.push(box(bx + 0.36, cy + 0.04, bz + 0.46, 0.18, 0.08, 0.14, th.trim, { bias: 0.03 }));
+    out.push(box(bx + 0.36, cy + 0.04, bz + 0.42, 0.18, 0.08, 0.14, th.trim, { bias: 0.03 }));
   }
 
-  // Cổ + đầu tròn + tai + 4 kiểu tóc + tai nghe (cho agent)
+  // Cổ + đầu tròn + tai + khuôn mặt (mắt, lông mày, mũi, miệng, kính) + 4 kiểu tóc + tai nghe
+  const hz = bz + 0.68 + bob;
   out.push(box(bx + 0.35, cy + 0.22, bz + 0.58 + bob, 0.2, 0.2, 0.16, skin, { shape: "cyl", bias: 0.03 }));
-  out.push(box(bx + 0.17, cy + 0.06, bz + 0.68 + bob, 0.56, 0.56, 0.58, skin, { shape: "sphere", bias: 0.03 }));
-  out.push(box(bx + 0.12, cy + 0.28, bz + 0.88 + bob, 0.1, 0.12, 0.16, skin, { shape: "sphere", bias: 0.03 }));
-  out.push(box(bx + 0.68, cy + 0.28, bz + 0.88 + bob, 0.1, 0.12, 0.16, skin, { shape: "sphere", bias: 0.03 }));
+  out.push(box(bx + 0.17, cy + 0.06, hz, 0.56, 0.56, 0.58, skin, { shape: "sphere", rz: look, bias: 0.03 }));
+  out.push(box(bx + 0.12, cy + 0.28, hz + 0.2, 0.1, 0.12, 0.16, skin, { shape: "sphere", bias: 0.03 }));
+  out.push(box(bx + 0.68, cy + 0.28, hz + 0.2, 0.1, 0.12, 0.16, skin, { shape: "sphere", bias: 0.03 }));
+  // Mặt hướng -y về màn hình (mắt, đồng tử, mũi, miệng)
+  out.push(box(bx + 0.29, cy + 0.04, hz + 0.3, 0.09, 0.05, 0.08, "#ffffff", { shape: "sphere", bias: 0.02 }));
+  out.push(box(bx + 0.52, cy + 0.04, hz + 0.3, 0.09, 0.05, 0.08, "#ffffff", { shape: "sphere", bias: 0.02 }));
+  out.push(box(bx + 0.31, cy + 0.02, hz + 0.31, 0.05, 0.05, 0.05, "#0f172a", { shape: "sphere", bias: 0.02 }));
+  out.push(box(bx + 0.54, cy + 0.02, hz + 0.31, 0.05, 0.05, 0.05, "#0f172a", { shape: "sphere", bias: 0.02 }));
+  out.push(box(bx + 0.42, cy + 0.02, hz + 0.22, 0.07, 0.07, 0.08, shade(skin, -0.12), { shape: "sphere", bias: 0.02 }));
+  out.push(box(bx + 0.38, cy + 0.04, hz + 0.13, 0.14, 0.04, seat.state === "done" ? 0.06 : 0.03, "#991b1b", { shape: "cyl", bias: 0.02 }));
+  if (i % 3 === 0) {
+    out.push(box(bx + 0.26, cy + 0.02, hz + 0.29, 0.15, 0.04, 0.1, "#1e293b", { bias: 0.02 }));
+    out.push(box(bx + 0.49, cy + 0.02, hz + 0.29, 0.15, 0.04, 0.1, "#1e293b", { bias: 0.02 }));
+  }
 
   const style = i % 4;
-  out.push(box(bx + 0.15, cy + 0.08, bz + 0.98 + bob, 0.6, 0.58, 0.32, hair, { shape: "sphere", bias: 0.04 }));
+  out.push(box(bx + 0.15, cy + 0.08, bz + 0.98 + bob, 0.6, 0.58, 0.32, hair, { shape: "sphere", tex: "hair", rz: look, bias: 0.04 }));
   if (style === 1) {
-    out.push(box(bx + 0.22, cy + 0.05, bz + 1.12 + bob, 0.46, 0.44, 0.22, shade(hair, 0.08), { shape: "ico", bias: 0.05 }));
+    out.push(box(bx + 0.22, cy + 0.05, bz + 1.12 + bob, 0.46, 0.44, 0.22, shade(hair, 0.08), { shape: "ico", tex: "hair", bias: 0.05 }));
   } else if (style === 2) {
-    out.push(box(bx + 0.16, cy + 0.38, bz + 0.72 + bob, 0.58, 0.28, 0.42, hair, { shape: "cyl", bias: 0.04 }));
+    out.push(box(bx + 0.16, cy + 0.38, bz + 0.72 + bob, 0.58, 0.28, 0.42, hair, { shape: "cyl", tex: "hair", bias: 0.04 }));
   } else if (style === 3) {
-    out.push(box(bx + 0.34, cy + 0.58, bz + 0.96 + bob, 0.22, 0.22, 0.22, hair, { shape: "sphere", bias: 0.05 }));
+    out.push(box(bx + 0.34, cy + 0.58, bz + 0.96 + bob, 0.22, 0.22, 0.22, hair, { shape: "sphere", tex: "hair", bias: 0.05 }));
   }
   if (seat.label) {
     out.push(box(bx + 0.14, cy + 0.26, bz + 0.86 + bob, 0.08, 0.16, 0.2, "#1f2937", { shape: "sphere", bias: 0.05 }));
@@ -536,15 +586,15 @@ function person(th, x, y, i, seat, out, t, motion, season) {
   }
 
   if (season === "noel") {
-    out.push(box(bx + 0.14, cy + 0.06, bz + 1.18 + bob, 0.62, 0.58, 0.12, "#f8fafc", { shape: "cyl", bias: 0.06 }));
-    out.push(box(bx + 0.18, cy + 0.1, bz + 1.28 + bob, 0.54, 0.5, 0.36, "#dc2626", { shape: "cone", bias: 0.07 }));
+    out.push(box(bx + 0.14, cy + 0.06, bz + 1.18 + bob, 0.62, 0.58, 0.12, "#f8fafc", { shape: "cyl", tex: "fabric", bias: 0.06 }));
+    out.push(box(bx + 0.18, cy + 0.1, bz + 1.28 + bob, 0.54, 0.5, 0.36, "#dc2626", { shape: "cone", tex: "fabric", bias: 0.07 }));
     out.push(box(bx + 0.38, cy + 0.28, bz + 1.62 + bob, 0.15, 0.15, 0.15, "#f8fafc", { shape: "sphere", bias: 0.08 }));
   } else if (season === "tet") {
-    out.push(box(bx + 0.16, cy + 0.08, bz + 1.18 + bob, 0.58, 0.54, 0.12, "#dc2626", { shape: "cyl", bias: 0.06 }));
+    out.push(box(bx + 0.16, cy + 0.08, bz + 1.18 + bob, 0.58, 0.54, 0.12, "#dc2626", { shape: "cyl", tex: "fabric", bias: 0.06 }));
     out.push(box(bx + 0.38, cy + 0.04, bz + 1.22 + bob, 0.14, 0.1, 0.1, "#facc15", { shape: "sphere", bias: 0.07 }));
   }
-  out.push(box(cx - 0.06, cy + 0.72, 0.48, 1.02, 0.16, 0.92, shade(th.chair, -0.1), { bias: 0.2 }));
-  out.push(box(cx + 0.14, cy + 0.68, 1.24, 0.62, 0.18, 0.22, shade(th.chair, -0.18), { shape: "cyl", rz: Math.PI / 2, bias: 0.21 }));
+  out.push(box(cx - 0.06, cy + 0.72, 0.48, 1.02, 0.16, 0.92, shade(th.chair, -0.1), { tex: "fabric", bias: 0.2 }));
+  out.push(box(cx + 0.14, cy + 0.68, 1.24, 0.62, 0.18, 0.22, shade(th.chair, -0.18), { shape: "cyl", tex: "fabric", rz: Math.PI / 2, bias: 0.21 }));
   return { x: bx + 0.45, y: cy + 0.3, z: bz + 1.55 + (season === "noel" ? 0.4 : 0.15) };
 }
 
