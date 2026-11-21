@@ -1,6 +1,7 @@
 # ADR-9002: Dòng phát hành riêng của X-Office bắt đầu từ 1.0.0
 
-- **Trạng thái:** Đã chấp nhận ngày 2026-11-21 (phiên chính tự duyệt theo ADR-0008, D-9008).
+- **Trạng thái:** Đã chấp nhận ngày 2026-11-21 (phiên chính tự duyệt theo ADR-0008, D-9008). **Thay một phần bởi
+  [ADR-9004](9004-remove-target-registry.md)** (2026-11-21): registry và `legacy-line` đã gỡ; phần còn lại giữ nguyên.
 - **Làm rõ:** ADR-0056 (cắt bản, `release-tag.yml`), ADR-0068 (registry sản phẩm), D-9007 (độc lập khỏi X-Templates).
 
 ## Bối cảnh

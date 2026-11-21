@@ -9,9 +9,14 @@ Bản < 3.20.0: [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md) (T-3651; `changel
 ### Changed
 
 - `xt.py deploy run|rollback --env dev` in tối đa 5 dòng cuối stderr của adapter cho mỗi bước thất bại (đã che bí mật, mỗi dòng ≤ 200 ký tự), nên lời hướng dẫn như `docker compose -p <project> down -v` tới người dùng; sổ `DEPLOYS.json` vẫn chỉ ghi exit code (AUD-A11Y-009). Starter `web-api-ts`: notes-ui chỉ gắn `aria-invalid`/`aria-describedby` cho lỗi dữ liệu (rỗng, 400/422), không cho lỗi mạng/503; README gói nêu cách lấy tên project Compose. **Dự án đích**: chạy lại `install.py` để nhận `xt.py` mới; mã starter chỉ chép vào repo mới, dự án có sẵn tự ghép notes-ui nếu muốn.
-- Repo cài khung ở dòng kế thừa (≤ 3.34.0) không được `doctor --drift` nhắc lên 1.x, vì lệnh này chạy `xt.py` đã cài của chính repo đó; đường nâng là chạy lại `install.py` từ bản khung mới (AUD-HAR-453).
+- Repo cài khung ở dòng kế thừa (≤ 3.34.0) không được `doctor --drift` nhắc lên 1.x, vì lệnh này chạy `xt.py` đã cài của chính repo đó (AUD-HAR-453). Chạy lại `install.py` bản 1.x vẫn chép tệp khung mới, nhưng `install.py` báo hạ bản (1.x cũ hơn 3.34.0 theo số) và không tự in bước làm tay — đọc CHANGELOG mục [1.0.0] và [Unreleased] (ADR-9004).
 - Mẫu `AGENTS.md` (dòng mở đầu) và `install.py` (`--help`, `.xtemplates/README.md`) gọi tên thống nhất "bộ khung `xt`" thay "khung X-Office" (AUD-DOC-312); `AGENTS.md` mẫu chỉ chép khi dự án chưa có, repo có sẵn tự sửa câu đó nếu muốn.
-- X-Office là dự án đích độc lập (D-9007), không còn theo dõi dự án khác: `docs/ops/registry.json` rỗng (`products: []`, vẫn schema 1), `docs/ops/TARGETS.md` không còn repo nào ở mục Danh sách; cơ chế `registry`/`legacy-line`/phản hồi giữ nguyên.
+- X-Office là dự án đích độc lập (D-9007), không còn theo dõi dự án khác: `docs/ops/TARGETS.md` không còn repo nào ở mục Danh sách; cơ chế phản hồi (ADR-0010) giữ nguyên.
+
+### Removed
+
+- Registry sản phẩm đích (ADR-0068 lát E) gỡ hẳn vì X-Office không theo dõi dự án khác ([ADR-9004](docs/adr/9004-remove-target-registry.md)): lệnh `xt.py registry` (cả `registry pull`, `--strict`, `--json`), trạng thái lệch `legacy-line`, `docs/ops/registry.json`, API `GET /api/registry` và màn Registry của `xt.py app` (app còn 8 màn). `docs/ops/TARGETS.md` và cơ chế phản hồi giữ nguyên. **Dự án đích** có script/CI gọi `xt.py registry`: bỏ lệnh đó trước khi chạy lại `install.py`.
+- `install.py` bỏ ngoại lệ nâng bản qua ranh giới dòng phát hành (ADR-9003): bản khung số nhỏ hơn bản đã cài là hạ bản, kể cả 3.34.0 → 1.x (không in bước làm tay); bước làm tay chỉ đọc CHANGELOG tới tiêu đề ranh giới dòng kế thừa, nên nâng hay cài lại trong dòng 1.x không in mục 3.x. Giữ so nhãn tiền phát hành và nhãn git describe (AUD-HAR-453, AUD-HAR-454); `changelog-check` vẫn nhận tiêu đề ranh giới, `doctor` vẫn bỏ tag kế thừa khi tìm bản mới nhất (ADR-9002).
 
 ### Fixed
 

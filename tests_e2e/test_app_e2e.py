@@ -47,7 +47,6 @@ SCREENS: Tuple[Tuple[str, str], ...] = (
     ("loop", "Vòng tự động"),
     ("office", "Văn phòng"),
     ("pr", "PR"),
-    ("registry", "Registry sản phẩm"),
 )
 TIMEOUT_MS = 20000
 
@@ -68,10 +67,6 @@ DECISIONS = """# Nhật ký quyết định
 - Đường lùi: đổi sang SQLite
 """
 ADR = "# ADR-0001: Dùng tệp phẳng\n\n- **Trạng thái:** Đã chấp nhận\n"
-REGISTRY = """{"schema": 1, "products": [{"repo": "owner/a-very-long-product-repository-name-for-narrow-table", "owner": "o",
- "type": "web-api", "risk": "high", "core": "1.0.0", "pack": null, "environments": ["prod"], "slo": "",
- "release": {"version": "1.0.0", "date": "2026-10-01", "digest": null},
- "exceptions": [{"id": "EX-1", "until": "2020-01-01", "why": "<script>alert(1)</script>"}]}]}"""
 
 _pw: Optional[Playwright] = None
 _browser: Optional[Browser] = None
@@ -113,8 +108,6 @@ def make_project(base: Path, with_blueprint: bool) -> None:
     (base / "docs" / "autopilot" / "PLAN.md").write_text(PLAN, encoding="utf-8")
     (base / "docs" / "autopilot" / "DECISIONS.md").write_text(DECISIONS, encoding="utf-8")
     (base / "docs" / "adr" / "0001-flat-files.md").write_text(ADR, encoding="utf-8")
-    (base / "docs" / "ops").mkdir(parents=True)
-    (base / "docs" / "ops" / "registry.json").write_text(REGISTRY, encoding="utf-8")  # màn Registry có bảng
     if with_blueprint:
         compose_blueprint(base)
 
@@ -255,9 +248,6 @@ class ScreensTest(AppCase):
         if route == "office":  # canvas có mô tả văn bản; bảng tương đương có đủ 5 bàn
             page.locator("canvas.office-canvas[aria-label^='Văn phòng kiểu']").wait_for()
             self.assertEqual(page.locator("main tbody tr").count(), 5)
-        if route == "registry":  # bảng có dòng; lý do ngoại lệ chứa thẻ HTML hiện thành chữ, không thành phần tử
-            page.get_by_text("hết hạn · EX-1", exact=False).wait_for()
-            self.assertEqual(page.locator("main script").count(), 0)
         assert_clean(self, page, watch, self.origin)
 
     def test_catalog_module_detail_mobile(self) -> None:

@@ -17,7 +17,7 @@ CLI có thể tự quay lui khi smoke hoặc digest sai. Để chủ động qua
 `deploy status --env dev --json` đọc và kiểm sổ schema 1 theo §5.
 
 `release-check` kiểm hàng `deploy` khi `deploy_envs` được khai. Receipt dev phải khớp content và digest của ứng viên.
-`registry pull --from DIR` đọc các sổ trong clone sản phẩm. `admin-plan` tổng hợp việc thiết lập,
+`admin-plan` tổng hợp việc thiết lập,
 `rollout-drill` diễn tập điều kiện phát hành và `ops-check` đối chiếu số liệu field với môi trường đã ghi nhận.
 
 Chạy lệnh triển khai tuỳ biến, guard chống ghi tay `DEPLOYS.json` (S-112) và lệnh triển khai/quay lui production
@@ -91,10 +91,8 @@ nhau khoảng trắng; adapter dọn ảnh cũ không được xoá các digest 
 - `deploy_envs` trống: **không có hàng ở mọi quy mô** — dự án đang chạy nâng khung không đổi `verdict`. Agent ký ở M/L và
   duyệt giai đoạn 2/3 thì đòi hàng này PASS (SPEC-factory-scale §2.2, §2.3): thiếu hàng chỉ chặn phần nới, không chặn
   đường người ký.
-- `xt.py registry pull --from <thư mục chứa clone>` (repo khung): đọc sổ của từng sản phẩm, cập nhật `environments` (các
-  môi trường có `current`). Với sản phẩm registry **đã có** `release` (có `version`): cập nhật `release.digest` và
-  `release.date` theo `prod.current`. `release` đang `null` → để nguyên và báo "có bản production nhưng registry chưa có
-  `release.version`" (schema registry không đổi; `version` vẫn do người hoặc bước cắt bản ghi).
+- Ngừng dùng: `xt.py registry pull` (repo khung đọc sổ của từng sản phẩm) đã gỡ cùng registry —
+  [ADR-9004](../adr/9004-remove-target-registry.md).
 
 ### 2.6 Bản dev của gói `web-api-ts` (F-102)
 - Gói thêm (thư mục `managed/`): Dockerfile, file compose cho `dev` (app + Postgres), script tương ứng các khoá;
@@ -165,9 +163,7 @@ nhau khoảng trắng; adapter dọn ảnh cũ không được xoá các digest 
 - Given phiên agent · When Write/Edit/Bash ghi `docs/ops/DEPLOYS.json` · Then guard chặn
 
 ### S-113 Registry kéo về
-- Given clone một sản phẩm có `envs.prod.current` digest D, ngày N; registry của sản phẩm đã có `release` với `version`
-- When `xt.py registry pull --from <thư mục>` · Then `environments` chứa `prod`, `release.digest` = D, `release.date` = N; `xt.py registry` vẫn exit như trước
-- And Given `release` là `null` · Then `release` vẫn `null`, lệnh in cảnh báo thiếu `release.version`
+- Ngừng dùng: registry và `registry pull` đã gỡ — [ADR-9004](../adr/9004-remove-target-registry.md).
 
 ### S-114 Gói: lát dọc bản dev trên repo sạch
 - Given repo sạch cài gói, runner có Docker · When workflow gói chạy

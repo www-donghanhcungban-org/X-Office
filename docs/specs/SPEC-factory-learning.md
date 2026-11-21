@@ -66,8 +66,8 @@ Giữ đúng ADR-0010: khung **không** cầm token ghi vào repo đích. Mỗi 
 - Canary đỏ: PR nâng ở dự án canary có CI đỏ → dự án đó ghi phản hồi `cong-cu` (`xt.py feedback add`) trong chính PR;
   Routine phản hồi (F-162) đưa về khung; khung quyết thu hồi bản đó trong `upgrade_soak_days` ngày — đây là lý do có
   khoảng chờ.
-- Ở repo khung: `xt.py registry pull` (SPEC-factory-deploy §2.5) cập nhật `core`/`pack.version` từ các clone; `xt.py
-  registry` báo "sản phẩm × bản khung × số tuần chậm" (`LOOP-FB-005`).
+- Ngừng dùng: `xt.py registry`/`registry pull` ở repo khung đã gỡ — [ADR-9004](../adr/9004-remove-target-registry.md);
+  bảng "sản phẩm × bản khung × số tuần chậm" là việc của Routine phản hồi (`LOOP-FB-005`).
 
 ## 3. Tiêu chí chấp nhận
 
@@ -148,7 +148,7 @@ Bước nâng không sửa mã sản phẩm ngoài phần `install.py` quản l�
 ghi vào PR.
 
 ## 8. Đo lường
-`registry` báo "sản phẩm × bản khung × số tuần chậm" (`LOOP-FB-005`); thời gian từ tag tới PR nâng merge ở mọi sản phẩm.
+Bảng "sản phẩm × bản khung × số tuần chậm" của Routine phản hồi (`LOOP-FB-005`; `registry` đã gỡ — ADR-9004); thời gian từ tag tới PR nâng merge ở mọi sản phẩm.
 
 ## 9. Câu hỏi mở
 - [x] Bot đẩy từ khung hay dự án tự kéo? — D-423: dự án tự kéo (ADR-0010: khung không cầm token ghi chéo repo); thay cho

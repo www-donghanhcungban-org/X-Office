@@ -17,7 +17,7 @@ hôm nay (ba lượt tra độc lập: một kiểm kê trong repo, hai `researc
 1. **Viết mã không phải nghẽn.** Ở hai dự án xây từ đầu bằng khung, 73 % (hotel-manager) và 76 % (X-Company) dòng mã
    sản phẩm vào nhánh chính trong 2–3 ngày đầu. Ba tuần sau đó gần như không thêm sản phẩm.
 2. **Nghẽn là quãng từ "mã xong" tới "bản chạy được có người dùng".** Cả bốn dự án `environments: []` ở
-   [registry](../docs/ops/registry.json); hai dự án mới vẫn NO-GO với 73–78 MUST mở, toàn bộ chờ người hoặc hạ tầng.
+   registry `docs/ops/registry.json` (đã gỡ — ADR-9004); hai dự án mới vẫn NO-GO với 73–78 MUST mở, toàn bộ chờ người hoặc hạ tầng.
 3. **Bốn khoản tốn thời gian tránh được**, theo số đo: chọn quy mô M từ ngày đầu (473 MUST so với 70 ở S) · nâng khung
    liên tục (16–22 % commit nhánh chính) · mỗi dự án tự dựng lại cổng CI/bảo mật · làm hồ sơ miễn trừ (84 % phản hồi).
 4. **Song song hoá là đòn bẩy bậc hai.** Nó rút ngắn khâu vốn chỉ chiếm vài ngày, tốn token gấp nhiều lần và chỉ chạy tốt
