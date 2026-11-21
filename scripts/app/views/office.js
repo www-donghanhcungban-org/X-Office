@@ -222,6 +222,7 @@ export async function render(main, { api, h, error }) {
     view.pan = { x: 0, y: 0 };
     for (const b of rooms.querySelectorAll("button")) b.setAttribute("aria-pressed", String(pressed(b.dataset.room)));
     dirty = true;
+    if (three) three.resetPan?.();
     if (three) three.dirty = true;
   }
 
@@ -288,7 +289,7 @@ export async function render(main, { api, h, error }) {
             ? hit.label + " · " + (STATE_TEXT[hit.state] || hit.state) + (hit.task ? " (" + hit.task + ")" : "") + " — bấm tới bàn"
             : "▸ " + hit.label + " — bấm tới phòng";
           hoverHud.hidden = false;
-        });
+        }, (f) => zoomBy(f));
         rmsg.replaceChildren();
         canvas.hidden = true;
         three.canvas.setAttribute("aria-label", canvas.getAttribute("aria-label") || "Văn phòng");
@@ -330,7 +331,7 @@ export async function render(main, { api, h, error }) {
       : "Văn phòng — chưa có dữ liệu agent (đang tải hoặc máy chủ lỗi)."; // không khai "không ai đang làm" khi chưa biết
     canvas.setAttribute("aria-label", text);
     keys.textContent = three
-      ? "Khi khung cảnh có focus: mũi tên xoay góc nhìn; kéo chuột để xoay; bấm nhân viên/phòng để phóng tới."
+      ? "Khi khung cảnh có focus: mũi tên xoay 360°; kéo chuột để xoay · cuộn để phóng/thu · chuột phải/Shift+kéo để dời · bấm nhân viên/phòng để tới."
       : "Khi khung cảnh có focus: mũi tên dời góc nhìn · + / − phóng to, thu nhỏ · 0 về giữa; kéo chuột để dời.";
     if (three) {
       three.canvas.setAttribute("aria-label", text);
@@ -367,7 +368,7 @@ export async function render(main, { api, h, error }) {
     el.addEventListener("change", changed);
   }
   const zoomBy = (f) => {
-    prefs.zoom = Math.min(4, Math.max(0.5, +(prefs.zoom * f).toFixed(2)));
+    prefs.zoom = Math.min(8, Math.max(0.3, +(prefs.zoom * f).toFixed(2)));
     zoomVal.textContent = Math.round(prefs.zoom * 100) + "%";
     persist();
     panTo(view.pan.x, view.pan.y); // thu nhỏ thì biên dời hẹp lại — kẹp lại góc nhìn đang dời

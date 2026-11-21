@@ -23,8 +23,8 @@ function box(x, y, z, w, d, h, color, extra) {
 // ---------------------------------------------------------------- phòng: tường, sàn, cửa sổ
 function drawRoom(iso, th, plan) {
   const { W, D, H, tile } = plan;
-  iso.box(box(-0.3, -0.3, 0, 0.3, D + 0.3, H, th.wall, { side: shade(th.wall, -0.08), top: shade(th.wall, -0.2) }));
-  iso.box(box(0, -0.3, 0, W, 0.3, H, th.wall, { front: th.wall, top: shade(th.wall, -0.2) }));
+  iso.box(box(-0.3, -0.3, 0, 0.3, D + 0.3, H, th.wall, { side: shade(th.wall, -0.08), top: shade(th.wall, -0.2), wall: "left" }));
+  iso.box(box(0, -0.3, 0, W, 0.3, H, th.wall, { front: th.wall, top: shade(th.wall, -0.2), wall: "back" }));
   for (let i = 0; i < W; i += tile) {
     for (let j = 0; j < D; j += tile) {
       iso.panel({ plane: "floor", c: 0, a: i, b: j, w: Math.min(tile, W - i), h: Math.min(tile, D - j), color: th.floor[(i / tile + j / tile) % 2] });

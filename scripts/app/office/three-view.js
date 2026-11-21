@@ -10,8 +10,7 @@ import { createTextureBank } from "./textures.js";
 // Mặt phẳng chồng nhau (cửa sổ trên tường, thảm trên sàn) nằm đúng toạ độ; thứ tự phát (như painter của 2D) được giữ
 // bằng polygonOffset — dịch độ sâu, không dịch hình — nên toạ độ lớn (mặt tiền toà nhà) không bị đẩy lệch.
 const MAX_OFFSET_UNITS = 4000;
-const AZ = [0.17, 1.4]; // giới hạn góc xoay ngang (rad): luôn nhìn từ phía hai bức tường mở
-const EL = [0.35, 1.1];
+const EL = [0.06, 1.48]; // xoay ngang 360° tự do; nghiêng dọc từ ngang mắt (~3.5°) tới nhìn thẳng xuống (~85°)
 
 // Màu đã phân tích, dùng lại giữa các khung hình (quy mô lớn có hàng nghìn lệnh mỗi khung — không cấp phát lại).
 const COLORS = new Map();
@@ -109,7 +108,7 @@ class Pool {
   }
 }
 
-export function createThreeView(stage, onTagClick, onHover) {
+export function createThreeView(stage, onTagClick, onHover, onZoom) {
   const canvas = document.createElement("canvas");
   canvas.className = "office-canvas office-3d";
   canvas.setAttribute("role", "img");
@@ -134,7 +133,7 @@ export function createThreeView(stage, onTagClick, onHover) {
   const scene = new THREE.Scene();
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 200);
   const target = new THREE.Vector3(8, 1.3, 6);
-  const view = { az: Math.PI / 4, el: Math.atan(1 / Math.SQRT2), w: 800, h: 540 };
+  const view = { az: Math.PI / 4, el: Math.atan(1 / Math.SQRT2), panX: 0, panZ: 0, w: 800, h: 540 };
   const hemi = new THREE.HemisphereLight(0xffffff, 0x8a8a9a, 1.6);
   scene.add(hemi);
   const fill = new THREE.DirectionalLight(0xcbd5e1, 0.42);
@@ -199,6 +198,10 @@ export function createThreeView(stage, onTagClick, onHover) {
 
   function syncBox(b, glowOn) {
     const m = boxes.next();
+    if ((b.wall === "left" && Math.sin(view.az) < -0.05) || (b.wall === "back" && Math.cos(view.az) < -0.05)) {
+      m.visible = false;
+      return;
+    }
     const shape = b.shape && SHAPES[b.shape] ? b.shape : "box";
     if (m.geometry !== SHAPES[shape]) m.geometry = SHAPES[shape];
     m.userData.pick = b.pick || null;
@@ -219,6 +222,10 @@ export function createThreeView(stage, onTagClick, onHover) {
 
   function syncPanel(f, seq, glowOn) {
     const m = panels.next();
+    if ((f.plane === "left" && f.c <= 0.05 && Math.sin(view.az) < -0.05) || (f.plane === "back" && f.c <= 0.05 && Math.cos(view.az) < -0.05)) {
+      m.visible = false;
+      return;
+    }
     const lift = 0;
     m.material.polygonOffset = true;
     m.material.polygonOffsetFactor = -1;
@@ -345,7 +352,7 @@ export function createThreeView(stage, onTagClick, onHover) {
   function place(zoom, v, plan) {
     // Tâm ở giữa hộp nhìn (kể cả cao độ sàn tầng thượng z0 của toà nhà); khung chiếu khớp đúng 8 góc hộp trong không gian
     // camera — "Tới phòng/tới bàn" luôn nằm trọn trong khung ở mọi góc xoay.
-    target.set((v.x0 + v.x1) / 2, (v.z0 + v.z1) / 2, (v.y0 + v.y1) / 2);
+    target.set((v.x0 + v.x1) / 2 + view.panX, (v.z0 + v.z1) / 2, (v.y0 + v.y1) / 2 + view.panZ);
     const sh = Math.max(plan.W, plan.D) * 0.75 + 4;
     Object.assign(sun.shadow.camera, { left: -sh, right: sh, top: sh, bottom: -sh, far: sh * 4 });
     sun.shadow.camera.updateProjectionMatrix();
@@ -404,20 +411,35 @@ export function createThreeView(stage, onTagClick, onHover) {
     return null;
   }
 
-  // Kéo để xoay (chuột/chạm); bấm trực tiếp vào nhân viên/phòng để phóng tới; mũi tên khi canvas có focus.
+  // Kéo để xoay 360° tự do; Shift+kéo hoặc chuột phải để dời; cuộn chuột để zoom; bấm trực tiếp để tới.
   let drag = null;
   let moved = 0;
   canvas.tabIndex = 0;
+  canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+  canvas.addEventListener("wheel", (e) => {
+    if (!onZoom || e.ctrlKey) return;
+    e.preventDefault();
+    onZoom(e.deltaY < 0 ? 1.12 : 0.89);
+  }, { passive: false });
   canvas.addEventListener("pointerdown", (e) => {
-    drag = { x: e.clientX, y: e.clientY, az: view.az, el: view.el };
+    const pan = e.button === 2 || e.shiftKey;
+    drag = { x: e.clientX, y: e.clientY, az: view.az, el: view.el, panX: view.panX, panZ: view.panZ, pan };
     moved = 0;
     canvas.setPointerCapture(e.pointerId);
   });
   canvas.addEventListener("pointermove", (e) => {
     if (drag) {
-      moved = Math.max(moved, Math.hypot(e.clientX - drag.x, e.clientY - drag.y));
-      view.az = Math.min(AZ[1], Math.max(AZ[0], drag.az - (e.clientX - drag.x) * 0.008));
-      view.el = Math.min(EL[1], Math.max(EL[0], drag.el + (e.clientY - drag.y) * 0.006));
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      moved = Math.max(moved, Math.hypot(dx, dy));
+      if (drag.pan) {
+        const s = 0.025 / Math.max(0.3, curZoom || 1);
+        const cosA = Math.cos(view.az), sinA = Math.sin(view.az);
+        view.panX = drag.panX - (dx * cosA + dy * sinA) * s;
+        view.panZ = drag.panZ - (-dx * sinA + dy * cosA) * s;
+      } else {
+        view.az = drag.az - dx * 0.008;
+        view.el = Math.min(EL[1], Math.max(EL[0], drag.el + dy * 0.006));
+      }
       api.dirty = true;
       if (onHover) onHover(null);
       canvas.dataset.hover = "";
@@ -432,7 +454,7 @@ export function createThreeView(stage, onTagClick, onHover) {
     if (onHover) onHover(null);
   });
   const stop = (e) => {
-    if (drag && moved < 5 && e.type === "pointerup" && onTagClick) {
+    if (drag && !drag.pan && moved < 5 && e.type === "pointerup" && onTagClick) {
       const hit = pickAt(e.clientX, e.clientY);
       if (hit) onTagClick(hit.kind, hit.id);
     }
@@ -445,7 +467,7 @@ export function createThreeView(stage, onTagClick, onHover) {
     const step = { ArrowLeft: [0.1, 0], ArrowRight: [-0.1, 0], ArrowUp: [0, 0.08], ArrowDown: [0, -0.08] }[e.key];
     if (!step) return;
     e.preventDefault();
-    view.az = Math.min(AZ[1], Math.max(AZ[0], view.az + step[0]));
+    view.az = view.az + step[0];
     view.el = Math.min(EL[1], Math.max(EL[0], view.el + step[1]));
     api.dirty = true;
   });
@@ -457,9 +479,16 @@ export function createThreeView(stage, onTagClick, onHover) {
   const api = {
     canvas,
     dirty: true,
+    resetPan() {
+      view.panX = 0;
+      view.panZ = 0;
+      api.dirty = true;
+    },
     resetView() {
       view.az = Math.PI / 4;
       view.el = Math.atan(1 / Math.SQRT2);
+      view.panX = 0;
+      view.panZ = 0;
       api.dirty = true;
     },
     resize(w, h, dpr) {
