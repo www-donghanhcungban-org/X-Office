@@ -14,8 +14,8 @@ import sys
 import tarfile
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
-from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import xt
@@ -294,8 +294,8 @@ class CoordinatorPruneTest(AdapterCase):
         self.served = ""
         self.bad = ""
         self.candidate = None
-        self.enterContext(mock.patch.object(xt.DevPreview, "run", self.fake_run))
-        self.enterContext(mock.patch.object(xt, "_dev_candidate", lambda base: self.candidate))
+        self.enterContext(unittest.mock.patch.object(xt.DevPreview, "run", self.fake_run))
+        self.enterContext(unittest.mock.patch.object(xt, "_dev_candidate", lambda base: self.candidate))
 
     def fake_run(self, argv, env, sink):
         """Deploy/rollback chạy adapter node; smoke đỏ với digest `bad`; digest đọc bản đang phục vụ."""
