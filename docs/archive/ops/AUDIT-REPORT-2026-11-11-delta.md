@@ -1,6 +1,6 @@
 # AUDIT-REPORT — X-Office · 2026-11-11 (delta)
 
-> Mốc quét `454d146..7ca87a6` trên `main` (TEST từ `c9f62ce`, A11Y từ `6acc573`, DATA từ `80566f7`). Sáu cụm reviewer read-only chạy trong một workflow, mỗi 🔴/🟠 một người xác minh độc lập (`reviewer-alt`, effort cao nhất, không nhận lý luận của người tìm), rồi một lượt đo hiệu năng chạy một mình. Kết quả theo ID ở [sổ audit](AUDIT-STATUS.md); kế hoạch sửa: [PLAN-harden-2026-11-11](../autopilot/PLAN-harden-2026-11-11.md) (D-416).
+> Mốc quét `454d146..7ca87a6` trên `main` (TEST từ `c9f62ce`, A11Y từ `6acc573`, DATA từ `80566f7`). Sáu cụm reviewer read-only chạy trong một workflow, mỗi 🔴/🟠 một người xác minh độc lập (`reviewer-alt`, effort cao nhất, không nhận lý luận của người tìm), rồi một lượt đo hiệu năng chạy một mình. Kết quả theo ID ở [sổ audit](../../ops/AUDIT-STATUS.md); kế hoạch sửa: [PLAN-harden-2026-11-11](../../autopilot/PLAN-harden-2026-11-11.md) (D-416).
 
 ## 1. Tóm tắt
 
@@ -70,4 +70,4 @@ Làm ở đợt này (rủi ro thấp, giữ nguyên hành vi): AUD-PERF-027 (`c
 
 ## 6. Kế hoạch sửa
 
-Theo [PLAN-harden-2026-11-11](../autopilot/PLAN-harden-2026-11-11.md): Lát 1 ba 🔴 mới · Lát 2 🟠 mới · Lát 3 bốn 🔴 guard có từ trước (AUD-SEC-606/609/610/611) · Lát 4 tối ưu · Lát 5 nợ còn lại và quét lại ba nhóm. Nợ để PLAN kế (chủ: phiên guard kế, hạn xét 2026-12-31): 🟠 guard có từ trước AUD-SEC-544/545/554/588/591…593/600/604/607/608/612, AUD-HAR-369/371, AUD-DOC-273/274 — `audit check --strict` còn đỏ tới khi trả.
+Theo [PLAN-harden-2026-11-11](../../autopilot/PLAN-harden-2026-11-11.md): Lát 1 ba 🔴 mới · Lát 2 🟠 mới · Lát 3 bốn 🔴 guard có từ trước (AUD-SEC-606/609/610/611) · Lát 4 tối ưu · Lát 5 nợ còn lại và quét lại ba nhóm. Nợ để PLAN kế (chủ: phiên guard kế, hạn xét 2026-12-31): 🟠 guard có từ trước AUD-SEC-544/545/554/588/591…593/600/604/607/608/612, AUD-HAR-369/371, AUD-DOC-273/274 — `audit check --strict` còn đỏ tới khi trả.

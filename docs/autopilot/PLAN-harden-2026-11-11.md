@@ -1,7 +1,7 @@
 # PLAN-harden-2026-11-11.md — harden sau audit delta `454d146..7ca87a6`
 
 > Lập 2026-11-11 theo `/complete` (chủ dự án: "audit và hoàn thiện, tối ưu dự án"). Duyệt: D-416 (phiên chính tự duyệt,
-> ADR-0008). Nguồn: [audit delta 2026-11-11](../ops/AUDIT-REPORT-2026-11-11-delta.md) + `release-check` lần 1 ở
+> ADR-0008). Nguồn: [audit delta 2026-11-11](../archive/ops/AUDIT-REPORT-2026-11-11-delta.md) + `release-check` lần 1 ở
 > `7ca87a6` (NO-GO: `audit`, `review_debt`; chờ người: `go_no_go`). Mỗi lát một PR ≤ 150 dòng, bug có test đỏ trước khi
 > sửa; diff chạm guard/bảo mật: reviewer đối kháng rà trước khi mở PR.
 >
