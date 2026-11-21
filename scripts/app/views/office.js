@@ -79,10 +79,12 @@ export async function render(main, { api, h, error }) {
   const zoomVal = h("span", { class: "office-zoom-val muted" }, Math.round(prefs.zoom * 100) + "%");
   const zoomIn = h("button", { type: "button", class: "office-btn", "aria-label": "Phóng to" }, "+");
   const resetView = h("button", { type: "button", class: "office-btn", title: "Về góc nhìn mặc định" }, "Về giữa");
+  const fullBtn = h("button", { type: "button", class: "office-btn" }, "Toàn màn hình");
   const refresh = h("button", { type: "button" }, "Làm mới");
   // tabindex 0: canvas 2D nhận focus để dời góc nhìn bằng phím mũi tên (thay cho kéo chuột — WCAG 2.1.1).
   const canvas = h("canvas", { class: "office-canvas", role: "img", tabindex: "0", "aria-label": "Văn phòng đang tải" });
-  const stage = h("div", { class: "office-stage" }, canvas);
+  const hoverHud = h("div", { class: "office-hover", "aria-hidden": "true", hidden: true });
+  const stage = h("div", { class: "office-stage" }, canvas, hoverHud);
   // Gợi ý phím hiển thị cho canvas có focus (cả 2D và 3D trỏ tới qua aria-describedby).
   const keys = h("p", { class: "muted office-keys", id: "office-keys" });
   canvas.setAttribute("aria-describedby", "office-keys");
@@ -100,7 +102,7 @@ export async function render(main, { api, h, error }) {
       h("span", null, rendererLabel, rendererSel), h("span", null, scaleLabel, scaleSel), h("span", null, layoutLabel, layoutSel),
       h("span", null, themeLabel, themeSel), h("span", null, seasonLabel, seasonSel), h("span", null, qualityLabel, qualitySel),
       h("span", null, namesBox, namesLabel), h("span", null, npcBox, npcLabel), h("span", null, motionBox, motionLabel),
-      h("span", { class: "office-actions" }, zoomOut, zoomVal, zoomIn, resetView, refresh)),
+      h("span", { class: "office-actions" }, zoomOut, zoomVal, zoomIn, resetView, fullBtn, refresh)),
     rooms, msg, rmsg, stage, keys, counters, summary,
     legend,
     h("h2", null, "Ai đang làm gì"),
@@ -177,8 +179,9 @@ export async function render(main, { api, h, error }) {
 
   function size() {
     dpr = prefs.quality === "low" ? 1 : Math.min(2, window.devicePixelRatio || 1);
+    const full = document.fullscreenElement === stage;
     cssW = Math.max(280, stage.clientWidth || 800);
-    cssH = Math.round(Math.max(300, Math.min(680, cssW * 0.68)));
+    cssH = full ? Math.max(300, stage.clientHeight || window.innerHeight) : Math.round(Math.max(300, Math.min(680, cssW * 0.68)));
     canvas.width = Math.round(cssW * dpr);
     canvas.height = Math.round(cssH * dpr);
     if (three) three.resize(cssW, cssH, dpr);
@@ -276,6 +279,15 @@ export async function render(main, { api, h, error }) {
         three = mod.createThreeView(stage, (kind, id) => {
           if (kind === "room") setFocus(id, null);
           else if (kind === "agent") goSeat(Number(id));
+        }, (hit) => {
+          if (!hit) {
+            hoverHud.hidden = true;
+            return;
+          }
+          hoverHud.textContent = hit.kind === "agent"
+            ? hit.label + " · " + (STATE_TEXT[hit.state] || hit.state) + (hit.task ? " (" + hit.task + ")" : "") + " — bấm tới bàn"
+            : "▸ " + hit.label + " — bấm tới phòng";
+          hoverHud.hidden = false;
         });
         rmsg.replaceChildren();
         canvas.hidden = true;
@@ -290,6 +302,7 @@ export async function render(main, { api, h, error }) {
     } else if (prefs.renderer !== "3d" && three) {
       three.dispose();
       three = null;
+      hoverHud.hidden = true;
       canvas.hidden = false;
     }
     size();
@@ -317,7 +330,7 @@ export async function render(main, { api, h, error }) {
       : "Văn phòng — chưa có dữ liệu agent (đang tải hoặc máy chủ lỗi)."; // không khai "không ai đang làm" khi chưa biết
     canvas.setAttribute("aria-label", text);
     keys.textContent = three
-      ? "Khi khung cảnh có focus: mũi tên xoay góc nhìn; kéo chuột để xoay."
+      ? "Khi khung cảnh có focus: mũi tên xoay góc nhìn; kéo chuột để xoay; bấm nhân viên/phòng để phóng tới."
       : "Khi khung cảnh có focus: mũi tên dời góc nhìn · + / − phóng to, thu nhỏ · 0 về giữa; kéo chuột để dời.";
     if (three) {
       three.canvas.setAttribute("aria-label", text);
@@ -368,6 +381,19 @@ export async function render(main, { api, h, error }) {
     persist();
     setFocus(null, null);
     if (three) three.resetView();
+  });
+  if (!document.fullscreenEnabled || !stage.requestFullscreen) fullBtn.hidden = true;
+  fullBtn.addEventListener("click", () => {
+    if (document.fullscreenElement === stage) document.exitFullscreen?.();
+    else stage.requestFullscreen?.().catch(() => {});
+  });
+  document.addEventListener("fullscreenchange", function onFs() {
+    if (!stage.isConnected) {
+      document.removeEventListener("fullscreenchange", onFs);
+      return;
+    }
+    fullBtn.textContent = document.fullscreenElement === stage ? "Thu lại" : "Toàn màn hình";
+    size();
   });
   // 2D: kéo CHUỘT để dời góc nhìn (chạm/bút: để trang cuộn bình thường); phím mũi tên khi canvas có focus. Dời giới hạn
   // theo cỡ cảnh đã phóng: dời tới mép cảnh, cộng 1/4 khung — luôn còn một phần cảnh trong tầm nhìn ở mọi mức phóng.

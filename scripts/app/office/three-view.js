@@ -109,7 +109,7 @@ class Pool {
   }
 }
 
-export function createThreeView(stage, onTagClick) {
+export function createThreeView(stage, onTagClick, onHover) {
   const canvas = document.createElement("canvas");
   canvas.className = "office-canvas office-3d";
   canvas.setAttribute("role", "img");
@@ -149,6 +149,23 @@ export function createThreeView(stage, onTagClick) {
   sun.shadow.normalBias = 0.025;
   Object.assign(sun.shadow.camera, { left: -16, right: 16, top: 16, bottom: -16, near: 1, far: 60 });
   scene.add(sun, sun.target);
+  const accentA = new THREE.PointLight(0xffffff, 0, 28, 1.4);
+  const accentB = new THREE.PointLight(0xfde68a, 0, 26, 1.4);
+  scene.add(accentA, accentB);
+
+  const P_COUNT = 180;
+  const pPos = new Float32Array(P_COUNT * 3);
+  const pSeed = Array.from({ length: P_COUNT }, (_, i) => [
+    (Math.sin(i * 12.9898) * 43758.5453) % 1,
+    (Math.sin(i * 78.233 + 1) * 43758.5453) % 1,
+    (Math.sin(i * 39.425 + 2) * 43758.5453) % 1,
+  ].map((v) => v - Math.floor(v)));
+  const pGeo = new THREE.BufferGeometry();
+  pGeo.setAttribute("position", new THREE.BufferAttribute(pPos, 3));
+  const pMat = new THREE.PointsMaterial({ size: 0.16, transparent: true, opacity: 0.85, depthWrite: false });
+  const pCloud = new THREE.Points(pGeo, pMat);
+  pCloud.visible = false;
+  scene.add(pCloud);
 
   const boxGeo = new THREE.BoxGeometry(1, 1, 1);
   const textures = createTextureBank(THREE);
@@ -184,6 +201,7 @@ export function createThreeView(stage, onTagClick) {
     const m = boxes.next();
     const shape = b.shape && SHAPES[b.shape] ? b.shape : "box";
     if (m.geometry !== SHAPES[shape]) m.geometry = SHAPES[shape];
+    m.userData.pick = b.pick || null;
     m.position.set(b.x + b.w / 2, b.z + b.h / 2, b.y + b.d / 2);
     m.rotation.set(b.rx || 0, b.rz || 0, b.ry || 0);
     m.scale.set(Math.max(b.w, 0.001), Math.max(b.h, 0.001), Math.max(b.d, 0.001));
@@ -359,20 +377,67 @@ export function createThreeView(stage, onTagClick) {
     camera.updateProjectionMatrix();
   }
 
-  // Kéo để xoay (chuột/chạm); mũi tên trái/phải/lên/xuống khi canvas có focus.
+  let lastPlan = null;
+  let lastZb = 0;
+
+  function pickAt(clientX, clientY) {
+    const r = canvas.getBoundingClientRect();
+    if (!r.width || !r.height) return null;
+    ndc.set(((clientX - r.left) / r.width) * 2 - 1, 1 - ((clientY - r.top) / r.height) * 2);
+    ray.setFromCamera(ndc, camera);
+    const active = [];
+    for (let i = 0; i < boxes.items.length; i++) {
+      const m = boxes.items[i];
+      if (m.visible && m.userData.pick) active.push(m);
+    }
+    const hits = ray.intersectObjects(active, false);
+    if (hits.length) return hits[0].object.userData.pick;
+    if (lastPlan && lastPlan.rooms && lastPlan.rooms.length && ray.ray.direction.y) {
+      const t = (lastZb - ray.ray.origin.y) / ray.ray.direction.y;
+      if (t > 0) {
+        const wx = ray.ray.origin.x + ray.ray.direction.x * t;
+        const wy = ray.ray.origin.z + ray.ray.direction.z * t;
+        const rm = lastPlan.rooms.find((x) => wx >= x.x && wx <= x.x + x.w && wy >= x.y && wy <= x.y + x.d);
+        if (rm) return { kind: "room", id: rm.id, label: rm.name };
+      }
+    }
+    return null;
+  }
+
+  // Kéo để xoay (chuột/chạm); bấm trực tiếp vào nhân viên/phòng để phóng tới; mũi tên khi canvas có focus.
   let drag = null;
+  let moved = 0;
   canvas.tabIndex = 0;
   canvas.addEventListener("pointerdown", (e) => {
     drag = { x: e.clientX, y: e.clientY, az: view.az, el: view.el };
+    moved = 0;
     canvas.setPointerCapture(e.pointerId);
   });
   canvas.addEventListener("pointermove", (e) => {
-    if (!drag) return;
-    view.az = Math.min(AZ[1], Math.max(AZ[0], drag.az - (e.clientX - drag.x) * 0.008));
-    view.el = Math.min(EL[1], Math.max(EL[0], drag.el + (e.clientY - drag.y) * 0.006));
-    api.dirty = true;
+    if (drag) {
+      moved = Math.max(moved, Math.hypot(e.clientX - drag.x, e.clientY - drag.y));
+      view.az = Math.min(AZ[1], Math.max(AZ[0], drag.az - (e.clientX - drag.x) * 0.008));
+      view.el = Math.min(EL[1], Math.max(EL[0], drag.el + (e.clientY - drag.y) * 0.006));
+      api.dirty = true;
+      if (onHover) onHover(null);
+      canvas.dataset.hover = "";
+      return;
+    }
+    const hit = pickAt(e.clientX, e.clientY);
+    canvas.dataset.hover = hit ? "1" : "";
+    if (onHover) onHover(hit);
   });
-  const stop = () => { drag = null; };
+  canvas.addEventListener("pointerleave", () => {
+    canvas.dataset.hover = "";
+    if (onHover) onHover(null);
+  });
+  const stop = (e) => {
+    if (drag && moved < 5 && e.type === "pointerup" && onTagClick) {
+      const hit = pickAt(e.clientX, e.clientY);
+      if (hit) onTagClick(hit.kind, hit.id);
+    }
+    drag = null;
+  };
   canvas.addEventListener("pointerup", stop);
   canvas.addEventListener("pointercancel", stop);
   canvas.addEventListener("keydown", (e) => {
@@ -413,11 +478,43 @@ export function createThreeView(stage, onTagClick) {
       const dark = Boolean(opts.theme.edge || opts.theme.id === "night" || opts.theme.id === "library");
       hemi.intensity = dark ? 1.25 : 1.8;
       sun.intensity = dark ? 1.45 : 1.55;
-      scene.background = parseColor(opts.theme.bg).color;
+      scene.background = textures.sky(opts.theme.bg, opts.theme.glow, dark);
       if (opts.motion && prevT) textures.animate(Math.min(0.1, Math.max(0, (opts.t || 0) - prevT)));
       prevT = opts.t || 0;
       const sink = new Collector();
       const { plan } = compose(sink, opts, false);
+      const zb = plan.levels ? plan.levels * plan.levelH : 0;
+      lastPlan = plan;
+      lastZb = zb;
+      accentA.color.copy(parseColor(opts.theme.glow || "#60a5fa").color);
+      accentA.position.set(plan.W * 0.35, zb + 2.8, plan.D * 0.45);
+      accentA.intensity = glowOn ? (dark ? 2.2 : 0.45) : 0;
+      accentB.color.copy(parseColor(dark ? "#fde68a" : "#bae6fd").color);
+      accentB.position.set(plan.W * 0.78, zb + 3.2, plan.D * 0.72);
+      accentB.intensity = glowOn ? (dark ? 1.8 : 0.35) : 0;
+      const pKind = opts.season === "noel" ? "snow" : opts.theme.ambient;
+      if (opts.motion && pKind && pKind !== "none" && glowOn) {
+        pCloud.visible = true;
+        pMat.color.copy(parseColor(pKind === "rain" ? "#00e5ff" : pKind === "snow" ? "#ffffff" : pKind === "stars" ? "#e0f2fe" : "#fde68a").color);
+        pMat.size = pKind === "snow" || pKind === "rain" ? 0.22 : pKind === "stars" ? 0.2 : 0.14;
+        pMat.opacity = pKind === "dust" ? 0.5 : 0.85;
+        const spanX = plan.W + 8, spanY = plan.D + 8, tNow = opts.t || 0;
+        for (let k = 0; k < P_COUNT; k++) {
+          const [rx, ry, rz] = pSeed[k];
+          const px = -4 + ((rx + (pKind === "rain" ? tNow * 0.15 : 0)) % 1) * spanX + (pKind === "snow" ? Math.sin(tNow * 0.9 + k) * 0.45 : 0);
+          const pz = -4 + ry * spanY;
+          let py;
+          if (pKind === "stars") py = zb + 1.5 + rz * 8;
+          else if (pKind === "dust") py = zb + 0.4 + ((rz + tNow * 0.04) % 1) * 4.5;
+          else py = zb + (1 - ((rz + tNow * (pKind === "rain" ? 0.55 : 0.12)) % 1)) * 7.5;
+          pPos[k * 3] = px;
+          pPos[k * 3 + 1] = py;
+          pPos[k * 3 + 2] = pz;
+        }
+        pGeo.attributes.position.needsUpdate = true;
+      } else {
+        pCloud.visible = false;
+      }
       sink.boxes.forEach((b) => syncBox(b, glowOn));
       sink.panels.forEach((f, i) => syncPanel(f, i + 1, glowOn));
       sink.dots.forEach((d) => {
@@ -464,6 +561,8 @@ export function createThreeView(stage, onTagClick) {
       renderer.dispose();
       renderer.forceContextLoss(); // trả ngữ cảnh WebGL ngay (trình duyệt giới hạn số ngữ cảnh sống)
       textures.dispose();
+      pGeo.dispose();
+      pMat.dispose();
       for (const g of [...Object.values(SHAPES), planeGeo, dotGeo, ringGeo]) g.dispose();
       scene.traverse((o) => {
         if (!o.material) return;
