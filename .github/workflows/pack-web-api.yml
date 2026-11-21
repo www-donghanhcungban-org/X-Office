@@ -80,7 +80,7 @@ jobs:
         case: [clean, tenant-leak, broken-down, contract-runtime, contract-static, contract-request-type]
     services:
       postgres:
-        # Cùng tag + digest với dự án đích hotel-manager (BASE-DEP-008: ghim digest).
+        # Ghim tag + digest (BASE-DEP-008), cùng image với CI nghiệm thu của gói (managed/…/pack-acceptance.yml).
         image: postgres:17.11-trixie@sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3
         env:
           # Không literal mật khẩu (BASE-SEC-005): CSDL rỗng dùng một lần trên runner tạm — xác thực trust.
