@@ -74,17 +74,26 @@ main:focus { outline: none; }
 
 .top {
   border-bottom: 1px solid var(--border);
-  padding: 0.5rem 1rem;
+  padding: 0.6rem 1.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1.25rem;
+  background: var(--background);
 }
-.brand { margin: 0; font-weight: 700; }
+.brand { margin: 0; font-weight: 800; font-size: 1.05rem; letter-spacing: -0.01em; }
 
-nav { display: flex; flex-wrap: wrap; gap: 0.25rem 0.75rem; }
+nav { display: flex; flex-wrap: wrap; gap: 0.25rem 0.4rem; }
 nav a {
-  padding: 0.5rem 0.25rem;
+  padding: 0.35rem 0.65rem;
   text-decoration: none;
-  border-bottom: 3px solid transparent;
+  border-radius: 0.375rem;
+  border-bottom: 2px solid transparent;
+  font-size: 0.925rem;
+  transition: background-color 0.15s ease;
 }
-nav a:hover { text-decoration: underline; }
+nav a:hover { background: var(--muted); text-decoration: none; }
 nav a[aria-current="page"] {
   background: var(--muted);
   color: var(--foreground);
@@ -165,29 +174,76 @@ form.compose select, form.compose button { max-width: 100%; }
 pre.md { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 60vh; overflow: auto; border: 1px solid var(--border); padding: 0.75rem; }
 
 /* F-008 Văn phòng: canvas tự vẽ, thanh tuỳ chọn co theo màn hẹp. */
-.office-bar { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: center; margin: 0.75rem 0; }
-.office-bar > span { display: inline-flex; gap: 0.35rem; align-items: center; }
-.office-bar select { font: inherit; max-width: 100%; }
-.office-stage { position: relative; border: 1px solid var(--border); border-radius: 0.5rem; overflow: hidden; }
+.office-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 1rem;
+  align-items: center;
+  margin: 0.75rem 0;
+  padding: 0.65rem 0.9rem;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 0.625rem;
+}
+.office-bar > span { display: inline-flex; gap: 0.35rem; align-items: center; font-size: 0.9rem; }
+.office-bar select {
+  font: inherit;
+  font-size: 0.875rem;
+  max-width: 100%;
+  padding: 0.25rem 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 0.375rem;
+  background: var(--background);
+  color: var(--foreground);
+}
+.office-actions { gap: 0.35rem; margin-left: auto; }
+.office-btn {
+  background: var(--background);
+  color: var(--foreground);
+  border-color: var(--border);
+  padding: 0.25rem 0.6rem;
+  font-size: 0.875rem;
+}
+.office-btn:hover { border-color: var(--ring); }
+.office-zoom-val { font-size: 0.82rem; font-variant-numeric: tabular-nums; min-width: 2.6rem; text-align: center; }
+.office-stage {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+}
 .office-canvas { cursor: grab; }
 .office-3d { touch-action: none; } /* 3D: kéo (cả chạm) để xoay; 2D để trang cuộn khi chạm */
 .office-canvas:focus-visible { outline-offset: -3px; } /* stage overflow:hidden cắt vòng focus vẽ ngoài canvas */
-.office-rooms { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; margin: 0 0 0.5rem; }
-.office-rooms button { background: var(--muted); color: var(--foreground); border-color: var(--border); padding: 0.2rem 0.6rem; }
+.office-rooms { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; margin: 0 0 0.6rem; }
+.office-rooms button {
+  background: var(--muted);
+  color: var(--foreground);
+  border-color: var(--border);
+  border-radius: 999px;
+  padding: 0.22rem 0.7rem;
+  font-size: 0.875rem;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.office-rooms button:hover { border-color: var(--ring); }
 .office-rooms button[aria-pressed="true"] { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary); }
-.office-counters { font-weight: 600; margin: 0.5rem 0 0; }
+.office-counters { font-weight: 600; margin: 0.6rem 0 0; }
 .office-3d:active { cursor: grabbing; }
 .office-labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .office-tag {
   position: absolute;
   transform: translate(-50%, -100%);
-  padding: 0.1rem 0.5rem;
+  padding: 0.12rem 0.52rem;
   border: 1.5px solid transparent;
-  border-radius: 0.6rem;
+  border-radius: 0.65rem;
   font-size: 0.75rem;
   font-weight: 600;
   white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28);
 }
+.office-tag[data-kind="room"],
+.office-tag[data-kind="agent"] { pointer-events: auto; cursor: pointer; }
 .office-canvas { display: block; width: 100%; height: auto; }
 .office-canvas[hidden] { display: none; }
 .office-state { font-weight: 700; }

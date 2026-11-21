@@ -75,8 +75,10 @@ export async function render(main, { api, h, error }) {
   const rooms = h("div", { class: "office-rooms", role: "group", "aria-label": "Tới phòng" });
   const counters = h("p", { class: "office-counters" });
   const legend = h("p", { class: "muted" });
-  const zoomOut = h("button", { type: "button", "aria-label": "Thu nhỏ" }, "−");
-  const zoomIn = h("button", { type: "button", "aria-label": "Phóng to" }, "+");
+  const zoomOut = h("button", { type: "button", class: "office-btn", "aria-label": "Thu nhỏ" }, "−");
+  const zoomVal = h("span", { class: "office-zoom-val muted" }, Math.round(prefs.zoom * 100) + "%");
+  const zoomIn = h("button", { type: "button", class: "office-btn", "aria-label": "Phóng to" }, "+");
+  const resetView = h("button", { type: "button", class: "office-btn", "aria-label": "Về góc nhìn mặc định" }, "Về giữa");
   const refresh = h("button", { type: "button" }, "Làm mới");
   // tabindex 0: canvas 2D nhận focus để dời góc nhìn bằng phím mũi tên (thay cho kéo chuột — WCAG 2.1.1).
   const canvas = h("canvas", { class: "office-canvas", role: "img", tabindex: "0", "aria-label": "Văn phòng đang tải" });
@@ -98,7 +100,7 @@ export async function render(main, { api, h, error }) {
       h("span", null, rendererLabel, rendererSel), h("span", null, scaleLabel, scaleSel), h("span", null, layoutLabel, layoutSel),
       h("span", null, themeLabel, themeSel), h("span", null, seasonLabel, seasonSel), h("span", null, qualityLabel, qualitySel),
       h("span", null, namesBox, namesLabel), h("span", null, npcBox, npcLabel), h("span", null, motionBox, motionLabel),
-      h("span", null, zoomOut, zoomIn, refresh)),
+      h("span", { class: "office-actions" }, zoomOut, zoomVal, zoomIn, resetView, refresh)),
     rooms, msg, rmsg, stage, keys, counters, summary,
     legend,
     h("h2", null, "Ai đang làm gì"),
@@ -232,6 +234,7 @@ export async function render(main, { api, h, error }) {
 
   // Nút "Tới phòng": Toàn cảnh + mọi phòng của mặt bằng hiện tại (quy mô nhóm nhỏ chỉ có Toàn cảnh).
   function roomButtons() {
+    npcBox.disabled = prefs.scale === "team";
     const plan = planFor(prefs.scale, prefs.layout);
     const list = [{ id: "", name: "Toàn cảnh" }, ...plan.rooms];
     rooms.replaceChildren(h("span", { class: "muted" }, "Tới phòng: "), ...list.map((r) => {
@@ -270,7 +273,10 @@ export async function render(main, { api, h, error }) {
         probe.getExtension("WEBGL_lose_context")?.loseContext();
         const mod = await import("../office/three-view.js");
         if (prefs.renderer !== "3d" || !stage.isConnected) return; // đổi ý / rời màn trong lúc tải
-        three = mod.createThreeView(stage);
+        three = mod.createThreeView(stage, (kind, id) => {
+          if (kind === "room") setFocus(id, null);
+          else if (kind === "agent") goSeat(Number(id));
+        });
         rmsg.replaceChildren();
         canvas.hidden = true;
         three.canvas.setAttribute("aria-label", canvas.getAttribute("aria-label") || "Văn phòng");
@@ -287,6 +293,7 @@ export async function render(main, { api, h, error }) {
       canvas.hidden = false;
     }
     size();
+    frame(performance.now() / 1000);
     label(); // tên + gợi ý phím theo bộ vẽ vừa chọn
   }
 
@@ -348,12 +355,20 @@ export async function render(main, { api, h, error }) {
   }
   const zoomBy = (f) => {
     prefs.zoom = Math.min(4, Math.max(0.5, +(prefs.zoom * f).toFixed(2)));
+    zoomVal.textContent = Math.round(prefs.zoom * 100) + "%";
     persist();
     panTo(view.pan.x, view.pan.y); // thu nhỏ thì biên dời hẹp lại — kẹp lại góc nhìn đang dời
     if (three) three.dirty = true;
   };
   zoomIn.addEventListener("click", () => zoomBy(1.25));
   zoomOut.addEventListener("click", () => zoomBy(0.8));
+  resetView.addEventListener("click", () => {
+    prefs.zoom = 1;
+    zoomVal.textContent = "100%";
+    persist();
+    setFocus(null, null);
+    if (three) three.resetView();
+  });
   // 2D: kéo CHUỘT để dời góc nhìn (chạm/bút: để trang cuộn bình thường); phím mũi tên khi canvas có focus. Dời giới hạn
   // theo cỡ cảnh đã phóng: dời tới mép cảnh, cộng 1/4 khung — luôn còn một phần cảnh trong tầm nhìn ở mọi mức phóng.
   // (3D: three-view.js tự xử lý xoay trên canvas của nó.)
@@ -384,7 +399,7 @@ export async function render(main, { api, h, error }) {
   });
   for (const ev of ["pointerup", "pointercancel"]) canvas.addEventListener(ev, () => { drag = null; });
   refresh.addEventListener("click", load);
-  if (window.ResizeObserver) new ResizeObserver(() => { if (stage.isConnected) size(); }).observe(stage);
+  if (window.ResizeObserver) new ResizeObserver(() => requestAnimationFrame(() => { if (stage.isConnected) size(); })).observe(stage);
 
   roomButtons();
   count(); // trước lần tải đầu: "chưa có dữ liệu" + chú thích theo lựa chọn
