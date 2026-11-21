@@ -123,10 +123,12 @@ function shelf(p, out) {
 
 function sofa(p, out) {
   const c = p.color || "#475569";
-  out.push(box(p.x, p.y, 0, 3.2, 1.2, 0.5, c));
-  out.push(box(p.x, p.y, 0.5, 3.2, 0.35, 0.6, shade(c, -0.1)));
-  out.push(box(p.x, p.y + 0.35, 0.5, 0.35, 0.85, 0.35, c));
-  out.push(box(p.x + 2.85, p.y + 0.35, 0.5, 0.35, 0.85, 0.35, c));
+  out.push(box(p.x, p.y, 0, 3.2, 1.2, 0.48, c));
+  out.push(box(p.x, p.y, 0.48, 3.2, 0.35, 0.58, shade(c, -0.1)));
+  out.push(box(p.x, p.y + 0.35, 0.48, 0.34, 0.85, 0.36, c, { shape: "cyl", rx: Math.PI / 2 }));
+  out.push(box(p.x + 2.86, p.y + 0.35, 0.48, 0.34, 0.85, 0.36, c, { shape: "cyl", rx: Math.PI / 2 }));
+  out.push(box(p.x + 0.52, p.y + 0.36, 0.5, 0.36, 0.24, 0.34, "#f8fafc", { shape: "sphere" }));
+  out.push(box(p.x + 2.32, p.y + 0.36, 0.5, 0.36, 0.24, 0.34, "#fde68a", { shape: "sphere" }));
 }
 
 function lamp(p, out) {
@@ -147,17 +149,18 @@ function rack(p, out, th, t, motion) {
 function counter(p, out) {
   out.push(box(p.x, p.y, 0, 3.4, 1.0, 1.1, "#6f4e37", { top: "#e7d5bd" }));
   out.push(box(p.x + 0.3, p.y + 0.2, 1.1, 0.6, 0.5, 0.7, "#9ca3af"));
-  out.push(box(p.x + 1.4, p.y + 0.3, 1.1, 0.25, 0.25, 0.25, "#ffffff"));
-  out.push(box(p.x + 1.9, p.y + 0.3, 1.1, 0.25, 0.25, 0.25, "#ffffff"));
-  out.push(box(p.x + 2.3, p.y + 0.15, 1.1, 0.9, 0.6, 0.35, "#fde68a"));
+  out.push(box(p.x + 1.4, p.y + 0.3, 1.1, 0.24, 0.24, 0.24, "#ffffff", { shape: "cyl" }));
+  out.push(box(p.x + 1.9, p.y + 0.3, 1.1, 0.24, 0.24, 0.24, "#ffffff", { shape: "cyl" }));
+  out.push(box(p.x + 2.35, p.y + 0.15, 1.1, 0.8, 0.6, 0.42, "#fde68a", { shape: "sphere" }));
 }
 
 function cafetable(p, out, th, t, motion) {
-  out.push(box(p.x + 0.35, p.y + 0.35, 0, 0.1, 0.1, 0.7, "#4b3621"));
-  out.push(box(p.x, p.y, 0.7, 0.8, 0.8, 0.08, "#d9b38c"));
-  out.push(box(p.x + 0.3, p.y + 0.3, 0.78, 0.2, 0.2, 0.2, "#ffffff"));
-  out.push(box(p.x - 0.7, p.y + 0.15, 0, 0.5, 0.5, 0.45, th.chair));
-  out.push(box(p.x + 1.0, p.y + 0.15, 0, 0.5, 0.5, 0.45, th.chair));
+  out.push(box(p.x + 0.22, p.y + 0.22, 0, 0.36, 0.36, 0.06, "#374151", { shape: "cyl" }));
+  out.push(box(p.x + 0.35, p.y + 0.35, 0.06, 0.1, 0.1, 0.64, "#4b3621", { shape: "cyl" }));
+  out.push(box(p.x - 0.08, p.y - 0.08, 0.7, 0.96, 0.96, 0.08, "#d9b38c", { shape: "cyl" }));
+  out.push(box(p.x + 0.3, p.y + 0.3, 0.78, 0.2, 0.2, 0.2, "#ffffff", { shape: "cyl" }));
+  out.push(box(p.x - 0.7, p.y + 0.15, 0, 0.5, 0.5, 0.45, th.chair, { shape: "cyl" }));
+  out.push(box(p.x + 1.0, p.y + 0.15, 0, 0.5, 0.5, 0.45, th.chair, { shape: "cyl" }));
   if (motion) {
     for (let k = 0; k < 3; k++) {
       const z = 1.0 + ((t * 0.6 + k / 3) % 1) * 0.9;
@@ -177,15 +180,13 @@ function consoleDesk(p, out, th, t, motion) {
 }
 
 function holo(p, out, th, t, motion) {
-  out.push(box(p.x, p.y, 0, 1.4, 1.4, 0.6, "#1f2937", { top: shade(p.color, -0.5) }));
+  out.push(box(p.x, p.y, 0, 1.4, 1.4, 0.6, "#1f2937", { shape: "cyl", top: shade(p.color, -0.5) }));
   const spin = motion ? t : 0;
   if (p.planet) {
     out.push({ kind: "orb", x: p.x + 0.7, y: p.y + 0.7, z: 1.5, w: 0, d: 0, h: 0, r: 0.42, color: p.color, ring: spin });
   } else {
-    for (let k = 0; k < 3; k++) {
-      const hgt = 0.4 + 0.3 * Math.abs(Math.sin(spin * 1.5 + k));
-      out.push(box(p.x + 0.25 + k * 0.35, p.y + 0.6, 0.6, 0.2, 0.2, hgt, p.color, { glow: p.color, bias: 0.3 }));
-    }
+    const hover = 0.85 + (motion ? Math.sin(spin * 2) * 0.14 : 0);
+    out.push(box(p.x + 0.38, p.y + 0.38, hover, 0.64, 0.64, 0.64, p.color, { shape: "ico", ry: spin * 0.6, rz: spin, glow: p.color, bias: 0.3 }));
   }
 }
 

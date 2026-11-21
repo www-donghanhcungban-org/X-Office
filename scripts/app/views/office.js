@@ -78,7 +78,7 @@ export async function render(main, { api, h, error }) {
   const zoomOut = h("button", { type: "button", class: "office-btn", "aria-label": "Thu nhỏ" }, "−");
   const zoomVal = h("span", { class: "office-zoom-val muted" }, Math.round(prefs.zoom * 100) + "%");
   const zoomIn = h("button", { type: "button", class: "office-btn", "aria-label": "Phóng to" }, "+");
-  const resetView = h("button", { type: "button", class: "office-btn", "aria-label": "Về góc nhìn mặc định" }, "Về giữa");
+  const resetView = h("button", { type: "button", class: "office-btn", title: "Về góc nhìn mặc định" }, "Về giữa");
   const refresh = h("button", { type: "button" }, "Làm mới");
   // tabindex 0: canvas 2D nhận focus để dời góc nhìn bằng phím mũi tên (thay cho kéo chuột — WCAG 2.1.1).
   const canvas = h("canvas", { class: "office-canvas", role: "img", tabindex: "0", "aria-label": "Văn phòng đang tải" });
@@ -293,7 +293,7 @@ export async function render(main, { api, h, error }) {
       canvas.hidden = false;
     }
     size();
-    frame(performance.now() / 1000);
+    frame(last / 1000);
     label(); // tên + gợi ý phím theo bộ vẽ vừa chọn
   }
 

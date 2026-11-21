@@ -41,6 +41,10 @@ function setMat(mat, str, glow, glowOn) {
     if (glow && glowOn) mat.emissive.copy(parseColor(glow).color).multiplyScalar(0.55);
     else mat.emissive.setRGB(0, 0, 0);
   }
+  if (mat.specular) {
+    mat.shininess = alpha < 1 ? 90 : 24;
+    mat.specular.setHex(alpha < 1 ? 0x94a3b8 : 0x222a36);
+  }
 }
 
 // Bộ thu lệnh vẽ của compose(): giữ nguyên dữ liệu để đồng bộ vào các mesh dùng lại.
@@ -120,6 +124,8 @@ export function createThreeView(stage, onTagClick) {
   sun.target.position.copy(target);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.bias = -0.0008;
+  sun.shadow.normalBias = 0.025;
   Object.assign(sun.shadow.camera, { left: -16, right: 16, top: 16, bottom: -16, near: 1, far: 60 });
   scene.add(sun, sun.target);
 
@@ -135,16 +141,16 @@ export function createThreeView(stage, onTagClick) {
   const planeGeo = new THREE.PlaneGeometry(1, 1);
   const dotGeo = new THREE.SphereGeometry(1, 14, 10);
   const ringGeo = new THREE.TorusGeometry(1, 0.025, 6, 48);
-  const lambert = () => new THREE.MeshLambertMaterial();
+  const phong = () => new THREE.MeshPhongMaterial({ shininess: 24, specular: 0x222a36 });
   const boxes = new Pool(scene, () => {
-    const m = new THREE.Mesh(boxGeo, lambert());
+    const m = new THREE.Mesh(boxGeo, phong());
     m.userData.single = m.material;
-    m.userData.multi = Array.from({ length: 6 }, lambert);
+    m.userData.multi = Array.from({ length: 6 }, phong);
     m.castShadow = m.receiveShadow = true;
     return m;
   });
   const panels = new Pool(scene, () => {
-    const m = new THREE.Mesh(planeGeo, lambert());
+    const m = new THREE.Mesh(planeGeo, phong());
     m.receiveShadow = true;
     return m;
   });
@@ -375,8 +381,8 @@ export function createThreeView(stage, onTagClick) {
     },
     draw(opts) {
       const glowOn = opts.quality !== "low";
-      // Bóng đổ nhân đôi draw call; ở quy mô công ty/tập đoàn (1–2 nghìn mesh) chỉ bật cho nhóm nhỏ để giữ khung hình.
-      const shadows = glowOn && (opts.scale || "team") === "team";
+      // Bóng đổ nhân đôi draw call; bật cho nhóm nhỏ và công ty (tắt ở toà nhà tập đoàn để giữ khung hình).
+      const shadows = glowOn && (opts.scale || "team") !== "corp";
       renderer.shadowMap.enabled = shadows;
       sun.castShadow = shadows;
       const dark = Boolean(opts.theme.edge || opts.theme.id === "night" || opts.theme.id === "library");
