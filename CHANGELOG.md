@@ -105,8 +105,8 @@ Bản < 3.20.0: [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md) (T-3651; `changel
   `--with-office-3d`, `CLAUDE.md` thêm `/factory`.
 - Gói `web-api-ts` (D-9006): quay lui bản dev qua một migration expand không còn hỏng — service `setup` chạy một lần
   (migrate rồi seed; `XT_SKIP_MIGRATE=1` khi rollback), `app` chỉ chạy sau khi `setup` xong và không nhận `XT_DEMO_*`;
-  `dev-preview.mjs` dọn ảnh/compose không còn cần sau mỗi lần `up` (giữ current, previous và hai digest phục vụ gần
-  nhất) và dừng kèm hướng dẫn `down -v` khi mất sổ mật khẩu mà volume DB còn; `pg_isready -h 127.0.0.1`; `seed.mjs`
+  `dev-preview.mjs` dọn ảnh/compose không còn cần sau mỗi lần `up` (giữ digest đang chạy, `previous` và slot trước
+  lần ghi đè do bộ điều phối truyền qua `XT_DEPLOY_KEEP`; thiếu biến này thì không dọn; lỗi dọn không làm deploy hỏng) và dừng kèm hướng dẫn `down -v` khi mất sổ mật khẩu mà volume DB còn; `pg_isready -h 127.0.0.1`; `seed.mjs`
   từ chối `DATABASE_URL` có query/fragment (AUD-DATA-019, AUD-CI-036, AUD-CFG-010). UI notes-ui trả focus sau thao tác,
   đặt thông báo trong từng form kèm `aria-invalid`/`aria-describedby`, viền ô nhập ≥ 3:1 (AUD-A11Y-005). Dự án đã cài
   gói nhận bản sửa khi chạy lại `install.py`; ảnh lưu từ trước vẫn chạy compose cũ.

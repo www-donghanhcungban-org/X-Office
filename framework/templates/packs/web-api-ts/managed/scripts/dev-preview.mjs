@@ -134,38 +134,27 @@ function compose(docker, access, file, image, args, skipMigrate = false) {
 
 const STAGED = /^([a-f0-9]{64})\.(?:image\.tar|image\.tmp|compose\.yaml|compose\.tmp)$/;
 
-// Digests a rollback may still need. The coordinator rewrites the dev slot to {current: null, previous:
-// target} before calling the adapter, so the slot it held before this run is rebuilt from the ledger
-// history: the two most recent distinct digests confirmed as served.
-function retained(...digests) {
+// Digests the ledger may point to once this run is recorded: the candidate, the rollback target and the
+// dev slot as it was before the coordinator rewrote it to {current: null, previous: target}, passed as
+// XT_DEPLOY_KEEP (space separated, empty before the first deploy). Ledger history is not a substitute:
+// after a failed rollback the slot keeps a digest that is no longer among the recently served ones.
+function retained() {
+  const listed = process.env.XT_DEPLOY_KEEP;
+  if (listed === undefined) throw new Error("bộ điều phối không truyền XT_DEPLOY_KEEP");
+  const digests = [process.env.XT_DEPLOY_DIGEST, process.env.XT_DEPLOY_PREVIOUS, ...listed.split(" ")];
   const keep = new Set(digests.filter(Boolean).map(validatedDigest));
-  const ledger = JSON.parse(readFileSync("docs/ops/DEPLOYS.json", "utf8"));
-  const slot = ledger.envs?.dev ?? {};
+  const slot = JSON.parse(readFileSync("docs/ops/DEPLOYS.json", "utf8")).envs?.dev ?? {};
   for (const entry of [slot.current, slot.previous]) {
     if (entry) keep.add(validatedDigest(entry.subject?.digest));
   }
-  const served = [];
-  for (const event of [...(ledger.events ?? [])].reverse()) {
-    if (served.length === 2) break;
-    if (event.env !== "dev" || !["deployed", "rolled_back"].includes(event.result)) continue;
-    const digest = validatedDigest(event.served_digest);
-    if (!served.includes(digest)) served.push(digest);
-  }
-  for (const digest of served) keep.add(digest);
   return keep;
 }
 
-// Best effort after the app is up: removes saved images (≥ 80 MB each), Compose files and image tags no
-// longer reachable by a rollback. Only files named <digest>.<kind> are touched; preview-access.json and
-// coordinator.lock stay. Any doubt about the ledger keeps everything.
-function prune(docker, state, ...digests) {
-  let keep;
-  try {
-    keep = retained(...digests);
-  } catch (error) {
-    console.error(`Bỏ qua dọn ảnh dev cũ: ${error.message}`);
-    return;
-  }
+// Best effort after the app is up (main catches): removes saved images (≥ 80 MB each), Compose files and
+// image tags no longer reachable by a rollback. Only files named <digest>.<kind> are touched;
+// preview-access.json and coordinator.lock stay. Any doubt about the digests to keep keeps everything.
+function prune(docker, state) {
+  const keep = retained();
   for (const name of readdirSync(state)) {
     const match = STAGED.exec(name);
     if (match && !keep.has(match[1])) rmSync(join(state, name), { force: true });
@@ -306,7 +295,12 @@ async function main(action) {
   else stageImage(docker, state, digest);
   const up = ["up", "-d", "--wait", "--wait-timeout", "120", ...(rollback ? ["--pull", "never"] : [])];
   compose(docker, access, join(state, `${digest}.compose.yaml`), imageTag(digest), up, rollback);
-  prune(docker, state, process.env.XT_DEPLOY_DIGEST, process.env.XT_DEPLOY_PREVIOUS);
+  try {
+    prune(docker, state);
+  } catch (error) {
+    // The app is already up: a cleanup failure must not fail the deploy and trigger a rollback.
+    console.error(`Bỏ qua dọn ảnh dev cũ: ${error.message}`);
+  }
 }
 
 main(process.argv[2]).catch((error) => {

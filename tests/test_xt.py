@@ -2298,6 +2298,20 @@ class LedgerArchiveTest(unittest.TestCase):
         text = archive_text([self.FIXED]) + extra + legend
         self.assertEqual(self.ids(text), ["AUD-SEC-001", "AUD-SEC-003"])
 
+    def test_archive_short_finding_row_still_checked(self):
+        """Dòng phát hiện thiếu ô rỗng cuối (6/7 ô) vẫn hiển thị trong GFM: phải bị kiểm `chỉ đã sửa`, ID và đếm — kể cả
+        nằm ngay sau bảng chú giải; dòng chú giải ít ô hơn vẫn bị bỏ."""
+        short = "| AUD-SEC-009 | 🔴 | mở | b | đo được: y | `t` |\n"
+        legend = "\n| Mức | Nghĩa |\n|---|---|\n| 🔴 | chặn |\n"
+        for text in (archive_text([self.FIXED]) + short, archive_text([self.FIXED]) + legend + "\n" + short):
+            with self.subTest(text=text):
+                self.assertEqual(self.ids(text), ["AUD-SEC-001", "AUD-SEC-009"])
+        self.books([], [self.FIXED])
+        (self.d / "AUDIT-STATUS-ARCHIVE.md").write_text(archive_text([self.FIXED]) + short, encoding="utf-8")
+        errors, counts = self.check()
+        self.assertEqual(errors, ["AUD-SEC-009: sổ lưu trữ AUDIT-STATUS-ARCHIVE.md chỉ nhận dòng `đã sửa` (đang `mở`)"])
+        self.assertEqual(counts["lưu trữ"], 2)
+
     def test_no_archive_keeps_counts(self):
         self.books([self.FIXED])
         errors, counts = self.check()

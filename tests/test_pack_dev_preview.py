@@ -10,10 +10,15 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tarfile
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+import xt
 
 PACK = Path(__file__).resolve().parents[1] / "framework/templates/packs/web-api-ts"
 MANAGED = PACK / "managed"
@@ -110,7 +115,8 @@ class AdapterCase(unittest.TestCase):
         }
         (self.repo / "docs/ops/DEPLOYS.json").write_text(json.dumps(data))
 
-    def run_adapter(self, action, digest="", previous="", **extra):
+    def run_adapter(self, action, digest="", previous="", keep="", **extra):
+        """`keep` là XT_DEPLOY_KEEP (slot trước khi bộ điều phối ghi đè); None = không đặt."""
         env = {
             **os.environ,
             "PATH": f"{self.fake}{os.pathsep}{os.environ['PATH']}",
@@ -121,8 +127,11 @@ class AdapterCase(unittest.TestCase):
             "XT_DEPLOY_ARTIFACTS": "dist/app.tgz",
             "XT_DEPLOY_DIGEST": digest,
             "XT_DEPLOY_PREVIOUS": previous,
+            "XT_DEPLOY_KEEP": keep,
             **extra,
         }
+        if keep is None:
+            del env["XT_DEPLOY_KEEP"]
         return subprocess.run(
             [NODE, "scripts/dev-preview.mjs", action], cwd=self.repo, env=env, capture_output=True, text=True
         )
@@ -200,7 +209,7 @@ class PruneTest(AdapterCase):
         access = self.write_access()
         (self.state / "coordinator.lock").write_text("")
         new = self.archive("new")
-        run = self.run_adapter("deploy", new, cur0, FAKE_VOLUME=f"{self.project}_db")
+        run = self.run_adapter("deploy", new, cur0, f"{cur0} {prev0}", FAKE_VOLUME=f"{self.project}_db")
         self.assertEqual(run.returncode, 0, run.stderr)
         keep = {new, cur0, prev0}
         self.assertEqual(self.stored(".image.tar"), keep)
@@ -235,6 +244,116 @@ class PruneTest(AdapterCase):
         self.assertEqual(self.stored(".image.tar"), {kept, new})
         self.assertEqual(self.tags(), {kept, new})
         self.assertFalse([line for line in self.trace() if line.startswith("image rm")])
+
+    def test_slot_passed_by_coordinator_survives_failed_rollback_history(self):
+        """Sau `rollback_failed` rồi deploy N, slot là {N, A} nhưng hai bản phục vụ gần nhất là N, B: A phải còn."""
+        a, b, n = "a" * 64, "b" * 64, self.archive("n")
+        self.plant(a, b, n)
+        self.write_access()
+        # Bộ điều phối đã ghi đè slot {N, A} thành {None, N}; A chỉ còn trong XT_DEPLOY_KEEP.
+        self.ledger(None, n, [("deployed", a), ("deployed", b), ("rollback_failed", None), ("deployed", n)])
+        run = self.run_adapter("deploy", n, n, f"{n} {a}")
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertEqual(self.stored(".image.tar"), {a, n})
+        self.assertEqual(self.tags(), {a, n})
+
+    def test_missing_or_invalid_keep_list_removes_nothing(self):
+        stale = "1" * 64
+        self.plant(stale)
+        self.write_access()
+        new = self.archive("new")
+        for keep in (None, "not-a-digest", f"{stale},{new}"):
+            with self.subTest(keep=keep):
+                run = self.run_adapter("deploy", new, "", keep)
+                self.assertEqual(run.returncode, 0, run.stderr)
+                self.assertIn("Bỏ qua dọn ảnh dev cũ", run.stderr)
+                self.assertEqual(self.stored(".image.tar"), {stale, new})
+                self.assertEqual(self.tags(), {stale, new})
+
+    def test_filesystem_error_while_pruning_does_not_fail_deploy(self):
+        """Dọn là best effort sau khi `up` xong: lỗi fs không được làm deploy thoát 1 (kích quay lui)."""
+        stale = "1" * 64
+        self.write_access()
+        blocker = self.state / f"{stale}.image.tar"
+        blocker.mkdir()
+        (blocker / "inside").write_text("x")
+        new = self.archive("new")
+        run = self.run_adapter("deploy", new, "")
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertIn("Bỏ qua dọn ảnh dev cũ", run.stderr)
+        self.assertTrue((blocker / "inside").exists())
+
+
+@unittest.skipUnless(NODE, "cần node")
+class CoordinatorPruneTest(AdapterCase):
+    """Bộ điều phối thật (`xt._dev_execute`) + adapter thật: sổ không bao giờ trỏ tới ảnh đã bị dọn."""
+
+    def setUp(self):
+        super().setUp()
+        (self.repo / "docs/ops/DEPLOYS.json").unlink()
+        self.served = ""
+        self.bad = ""
+        self.candidate = None
+        self.enterContext(mock.patch.object(xt.DevPreview, "run", self.fake_run))
+        self.enterContext(mock.patch.object(xt, "_dev_candidate", lambda base: self.candidate))
+
+    def fake_run(self, argv, env, sink):
+        """Deploy/rollback chạy adapter node; smoke đỏ với digest `bad`; digest đọc bản đang phục vụ."""
+        action = argv[-1]
+        if action in ("deploy", "rollback"):
+            extra = {
+                "PATH": f"{self.fake}{os.pathsep}{env['PATH']}",
+                "DOCKER_HOST": "unix:///x",
+                "FAKE": str(self.fake),
+            }
+            run = subprocess.run(argv, cwd=self.repo, env={**env, **extra}, capture_output=True, text=True)
+            if run.returncode == 0:
+                self.served = env["XT_DEPLOY_DIGEST" if action == "deploy" else "XT_DEPLOY_PREVIOUS"]
+            return run.returncode
+        if action == "digest":
+            sink.write(f"{self.served}\n".encode())
+        return int(action == "smoke" and self.served == self.bad)
+
+    def deploy(self, label, broken=False):
+        digest = self.archive(label)
+        raw = hashlib.sha256((self.repo / "dist/app.tgz").read_bytes()).hexdigest()
+        identity = {"head": "a" * 40, "content": raw, "digest": digest}
+        self.candidate = (identity, [{"path": "dist/app.tgz", "sha256": raw}])
+        self.bad = digest if broken else ""
+        return digest, xt._dev_execute(self.repo, self.state, 60, False)[0]["result"]
+
+    def rollback(self, broken=""):
+        self.bad = broken
+        return xt._dev_execute(self.repo, self.state, 60, True)[0]["result"]
+
+    def after_failed_rollback(self):
+        """Chuỗi của reviewer: A, B, rollback thủ công đỏ (slot {None, A}), N (slot {N, A}; phục vụ gần nhất N, B)."""
+        (a, _), (b, _) = self.deploy("A"), self.deploy("B")
+        self.assertEqual(self.rollback(broken=a), "rollback_failed")
+        n, result = self.deploy("N")
+        self.assertEqual(result, "deployed")
+        return a, b, n
+
+    def assert_rolls_back_to(self, a, n):
+        self.assertEqual(self.rollback(), "rolled_back")
+        self.assertEqual(self.served, a)
+        self.assertEqual(self.stored(".image.tar"), {a, n})
+        self.assertEqual(self.tags(), {a, n})
+
+    def test_redeploy_same_digest_keeps_previous_after_failed_rollback(self):
+        a, b, n = self.after_failed_rollback()
+        self.assertEqual(self.deploy("N"), (n, "deployed"))
+        self.assertEqual(self.stored(".image.tar"), {a, n})
+        self.assertNotIn(b, self.tags())
+        self.assert_rolls_back_to(a, n)
+
+    def test_failed_smoke_auto_rollback_keeps_previous_after_failed_rollback(self):
+        a, _, n = self.after_failed_rollback()
+        m, result = self.deploy("M", broken=True)
+        self.assertEqual(result, "rolled_back")
+        self.assertEqual(self.served, n)
+        self.assertEqual(self.stored(".image.tar"), {a, n, m})
+        self.assert_rolls_back_to(a, n)
 
 
 class AccessVolumeTest(AdapterCase):
