@@ -112,6 +112,8 @@ Bản < 3.20.0: [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md) (T-3651; `changel
   gói nhận bản sửa khi chạy lại `install.py`; ảnh lưu từ trước vẫn chạy compose cũ.
 - `xt.py audit check` đọc sổ lưu trữ đúng với dòng bảng thụt lề, ví dụ trong code fence, bảng lặp tiêu đề và bảng
   chú giải (AUD-HAR-451).
+- README và `AGENTS.md` mở đầu bằng sản phẩm: X-Office là văn phòng online 3D cho AI agent (màn Văn phòng của `xt.py app`,
+  chạy trên trình duyệt; chưa có dịch vụ nhiều người dùng); bộ khung `xt` chuyển thành mục "Quy trình phát triển đi kèm".
 - X-Office là dự án độc lập, không còn làn đồng bộ X-Templates (D-9007): mọi mô tả "bản phái sinh", "đồng bộ upstream",
   "tên lịch sử X-Templates" đổi thành X-Office ở tài liệu (ADR, research, báo cáo, PLAN, CHANGELOG); `docs/adr/README.md`
   bỏ quy ước dải số tránh va chạm; bỏ `tests/test_docs_history.py` (tiền đề đã đảo). Slug và liên kết GitHub

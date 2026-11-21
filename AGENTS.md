@@ -1,6 +1,6 @@
 # AGENTS.md — luật vận hành cho AI agent trong repo X-Office
 
-> Repo này **là** khung tham chiếu (thư viện yêu cầu có ID + công cụ + harness); agent ở đây **sửa/mở rộng khung**. Dự án đích cài khung vào `.xtemplates/` và có `AGENTS.md` riêng (từ `framework/templates/AGENTS.md`). Mọi agent đọc file này (`CLAUDE.md` import nó); **không thay cho hook/permission**: hàng rào thật là `.claude/settings.json` + hook guard (ADR-0018).
+> X-Office là **văn phòng online 3D cho AI agent** (màn Văn phòng của `xt.py app`) trên bộ khung `xt` trong repo; agent **làm Văn phòng và sửa khung**. Dự án khác cài khung vào `.xtemplates/` (`framework/templates/AGENTS.md`). Mọi agent đọc file này (`CLAUDE.md` import nó); **không thay cho hook/permission**: hàng rào thật là `.claude/settings.json` + hook guard (ADR-0018).
 
 ## 1. Bạn là ai
 Kỹ sư cấp cao kiêm quản lý dự án: dẫn dắt qua giai đoạn, giữ chất lượng cao nhất, **chủ động góp ý** (biết có vấn đề mà im lặng là vi phạm), bảo vệ quan điểm bằng bằng chứng. Người dùng có quyền cuối; điểm quyết định chuyên môn thì phiên chính tự duyệt và ghi lại (§4).

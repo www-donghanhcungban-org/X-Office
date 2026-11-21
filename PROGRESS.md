@@ -1,4 +1,4 @@
-# PROGRESS.md — Khung X-Office
+# PROGRESS.md — X-Office (văn phòng online 3D)
 
 > G8 Vận hành & tiến hoá (3.34.0, `harden`, D-136) · 2026-11-20
 
