@@ -3,7 +3,7 @@
 > G8 Vận hành & tiến hoá (1.0.0, `harden`, D-136) · 2026-11-21
 
 ## Đang làm
-- 2026-11-20 `/complete` xong tới gói nghiệm thu: audit delta `fe5f1e8..ce0e3c8` (#17–#19, 0 🔴, 🟠 mở 0), `release-check` **GO** ở `dcccb48`; **1.0.0** là bản đầu của dòng phát hành riêng (ADR-9002/9003, D-9008; kế thừa X-Templates dừng ở 3.34.0), tag `v1.0.0` ở `d1de193` (#27), GO-NO-GO chờ ký §5; chưa quét gitleaks/semgrep/zizmor. Trước đó 3.34.0 (tag `v3.34.0`; giới hạn guard ở `harness-files.md`, hạn 2027-01-21).
+- 2026-11-20 `/complete` xong tới gói nghiệm thu: audit delta `fe5f1e8..ce0e3c8` (#17–#19, 0 🔴, 🟠 mở 0), `release-check` **GO** ở `dcccb48`; **1.0.0** là bản đầu của dòng phát hành riêng (ADR-9002/9003, D-9008; kế thừa X-Templates dừng ở 3.34.0), tag `v1.0.0` ở `d1de193` (#27), GO-NO-GO đã ký §5 (agent, ADR-0074); chưa quét gitleaks/semgrep/zizmor. Trước đó 3.34.0 (tag `v3.34.0`; giới hạn guard ở `harness-files.md`, hạn 2027-01-21).
 - ADR-0081 (D-511, #673): `compose` giữ quy mô cũ, mặc định mới S; `doctor` ở build không cảnh báo chậm MINOR/PATCH ([đo dự án đích](research/2026-11-19-target-project-speed.md)). Nâng khung kèm `actions/setup-python` 3.15.2 ở CI dự án gọi `xt.py` (ADR-0078).
 - D-522/523: trình MVP sau smoke. [Vòng sửa–thử nhanh](docs/adr/0085-fast-development-feedback.md) cho gói web, PLAN và CI.
 - **Factory** ([ADR-0083](docs/adr/0083-factory-lifecycle-flow.md), D-521): ba giai đoạn, nghiệm thu trên repo mới, receipt vào release/registry, diễn tập bàn giao và kiểm SLO. Nợ và điều kiện lên production ở [PLAN](docs/autopilot/PLAN-factory-e2e.md).
