@@ -26,7 +26,7 @@ Hai lượt dùng scope `staging-isolated`, PostgreSQL dùng một lần và loo
 - [Run đầu](https://github.com/seeker19110/xboss/actions/runs/42436408338) dừng vì symlink dependencies; bản sửa kiểm đích tương đối trong manifest. Hai run cuối qua cài, runtime và upload receipt.
 - **(chưa xác minh)** Next cục bộ từ archive/DB dùng một lần sau migration được báo cáo `verified`; thiếu log/receipt máy đọc, không tính là bằng chứng pilot.
 - [PR #719](https://github.com/seeker19110/xboss/pull/719) chỉ đổi pilot, giữ workflow VPS/release, `deploy.sh`, GO-NO-GO; báo cáo không có deployment Preview/Production cho SHA pilot.
-- X-Office #474 gia cố cổng release: báo cáo 67 test Python 3.14, 38 test Python 3.11 exit 0, coverage dòng/nhánh đổi và CI `quality`/`coverage` đạt; bản vá checkout gốc giữ nguyên. [PR #474](https://github.com/seeker19110/X-Templates/pull/474) · [Run 42436533849](https://github.com/seeker19110/X-Templates/actions/runs/42436533849)
+- X-Office #474 gia cố cổng release: báo cáo 67 test Python 3.14, 38 test Python 3.11 exit 0, coverage dòng/nhánh đổi và CI `quality`/`coverage` đạt; bản vá checkout gốc giữ nguyên. [PR #474](https://github.com/www-donghanhcungban-org/X-Office/pull/474) · [Run 42436533849](https://github.com/www-donghanhcungban-org/X-Office/actions/runs/42436533849)
 
 ## Xác minh lại sau khi gia cố PR
 

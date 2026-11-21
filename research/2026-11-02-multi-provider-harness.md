@@ -12,7 +12,7 @@ updated: 2026-11-03
 > kiểm lại điểm quan trọng cho thiết kế (ADR-0049, khuôn `/research` bước 3). Mọi dữ kiện ghi ngày **2026-11-02**. Điều
 > không mở được nguồn ghi **(chưa xác minh)** — §6. Không đề xuất ở đây; đề xuất ở ADR-0064
 > (`docs/adr/0064-multi-provider-harness.md` của repo khung;
-> <https://github.com/seeker19110/X-Templates/blob/main/docs/adr/0064-multi-provider-harness.md>).
+> <https://github.com/www-donghanhcungban-org/X-Office/blob/main/docs/adr/0064-multi-provider-harness.md>).
 
 ## 1. Kết luận dữ kiện
 

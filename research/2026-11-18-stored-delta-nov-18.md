@@ -40,7 +40,7 @@ Bổ sung cho [đợt 11–16/11](2026-11-16-stored-delta-nov-11-16.md). File n�
 
 **Đề xuất:** chỉ thêm ví dụ vào ID hiện có, không cần ID mới.
 
-**Đối chiếu khung:** [BASE-DEP-006](https://github.com/seeker19110/X-Templates/blob/3cd50cb2e1b1c673ded8a2de6e45c7a093f9dd19/framework/01-baseline/dependencies.md#L43), [FE-BUILD-017](https://github.com/seeker19110/X-Templates/blob/3cd50cb2e1b1c673ded8a2de6e45c7a093f9dd19/framework/07-frontend/build-and-tooling.md#L57), [SEC-INFRA-027](https://github.com/seeker19110/X-Templates/blob/3cd50cb2e1b1c673ded8a2de6e45c7a093f9dd19/framework/12-security/infrastructure-and-network.md#L69), [LOOP-HARNESS-030](https://github.com/seeker19110/X-Templates/blob/3cd50cb2e1b1c673ded8a2de6e45c7a093f9dd19/framework/11-autonomous-loop/harness-files.md#L354).
+**Đối chiếu khung:** [BASE-DEP-006](https://github.com/www-donghanhcungban-org/X-Office/blob/3cd50cb2e1b1c673ded8a2de6e45c7a093f9dd19/framework/01-baseline/dependencies.md#L43), [FE-BUILD-017](https://github.com/www-donghanhcungban-org/X-Office/blob/3cd50cb2e1b1c673ded8a2de6e45c7a093f9dd19/framework/07-frontend/build-and-tooling.md#L57), [SEC-INFRA-027](https://github.com/www-donghanhcungban-org/X-Office/blob/3cd50cb2e1b1c673ded8a2de6e45c7a093f9dd19/framework/12-security/infrastructure-and-network.md#L69), [LOOP-HARNESS-030](https://github.com/www-donghanhcungban-org/X-Office/blob/3cd50cb2e1b1c673ded8a2de6e45c7a093f9dd19/framework/11-autonomous-loop/harness-files.md#L354).
 
 **Liên quan đợt trước:** XT-H-002, XT-H-045; chỉ giữ phần delta nêu trên.
 
@@ -56,7 +56,7 @@ Bổ sung cho [đợt 11–16/11](2026-11-16-stored-delta-nov-11-16.md). File n�
 
 **Đề xuất SHOULD:** Trước khi thêm phụ thuộc, công cụ agent hoặc skill theo tên registry, SHOULD đối chiếu tên gói, owner/repo và domain cài với kênh chính thức trong README hoặc SECURITY.md của dự án, ghi nguồn đối chiếu vào PR; lệnh cài trong tài liệu dự án đích trỏ đúng tên đã đối chiếu. Kiểm fixture: lệnh `npm install omo` trong khi dự án công bố `omo-ai` bị báo lệch.
 
-**Đối chiếu khung:** [BASE-DEP-006](https://github.com/seeker19110/X-Templates/blob/3cd50cb2e1b1c673ded8a2de6e45c7a093f9dd19/framework/01-baseline/dependencies.md#L43), [BASE-DEP-011](https://github.com/seeker19110/X-Templates/blob/3cd50cb2e1b1c673ded8a2de6e45c7a093f9dd19/framework/01-baseline/dependencies.md#L48), [XC-OSS-021](https://github.com/seeker19110/X-Templates/blob/3cd50cb2e1b1c673ded8a2de6e45c7a093f9dd19/framework/18-cross-cutting/open-source-and-community.md#L60).
+**Đối chiếu khung:** [BASE-DEP-006](https://github.com/www-donghanhcungban-org/X-Office/blob/3cd50cb2e1b1c673ded8a2de6e45c7a093f9dd19/framework/01-baseline/dependencies.md#L43), [BASE-DEP-011](https://github.com/www-donghanhcungban-org/X-Office/blob/3cd50cb2e1b1c673ded8a2de6e45c7a093f9dd19/framework/01-baseline/dependencies.md#L48), [XC-OSS-021](https://github.com/www-donghanhcungban-org/X-Office/blob/3cd50cb2e1b1c673ded8a2de6e45c7a093f9dd19/framework/18-cross-cutting/open-source-and-community.md#L60).
 
 **Liên quan đợt trước:** XT-H-123; chỉ giữ phần delta nêu trên.
 
@@ -72,7 +72,7 @@ Bổ sung cho [đợt 11–16/11](2026-11-16-stored-delta-nov-11-16.md). File n�
 
 **Đề xuất:** chỉ thêm ví dụ vào ID hiện có, không cần ID mới.
 
-**Đối chiếu khung:** [CMP-LIC-004](https://github.com/seeker19110/X-Templates/blob/3cd50cb2e1b1c673ded8a2de6e45c7a093f9dd19/framework/16-compliance-privacy/licensing-and-ip.md#L52), [CMP-LIC-022](https://github.com/seeker19110/X-Templates/blob/3cd50cb2e1b1c673ded8a2de6e45c7a093f9dd19/framework/16-compliance-privacy/licensing-and-ip.md#L70).
+**Đối chiếu khung:** [CMP-LIC-004](https://github.com/www-donghanhcungban-org/X-Office/blob/3cd50cb2e1b1c673ded8a2de6e45c7a093f9dd19/framework/16-compliance-privacy/licensing-and-ip.md#L52), [CMP-LIC-022](https://github.com/www-donghanhcungban-org/X-Office/blob/3cd50cb2e1b1c673ded8a2de6e45c7a093f9dd19/framework/16-compliance-privacy/licensing-and-ip.md#L70).
 
 **Liên quan đợt trước:** XT-H-025, XT-H-112; chỉ giữ phần delta nêu trên.
 
@@ -88,7 +88,7 @@ Bổ sung cho [đợt 11–16/11](2026-11-16-stored-delta-nov-11-16.md). File n�
 
 **Đề xuất SHOULD:** Với bộ điều phối khởi chạy agent con (Codex, Claude Code, CLI agent khác), SHOULD giữ khóa dịch vụ ngoài ở phía host và gọi qua tool hoặc proxy chạy ngoài tiến trình agent; môi trường của tiến trình agent chỉ nhận biến cần thiết theo allowlist. Kiểm fixture: in môi trường bên trong tiến trình agent không thấy LINEAR_API_KEY hay token tracker dù bộ điều phối có.
 
-**Đối chiếu khung:** [SEC-AI-007](https://github.com/seeker19110/X-Templates/blob/3cd50cb2e1b1c673ded8a2de6e45c7a093f9dd19/framework/12-security/ai-security.md#L59), [LOOP-HARNESS-022](https://github.com/seeker19110/X-Templates/blob/3cd50cb2e1b1c673ded8a2de6e45c7a093f9dd19/framework/11-autonomous-loop/harness-files.md#L346).
+**Đối chiếu khung:** [SEC-AI-007](https://github.com/www-donghanhcungban-org/X-Office/blob/3cd50cb2e1b1c673ded8a2de6e45c7a093f9dd19/framework/12-security/ai-security.md#L59), [LOOP-HARNESS-022](https://github.com/www-donghanhcungban-org/X-Office/blob/3cd50cb2e1b1c673ded8a2de6e45c7a093f9dd19/framework/11-autonomous-loop/harness-files.md#L346).
 
 **Nguồn triển khai upstream:** [nguồn 1](https://github.com/openai/symphony/blob/be10a1b79df723d6d7612b5651c8522704dafb2e/README.md).
 
@@ -102,7 +102,7 @@ Bổ sung cho [đợt 11–16/11](2026-11-16-stored-delta-nov-11-16.md). File n�
 
 **Đề xuất SHOULD:** Khi công cụ agent nối vào trình duyệt đã đăng nhập (CDP remote debugging, chép cookie), SHOULD dùng profile Chrome riêng chỉ đăng nhập đúng tài khoản cần (ưu tiên tài khoản phụ), chỉ bật trong phiên có người trực, tắt remote debugging sau phiên và ghi danh sách trang được phép. Kiểm: phiên không người trực không khởi được kết nối CDP tới profile chính.
 
-**Đối chiếu khung:** [QA-E2E-030](https://github.com/seeker19110/X-Templates/blob/3cd50cb2e1b1c673ded8a2de6e45c7a093f9dd19/framework/14-testing-quality/e2e-and-accessibility.md#L65), [SEC-AI-007](https://github.com/seeker19110/X-Templates/blob/3cd50cb2e1b1c673ded8a2de6e45c7a093f9dd19/framework/12-security/ai-security.md#L59).
+**Đối chiếu khung:** [QA-E2E-030](https://github.com/www-donghanhcungban-org/X-Office/blob/3cd50cb2e1b1c673ded8a2de6e45c7a093f9dd19/framework/14-testing-quality/e2e-and-accessibility.md#L65), [SEC-AI-007](https://github.com/www-donghanhcungban-org/X-Office/blob/3cd50cb2e1b1c673ded8a2de6e45c7a093f9dd19/framework/12-security/ai-security.md#L59).
 
 **Liên quan đợt trước:** XT-H-005; chỉ giữ phần delta nêu trên.
 
@@ -118,7 +118,7 @@ Bổ sung cho [đợt 11–16/11](2026-11-16-stored-delta-nov-11-16.md). File n�
 
 **Đề xuất:** chỉ sửa chữ hoặc thêm ví dụ vào ID hiện có, không cần ID mới (đính chính 18/11/2026).
 
-**Đối chiếu khung:** [CMP-LIC-004](https://github.com/seeker19110/X-Templates/blob/7cf743fcd5a70137d9bf8b1e355354985ae76697/framework/16-compliance-privacy/licensing-and-ip.md#L52), [CMP-LIC-002](https://github.com/seeker19110/X-Templates/blob/7cf743fcd5a70137d9bf8b1e355354985ae76697/framework/16-compliance-privacy/licensing-and-ip.md#L50).
+**Đối chiếu khung:** [CMP-LIC-004](https://github.com/www-donghanhcungban-org/X-Office/blob/7cf743fcd5a70137d9bf8b1e355354985ae76697/framework/16-compliance-privacy/licensing-and-ip.md#L52), [CMP-LIC-002](https://github.com/www-donghanhcungban-org/X-Office/blob/7cf743fcd5a70137d9bf8b1e355354985ae76697/framework/16-compliance-privacy/licensing-and-ip.md#L50).
 
 **Liên quan đợt trước:** XT-H-134; chỉ giữ phần delta nêu trên.
 
@@ -134,7 +134,7 @@ Bổ sung cho [đợt 11–16/11](2026-11-16-stored-delta-nov-11-16.md). File n�
 
 **Đề xuất:** chỉ sửa chữ hoặc thêm ví dụ vào ID hiện có, không cần ID mới (đính chính 18/11/2026).
 
-**Đối chiếu khung:** [OPS-MAINT-008](https://github.com/seeker19110/X-Templates/blob/7cf743fcd5a70137d9bf8b1e355354985ae76697/framework/15-operations/maintenance-and-lifecycle.md#L45).
+**Đối chiếu khung:** [OPS-MAINT-008](https://github.com/www-donghanhcungban-org/X-Office/blob/7cf743fcd5a70137d9bf8b1e355354985ae76697/framework/15-operations/maintenance-and-lifecycle.md#L45).
 
 **Nguồn triển khai upstream:** [nguồn 1](https://github.com/RasaHQ/rasa/tree/60a3cff9c08183760355b07bd60f5223d8916d6b) · [nguồn 2](https://github.com/ageron/handson-ml/tree/b7051594afbb1d835f5e031af8664c4363878050) · [nguồn 3](https://github.com/ultralytics/yolov5/tree/1e7cf74cb64d719b34f7315aa13eab9e32cde672).
 
@@ -148,7 +148,7 @@ Bổ sung cho [đợt 11–16/11](2026-11-16-stored-delta-nov-11-16.md). File n�
 
 **Đề xuất:** chỉ sửa chữ hoặc thêm ví dụ vào ID hiện có, không cần ID mới (đính chính 18/11/2026).
 
-**Đối chiếu khung:** [AI-APP-021](https://github.com/seeker19110/X-Templates/blob/7cf743fcd5a70137d9bf8b1e355354985ae76697/framework/13-ai-engineering/llm-app-foundations.md#L84), [AI-OBS-009](https://github.com/seeker19110/X-Templates/blob/7cf743fcd5a70137d9bf8b1e355354985ae76697/framework/13-ai-engineering/observability-and-cost.md#L66).
+**Đối chiếu khung:** [AI-APP-021](https://github.com/www-donghanhcungban-org/X-Office/blob/7cf743fcd5a70137d9bf8b1e355354985ae76697/framework/13-ai-engineering/llm-app-foundations.md#L84), [AI-OBS-009](https://github.com/www-donghanhcungban-org/X-Office/blob/7cf743fcd5a70137d9bf8b1e355354985ae76697/framework/13-ai-engineering/observability-and-cost.md#L66).
 
 **Nguồn triển khai upstream:** [nguồn 1](https://github.com/router-for-me/CLIProxyAPI/tree/a5e8f69e56309e1ef6d6872e667da81fdfbce2ce) · [nguồn 2](https://github.com/decolua/9router/tree/1855aa44473e88feac9d3f131b9c0c5fc9706b68) · [nguồn 3](https://github.com/lidge-jun/opencodex/tree/04304da28a2a8c0349f01ad161a58c16dbe8d982).
 

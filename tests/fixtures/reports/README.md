@@ -12,7 +12,7 @@ sinh ngày 2026-11-07 trên Linux (WSL2), Python 3.14.6, venv tạm. Không thê
 | `gitleaks-8.30.1-leak.sarif` | gitleaks 8.30.1 | như trên thêm `--redact`; repo có một dòng `aws_access_key_id = AKIA…` GIẢ ngẫu nhiên |
 | `pip-audit-2.10.1-clean.json` | pip-audit 2.10.1 | `pip-audit --no-deps --disable-pip -r <req> -f json -o <f>` với `idna==3.20` |
 | `pip-audit-2.10.1-vuln.json` | pip-audit 2.10.1 | như trên với `requests==2.19.0` (CVE-2018-18074…; cần mạng); trường `description` thay bằng câu tóm tắt — không chép nguyên văn advisory của bên thứ ba |
-| `codeql-2.27.4-clean.sarif` | CodeQL 2.27.4 | SARIF trích từ [phân tích CI 2166341363](https://api.github.com/repos/seeker19110/X-Templates/code-scanning/analyses/2166341363) |
+| `codeql-2.27.4-clean.sarif` | CodeQL 2.27.4 | SARIF trích từ [phân tích CI 2166341363](https://api.github.com/repos/www-donghanhcungban-org/X-Office/code-scanning/analyses/2166341363) |
 
 Ghi chú sinh:
 - gitleaks dùng cấu hình tối giản một luật `aws-access-key-id` (regex `\b(AKIA[A-Z0-9]{16})\b`): bộ luật mặc định làm

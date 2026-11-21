@@ -39,7 +39,7 @@ Bổ sung cho [đợt 5–8/11](2026-11-10-stored-delta-nov-5-8.md). File này c
 
 **Đề xuất SHOULD:** Khi agent trích token (màu, chữ, spacing) từ ảnh hoặc trang tham chiếu, SHOULD đo màu bằng công cụ tất định trên pixel thật (mã hex, tỉ lệ phủ, vai trò) thay vì để model ước; sau khi dựng, chụp bản dựng và so từng token với số đo, ghi ΔE và ngưỡng đạt; giữ nguồn tham chiếu và giới hạn quyền theo FE-START-005. Kiểm fixture: ảnh có màu nhấn hồng #ff90e8 thì token trích ra không được thành #ec4899; bản dựng lệch nền đen gần (#16151b → #000000) phải FAIL.
 
-**Đối chiếu khung:** [FE-START-005](https://github.com/seeker19110/X-Templates/blob/efa521a64e2c2be2cdd596b7b8fd59bab8029cf0/framework/07-frontend/starter-layouts.md#L45), [UX-DS-014](https://github.com/seeker19110/X-Templates/blob/efa521a64e2c2be2cdd596b7b8fd59bab8029cf0/framework/06-design-ux/design-system-and-tokens.md#L61).
+**Đối chiếu khung:** [FE-START-005](https://github.com/www-donghanhcungban-org/X-Office/blob/efa521a64e2c2be2cdd596b7b8fd59bab8029cf0/framework/07-frontend/starter-layouts.md#L45), [UX-DS-014](https://github.com/www-donghanhcungban-org/X-Office/blob/efa521a64e2c2be2cdd596b7b8fd59bab8029cf0/framework/06-design-ux/design-system-and-tokens.md#L61).
 
 **Nguồn triển khai upstream:** [nguồn 1](https://github.com/zanwei/design-dna/blob/593e39bc9e3652734653bd75544a333d7d43615e/README.md) · [nguồn 2](https://github.com/zanwei/design-dna/blob/593e39bc9e3652734653bd75544a333d7d43615e/SKILL.md).
 
@@ -53,7 +53,7 @@ Bổ sung cho [đợt 5–8/11](2026-11-10-stored-delta-nov-5-8.md). File này c
 
 **Đề xuất SHOULD:** Với dự án dùng công cụ thiết kế có biến (Figma, Penpot), SHOULD giữ một nguồn token/contract trong repo; CI hoặc lệnh định kỳ so biến thiết kế với token code và báo ba trạng thái khớp/lệch/thiếu, lưu báo cáo có ngày; ghi ngược vào file thiết kế chỉ sau khi người duyệt bản chênh và chỉ áp phần chênh. Kiểm fixture: radius/lg 24px trong thiết kế và 20px trong code phải báo lệch; color/muted có ở thiết kế mà thiếu trong code phải báo thiếu.
 
-**Đối chiếu khung:** [UX-DS-018](https://github.com/seeker19110/X-Templates/blob/efa521a64e2c2be2cdd596b7b8fd59bab8029cf0/framework/06-design-ux/design-system-and-tokens.md#L65), [UX-DS-014](https://github.com/seeker19110/X-Templates/blob/efa521a64e2c2be2cdd596b7b8fd59bab8029cf0/framework/06-design-ux/design-system-and-tokens.md#L61).
+**Đối chiếu khung:** [UX-DS-018](https://github.com/www-donghanhcungban-org/X-Office/blob/efa521a64e2c2be2cdd596b7b8fd59bab8029cf0/framework/06-design-ux/design-system-and-tokens.md#L65), [UX-DS-014](https://github.com/www-donghanhcungban-org/X-Office/blob/efa521a64e2c2be2cdd596b7b8fd59bab8029cf0/framework/06-design-ux/design-system-and-tokens.md#L61).
 
 **Liên quan đợt trước:** XT-H-125; chỉ giữ phần delta nêu trên.
 
@@ -69,7 +69,7 @@ Bổ sung cho [đợt 5–8/11](2026-11-10-stored-delta-nov-5-8.md). File này c
 
 **Xử lý:** chỉ thêm ví dụ/fixture vào ID hiện có, không cần ID mới.
 
-**Đối chiếu khung:** [XC-DOCAI-012](https://github.com/seeker19110/X-Templates/blob/efa521a64e2c2be2cdd596b7b8fd59bab8029cf0/framework/18-cross-cutting/docs-for-ai-agents.md#L54), [OPS-MAINT-015](https://github.com/seeker19110/X-Templates/blob/efa521a64e2c2be2cdd596b7b8fd59bab8029cf0/framework/15-operations/maintenance-and-lifecycle.md#L52), [WF-DOC-019](https://github.com/seeker19110/X-Templates/blob/efa521a64e2c2be2cdd596b7b8fd59bab8029cf0/framework/10-workflow/documentation-workflow.md#L63).
+**Đối chiếu khung:** [XC-DOCAI-012](https://github.com/www-donghanhcungban-org/X-Office/blob/efa521a64e2c2be2cdd596b7b8fd59bab8029cf0/framework/18-cross-cutting/docs-for-ai-agents.md#L54), [OPS-MAINT-015](https://github.com/www-donghanhcungban-org/X-Office/blob/efa521a64e2c2be2cdd596b7b8fd59bab8029cf0/framework/15-operations/maintenance-and-lifecycle.md#L52), [WF-DOC-019](https://github.com/www-donghanhcungban-org/X-Office/blob/efa521a64e2c2be2cdd596b7b8fd59bab8029cf0/framework/10-workflow/documentation-workflow.md#L63).
 
 **Liên quan đợt trước:** XT-H-095; chỉ giữ phần delta nêu trên.
 
@@ -85,7 +85,7 @@ Bổ sung cho [đợt 5–8/11](2026-11-10-stored-delta-nov-5-8.md). File này c
 
 **Xử lý:** chỉ thêm ví dụ/fixture vào ID hiện có, không cần ID mới.
 
-**Đối chiếu khung:** [UX-A11Y-006](https://github.com/seeker19110/X-Templates/blob/efa521a64e2c2be2cdd596b7b8fd59bab8029cf0/framework/06-design-ux/accessibility.md#L44), [FE-FORM-004](https://github.com/seeker19110/X-Templates/blob/efa521a64e2c2be2cdd596b7b8fd59bab8029cf0/framework/07-frontend/forms-and-validation.md#L43), [PRF-MOB-011](https://github.com/seeker19110/X-Templates/blob/efa521a64e2c2be2cdd596b7b8fd59bab8029cf0/framework/02-profiles/mobile-app.md#L71).
+**Đối chiếu khung:** [UX-A11Y-006](https://github.com/www-donghanhcungban-org/X-Office/blob/efa521a64e2c2be2cdd596b7b8fd59bab8029cf0/framework/06-design-ux/accessibility.md#L44), [FE-FORM-004](https://github.com/www-donghanhcungban-org/X-Office/blob/efa521a64e2c2be2cdd596b7b8fd59bab8029cf0/framework/07-frontend/forms-and-validation.md#L43), [PRF-MOB-011](https://github.com/www-donghanhcungban-org/X-Office/blob/efa521a64e2c2be2cdd596b7b8fd59bab8029cf0/framework/02-profiles/mobile-app.md#L71).
 
 **Nguồn triển khai upstream:** [nguồn 1](https://github.com/evondev/evondevKit/blob/5a892ceac93d1bb286391663eb01cbd011706886/README.vi.md) · [nguồn 2](https://github.com/evondev/evondevKit/blob/5a892ceac93d1bb286391663eb01cbd011706886/NEXT.md).
 
@@ -99,7 +99,7 @@ Bổ sung cho [đợt 5–8/11](2026-11-10-stored-delta-nov-5-8.md). File này c
 
 **Xử lý:** chỉ thêm ví dụ/fixture vào ID hiện có, không cần ID mới.
 
-**Đối chiếu khung:** [SEC-SUPPLY-026](https://github.com/seeker19110/X-Templates/blob/efa521a64e2c2be2cdd596b7b8fd59bab8029cf0/framework/12-security/supply-chain.md#L72).
+**Đối chiếu khung:** [SEC-SUPPLY-026](https://github.com/www-donghanhcungban-org/X-Office/blob/efa521a64e2c2be2cdd596b7b8fd59bab8029cf0/framework/12-security/supply-chain.md#L72).
 
 **Liên quan đợt trước:** XT-H-123; chỉ giữ phần delta nêu trên.
 
@@ -115,7 +115,7 @@ Bổ sung cho [đợt 5–8/11](2026-11-10-stored-delta-nov-5-8.md). File này c
 
 **Xử lý:** chỉ thêm ví dụ/fixture vào ID hiện có, không cần ID mới.
 
-**Đối chiếu khung:** [LOOP-DESIGN-006](https://github.com/seeker19110/X-Templates/blob/efa521a64e2c2be2cdd596b7b8fd59bab8029cf0/framework/11-autonomous-loop/loop-design.md#L67), [LOOP-CTX-006](https://github.com/seeker19110/X-Templates/blob/efa521a64e2c2be2cdd596b7b8fd59bab8029cf0/framework/11-autonomous-loop/context-and-token-budget.md#L73).
+**Đối chiếu khung:** [LOOP-DESIGN-006](https://github.com/www-donghanhcungban-org/X-Office/blob/efa521a64e2c2be2cdd596b7b8fd59bab8029cf0/framework/11-autonomous-loop/loop-design.md#L67), [LOOP-CTX-006](https://github.com/www-donghanhcungban-org/X-Office/blob/efa521a64e2c2be2cdd596b7b8fd59bab8029cf0/framework/11-autonomous-loop/context-and-token-budget.md#L73).
 
 **Nguồn triển khai upstream:** [nguồn 1](https://arxiv.org/abs/2608.21884) · [nguồn 2](https://arxiv.org/abs/2611.06946).
 
