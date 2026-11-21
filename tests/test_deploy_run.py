@@ -6,9 +6,8 @@ import os
 import subprocess
 import sys
 import tempfile
-import unittest
+import unittest.mock
 from pathlib import Path
-from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from test_xt_cli import TmpRepoCase, run_main, xt
@@ -63,7 +62,7 @@ class DevPreviewCommandTest(TmpRepoCase):
         self.fake.write_text("#!" + sys.executable + "\n" + FAKE_NODE, encoding="utf-8")
         self.fake.chmod(0o700)
         self.enterContext(
-            mock.patch.dict(
+            unittest.mock.patch.dict(
                 os.environ,
                 {
                     "CLAUDE_PROJECT_DIR": str(self.repo),
@@ -165,7 +164,7 @@ class DevPreviewCommandTest(TmpRepoCase):
         self.assertIn("chưa có", self.error("rollback", "--env", "dev"))
         (self.dist.parent / "app.tgz.sha256").write_text("a" * 64)
         self.assertIn("sidecar", self.error("run", "--env", "dev"))
-        with mock.patch.object(xt, "_release_artifacts", return_value=(None, [])):
+        with unittest.mock.patch.object(xt, "_release_artifacts", return_value=(None, [])):
             self.assertIn("dist/app", self.error("run", "--env", "dev"))
         for before, after, message in [
             ("smoke_dev: node scripts/dev-preview.mjs smoke", 'smoke_dev: ""', "adapter"),
@@ -176,9 +175,9 @@ class DevPreviewCommandTest(TmpRepoCase):
             (self.repo / "xt.yaml").write_text(CONFIG.replace(before, after))
             self.assertIn(message, self.error("run", "--env", "dev"))
         (self.repo / "xt.yaml").write_text(CONFIG)
-        with mock.patch.dict(os.environ, {"XT_DEPLOY_TIMEOUT": "0"}):
+        with unittest.mock.patch.dict(os.environ, {"XT_DEPLOY_TIMEOUT": "0"}):
             self.assertIn("XT_DEPLOY_TIMEOUT", self.error("run", "--env", "dev"))
-        with mock.patch.object(xt, "guard_blocks", return_value=["", "", "RULE_DENY", ""]):
+        with unittest.mock.patch.object(xt, "guard_blocks", return_value=["", "", "RULE_DENY", ""]):
             self.assertIn("RULE_DENY", self.error("run", "--env", "dev", rc=126))
         (self.repo / "scripts/dev-preview.mjs").unlink()
         self.assertIn("thiếu", self.error("run", "--env", "dev"))
@@ -188,9 +187,9 @@ class DevPreviewCommandTest(TmpRepoCase):
     def test_concurrent_and_ambiguous_state_refused(self):
         with xt._dev_lock(self.repo):
             self.error("run", "--env", "dev")
-        with mock.patch.object(xt, "_fcntl", return_value=None):
+        with unittest.mock.patch.object(xt, "_fcntl", return_value=None):
             self.assertIn("flock", self.error("run", "--env", "dev"))
-        with mock.patch.object(xt, "_git_tree", return_value=None):
+        with unittest.mock.patch.object(xt, "_git_tree", return_value=None):
             self.assertIn("checkout", self.error("run", "--env", "dev"))
         self.state.rename(self.state.with_name("elsewhere"))
         self.state.symlink_to(self.state.with_name("elsewhere"))
@@ -203,7 +202,9 @@ class DevPreviewCommandTest(TmpRepoCase):
 
     def test_interrupted_command_does_not_leave_a_false_current(self):
         a = self.call()
-        with mock.patch.object(xt.DevPreview, "invoke", side_effect=[({"exit_code": 0}, None), KeyboardInterrupt]):
+        with unittest.mock.patch.object(
+            xt.DevPreview, "invoke", side_effect=[({"exit_code": 0}, None), KeyboardInterrupt]
+        ):
             with self.assertRaises(KeyboardInterrupt):
                 xt._dev_execute(self.repo, self.state, 5, False)
         slot = self.call("status")["envs"]["dev"]
@@ -213,11 +214,11 @@ class DevPreviewCommandTest(TmpRepoCase):
         self.assertEqual(self.call("rollback")["result"], "rolled_back")
 
     def test_candidate_failure_and_runner_metadata(self):
-        with mock.patch.object(
+        with unittest.mock.patch.object(
             xt, "_release_subject", return_value=({"head": None, "content": None, "digest": None}, "error")
         ):
             self.assertIn("định danh", self.error("run", "--env", "dev"))
-        with mock.patch.dict(
+        with unittest.mock.patch.dict(
             os.environ, {"GITHUB_ACTIONS": "true", "GITHUB_RUN_ID": "17", "GITHUB_REPOSITORY": "owner/name"}
         ):
             a = self.call()
@@ -230,7 +231,10 @@ class DevPreviewCommandTest(TmpRepoCase):
         driver = xt.DevPreview(self.repo, self.state, 1, {"digest": "a" * 64}, "")
         with tempfile.TemporaryFile() as sink:
             self.assertEqual(driver.run(["/missing-dev-preview-executable"], {}, sink, sink), 127)
-            with mock.patch.object(xt, "_stop_group") as stop, mock.patch.object(subprocess, "Popen") as spawn:
+            with (
+                unittest.mock.patch.object(xt, "_stop_group") as stop,
+                unittest.mock.patch.object(subprocess, "Popen") as spawn,
+            ):
                 spawn.return_value.wait.side_effect = subprocess.TimeoutExpired("fixture", 1)
                 self.assertEqual(driver.run(["node"], {}, sink, sink), 124)
                 stop.assert_called_once_with(spawn.return_value)
@@ -317,14 +321,13 @@ class AdapterSaidTest(unittest.TestCase):
         self.assertEqual(self.said(b"x" + exact), ["b" * xt.DEV_STDERR_CHARS])
 
     def test_pem_longer_than_window_masked(self):
-        body = b"".join(b"MIIE" + str(i % 10).encode() * 60 + b"\n" for i in range(140))
-        pem = b"-----BEGIN PRIVATE KEY-----\n" + body + b"-----END PRIVATE KEY-----\n"
+        # dấu PEM ghép lúc chạy (như tests/test_xt.py, test_stage.py): gitleaks không bắt khoá giả trong mã nguồn
+        begin, end = "-----BEGIN " + "PRIVATE KEY-----\n", "-----END " + "PRIVATE KEY-----\n"
+        rsa_begin, rsa_end = "-----BEGIN " + "RSA PRIVATE KEY-----\n", "-----END " + "RSA PRIVATE KEY-----\n"
+        body = "".join("MIIE" + str(i % 10) * 60 + "\n" for i in range(140))
+        pem = (begin + body + end).encode()
         self.assertGreater(len(pem), xt.DEV_STDERR_BYTES)
         self.assertEqual(self.said(pem), [xt.PEM_MASK])
-        tail = self.said(
-            b"truoc\n" + pem + b"sau khoa\n-----BEGIN RSA PRIVATE KEY-----\nAAAA\n-----END RSA PRIVATE KEY-----\n"
-        )
+        tail = self.said(b"truoc\n" + pem + b"sau khoa\n" + (rsa_begin + "AAAA\n" + rsa_end).encode())
         self.assertEqual(tail, [xt.PEM_MASK, "sau khoa", xt.PEM_MASK])
-        self.assertEqual(
-            self.said(b"-----BEGIN PRIVATE KEY-----\nMIIE\n-----END PRIVATE KEY-----\nok\n"), [xt.PEM_MASK, "ok"]
-        )
+        self.assertEqual(self.said((begin + "MIIE\n" + end + "ok\n").encode()), [xt.PEM_MASK, "ok"])

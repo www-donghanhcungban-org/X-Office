@@ -2370,11 +2370,14 @@ class LedgerArchiveTest(unittest.TestCase):
         self.status.write_text(audit_status_text(findings=[]), encoding="utf-8")
         (self.d / "AUDIT-STATUS-ARCHIVE.md").write_text(text, encoding="utf-8")
         errors, counts = self.check()
+        mismatch = (
+            "AUDIT-STATUS-ARCHIVE.md: `## Phát hiện`: bảng khác tiêu đề bảng chính (`| ID | Mức | Trạng thái | Tóm tắt"
+            " | Bằng chứng | Gate | Ghi chu |`) — dòng vẫn kiểm theo cột của bảng chính; sửa tiêu đề cho khớp"
+        )
         self.assertEqual(
             errors,
             [
-                "AUDIT-STATUS-ARCHIVE.md: `## Phát hiện`: bảng khác tiêu đề bảng chính (`| ID | Mức | Trạng thái | Tóm tắt"
-                " | Bằng chứng | Gate | Ghi chu |`) — dòng vẫn kiểm theo cột của bảng chính; sửa tiêu đề cho khớp",
+                mismatch,
                 "AUD-SEC-002: sổ lưu trữ AUDIT-STATUS-ARCHIVE.md chỉ nhận dòng `đã sửa` (đang `mở`)",
                 "AUD-SEC-001: ID trùng 2 lần",
             ],
