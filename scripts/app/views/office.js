@@ -79,6 +79,7 @@ export async function render(main, { api, h, error }) {
   const zoomVal = h("span", { class: "office-zoom-val muted" }, Math.round(prefs.zoom * 100) + "%");
   const zoomIn = h("button", { type: "button", class: "office-btn", "aria-label": "Phóng to" }, "+");
   const resetView = h("button", { type: "button", class: "office-btn", title: "Về góc nhìn mặc định" }, "Về giữa");
+  const projBtn = h("button", { type: "button", class: "office-btn", "aria-pressed": "true", hidden: true }, "Phối cảnh 3D");
   const fullBtn = h("button", { type: "button", class: "office-btn" }, "Toàn màn hình");
   const refresh = h("button", { type: "button" }, "Làm mới");
   // tabindex 0: canvas 2D nhận focus để dời góc nhìn bằng phím mũi tên (thay cho kéo chuột — WCAG 2.1.1).
@@ -102,7 +103,7 @@ export async function render(main, { api, h, error }) {
       h("span", null, rendererLabel, rendererSel), h("span", null, scaleLabel, scaleSel), h("span", null, layoutLabel, layoutSel),
       h("span", null, themeLabel, themeSel), h("span", null, seasonLabel, seasonSel), h("span", null, qualityLabel, qualitySel),
       h("span", null, namesBox, namesLabel), h("span", null, npcBox, npcLabel), h("span", null, motionBox, motionLabel),
-      h("span", { class: "office-actions" }, zoomOut, zoomVal, zoomIn, resetView, fullBtn, refresh)),
+      h("span", { class: "office-actions" }, zoomOut, zoomVal, zoomIn, resetView, projBtn, fullBtn, refresh)),
     rooms, msg, rmsg, stage, keys, counters, summary,
     legend,
     h("h2", null, "Ai đang làm gì"),
@@ -294,10 +295,13 @@ export async function render(main, { api, h, error }) {
         });
         rmsg.replaceChildren();
         canvas.hidden = true;
+        projBtn.hidden = false;
+        projBtn.setAttribute("aria-pressed", String(three.perspective()));
         three.canvas.setAttribute("aria-label", canvas.getAttribute("aria-label") || "Văn phòng");
       } catch (e) {
         three = null;
         prefs.renderer = rendererSel.value = "2d";
+        projBtn.hidden = true;
         persist(); // không thử lại 3D mỗi lần mở màn
         rmsg.replaceChildren(h("p", { class: "state error", role: "alert" },
           "Không bật được 3D (" + ((e && e.message) || "WebGL không khả dụng") + ") — dùng bản 2D. Ở dự án đích, bản 3D cần cài bằng `install.py --with-office-3d`."));
@@ -306,6 +310,7 @@ export async function render(main, { api, h, error }) {
       three.dispose();
       three = null;
       hoverHud.hidden = true;
+      projBtn.hidden = true;
       canvas.hidden = false;
     }
     size();
@@ -386,6 +391,12 @@ export async function render(main, { api, h, error }) {
     persist();
     setFocus(null, null);
     if (three) three.resetView();
+  });
+  projBtn.addEventListener("click", () => {
+    if (!three) return;
+    const next = !three.perspective();
+    three.setPerspective(next);
+    projBtn.setAttribute("aria-pressed", String(next));
   });
   if (!document.fullscreenEnabled || !stage.requestFullscreen) fullBtn.hidden = true;
   fullBtn.addEventListener("click", () => {

@@ -9,7 +9,7 @@ import { planFor } from "./plans.js";
 import { STATE_TEXT, roomLabelAt, wallSegments } from "./scene.js";
 import { buildHumanRig, animateHumanRig } from "./human3d.js";
 import {
-  buildBench, buildBollard, buildFence, buildFlowerbed, buildPlant,
+  buildBench, buildBollard, buildCar, buildFence, buildFlowerbed, buildInstancedLawn, buildPlant,
   buildPool, buildRock, buildSeasonTree, buildStreetlamp, buildTree, buildUmbrella,
 } from "./nature3d.js";
 
@@ -271,6 +271,10 @@ export function createMaterialBank(THREE, textures, glowOn) {
     shadow,
     caustics,
     sunbeam,
+    own(m) {
+      owned.push(m);
+      return m;
+    },
     dispose() {
       for (const m of owned) m.dispose();
       owned.length = 0;
@@ -358,6 +362,48 @@ function buildOutdoor(THREE, sceneAssets, natureAssets, mats, plan, anim) {
   group.add(buildRock(THREE, natureAssets, mats, 42.2, 18.8, 0.75));
   group.add(buildStreetlamp(THREE, natureAssets, mats, { x: 2.5, y: plan.D + 1.4 }));
   group.add(buildStreetlamp(THREE, natureAssets, mats, { x: 7.4, y: plan.D + 1.4 }));
+
+  // Cỏ 3D & hoa dại thật quanh khuôn viên sân vườn (InstancedMesh)
+  group.add(buildInstancedLawn(THREE, natureAssets, mats, {
+    x0: -1.0, x1: plan.W + pad - 1.2, y0: plan.D + 0.2, y1: plan.D + pad - 1.2, count: 280, flowers: 38,
+  }, [[2.4, plan.D - 0.5, 7.6, plan.D + pad + 1], [8.0, plan.D, 32.0, plan.D + 1.5]]));
+
+  // Vỉa hè bê tông + đại lộ nhựa + vạch qua đường + 2 xe ô tô điện bóng clearcoat đỗ gọn trước văn phòng
+  const streetZ = plan.D + pad;
+  const swMat = mats.standard("#dedad2", { roughness: 0.82, tex: "sidewalk", normal: 0.55 });
+  const roadMat = mats.standard("#ffffff", { roughness: 0.78, tex: "road", normal: 0.65 });
+  const curbCol = mats.standard("#a8a29e", { roughness: 0.8, tex: "stone", normal: 0.45 });
+  const swW = plan.W + pad + 12;
+  const swX = (plan.W + pad - 1.5) / 2;
+
+  const sidewalk = new THREE.Mesh(g.unitPlane, swMat);
+  sidewalk.rotation.x = -Math.PI / 2;
+  sidewalk.position.set(swX, -0.008, streetZ + 1.15);
+  sidewalk.scale.set(swW, 2.3, 1);
+  sidewalk.receiveShadow = true;
+  group.add(sidewalk);
+  addBox(THREE, group, g.unitBox, curbCol, swX, 0.05, streetZ + 2.32, swW, 0.14, 0.18, false, true);
+
+  const road = new THREE.Mesh(g.unitPlane, roadMat);
+  road.rotation.x = -Math.PI / 2;
+  road.position.set(swX, -0.028, streetZ + 5.9);
+  road.scale.set(swW, 7.2, 1);
+  road.receiveShadow = true;
+  group.add(road);
+
+  // Vạch kẻ người đi bộ qua đường thẳng trục lối vào sảnh
+  const stripeMat = mats.standard("#f1f5f9", { roughness: 0.72, polygonOffset: true, offsetUnits: -2 });
+  for (let k = 0; k < 5; k++) {
+    const st = new THREE.Mesh(g.unitPlane, stripeMat);
+    st.rotation.x = -Math.PI / 2;
+    st.position.set(3.4 + k * 0.8, -0.015, streetZ + 5.9);
+    st.scale.set(0.42, 4.8, 1);
+    group.add(st);
+  }
+
+  // Hai xe ô tô điện hiện đại sơn bóng clearcoat đỗ ven đường (không che tầm nhìn sảnh)
+  group.add(buildCar(THREE, natureAssets, mats, { x: 14.5, y: streetZ + 3.85, color: "#f1f5f9", rotY: 0 }));
+  group.add(buildCar(THREE, natureAssets, mats, { x: 28.5, y: streetZ + 3.85, color: "#0284c7", rotY: Math.PI }));
   return group;
 }
 
@@ -551,52 +597,80 @@ function buildArchitecture(THREE, sceneAssets, mats, plan, th, cutaway, anim) {
     wg.add(gl);
     cutaway.back.add(wg);
 
-    // Vệt nắng tự nhiên từ cửa sổ hắt dài xuống sàn nhà (ArchViz daylight realism)
+    // Vệt nắng tự nhiên trên sàn + tia nắng khối (volumetric light shaft) xiên qua cửa sổ
     if (th.window === "sky" || th.window === "garden" || th.window === "street" || th.window === "dusk") {
       const beamCol = th.window === "dusk" ? "#fdba74" : "#fff7dc";
-      const beam = new THREE.Mesh(g.unitPlane, mats.sunbeam(beamCol, th.window === "dusk" ? 0.22 : 0.28));
+      const beam = new THREE.Mesh(g.unitPlane, mats.sunbeam(beamCol, th.window === "dusk" ? 0.24 : 0.3));
       beam.rotation.x = -Math.PI / 2;
       beam.position.set(a + w / 2 + 0.45, 0.013, 1.85);
       beam.scale.set(w * 1.04, 3.2, 1);
       floorGroup.add(beam);
+
+      const shaft = new THREE.Mesh(g.unitPlane, mats.sunbeam(beamCol, 0.1));
+      shaft.position.set(a + w / 2 + 0.35, 1.55, 1.25);
+      shaft.rotation.set(-0.62, 0.12, 0);
+      shaft.scale.set(w * 0.96, 3.3, 1);
+      cutaway.back.add(shaft);
     }
   }
 
-  // Tranh nghệ thuật hiện đại & đồng hồ tối giản gắn tường tạo không gian sống động
+  // Hệ đèn LED thanh treo trần kiến trúc (tự ẩn khi nhìn góc thẳng đứng từ trên xuống)
+  if (cutaway.ceiling) {
+    const darkTheme = Boolean(th.edge || th.id === "night" || th.id === "library");
+    const fixMat = mats.standard("#18181b", { roughness: 0.35, metalness: 0.72 });
+    const wireMat = mats.standard("#475569", { roughness: 0.4, metalness: 0.8 });
+    const ledCol = th.edge ? th.glow : (darkTheme ? "#fef08a" : "#fffbeb");
+    const ledMat = mats.standard(ledCol, { roughness: 0.1, emissive: ledCol, emissiveIntensity: darkTheme ? 1.55 : 1.15 });
+    const bars = plan.W <= 20
+      ? [[4.5, 2.0, 7.2], [4.5, 7.0, 5.2]]
+      : [[10.0, 12.2, 12.0], [22.0, 12.2, 10.0], [19.0, 3.7, 6.2]];
+    for (const [bx, bz, blen] of bars) {
+      addBox(THREE, cutaway.ceiling, g.unitBox, fixMat, bx, H - 0.52, bz, blen, 0.065, 0.14, false, false);
+      addBox(THREE, cutaway.ceiling, g.unitBox, ledMat, bx, H - 0.56, bz, blen - 0.1, 0.025, 0.1, false, false);
+      for (const sx of [-blen * 0.38, blen * 0.38]) {
+        addBox(THREE, cutaway.ceiling, g.unitCyl, wireMat, bx + sx, H - 0.25, bz, 0.015, 0.5, 0.015, false, false);
+      }
+    }
+  }
+
+  // Tranh nghệ thuật hiện đại & đồng hồ kim chạy thật gắn tường
   const artFrame = mats.standard("#1e293b", { roughness: 0.35, metalness: 0.5 });
   const addArt = (parent, x, y, z, ry, idx, w = 1.05, h = 0.85) => {
     const ag = new THREE.Group();
     ag.position.set(x, y, z);
     ag.rotation.y = ry;
     addBox(THREE, ag, g.unitBox, artFrame, 0, 0, 0, w + 0.09, h + 0.09, 0.04, false, true);
-    const canvas = new THREE.Mesh(g.unitPlane, mats.standard("#ffffff", { roughness: 0.42, tex: "art:" + idx }));
+    const canvas = new THREE.Mesh(g.unitPlane, mats.standard("#ffffff", { roughness: 0.36, tex: "art:" + idx }));
     canvas.position.z = 0.024;
     canvas.scale.set(w, h, 1);
     ag.add(canvas);
     parent.add(ag);
   };
   if (plan.W <= 20) {
-    // Nhóm nhỏ: đồng hồ treo tường + tranh tường bên trái
+    // Nhóm nhỏ: đồng hồ treo tường có kim giây quay thật + tranh tường bên trái
     const clk = new THREE.Group();
     clk.position.set(4.5, 2.7, 0.04);
-    const rim = new THREE.Mesh(g.unitCyl, mats.standard("#334155", { roughness: 0.25, metalness: 0.8 }));
+    const rim = new THREE.Mesh(g.unitCyl, mats.standard("#334155", { roughness: 0.22, metalness: 0.85 }));
     rim.rotation.x = Math.PI / 2;
     rim.scale.set(0.54, 0.05, 0.54);
-    const face = new THREE.Mesh(g.unitCyl, mats.standard("#ffffff", { roughness: 0.3, tex: "clock" }));
+    const face = new THREE.Mesh(g.unitCyl, mats.standard("#ffffff", { roughness: 0.28, tex: "clock" }));
     face.rotation.x = Math.PI / 2;
     face.position.z = 0.022;
     face.scale.set(0.48, 0.02, 0.48);
-    clk.add(rim, face);
+    const secPivot = new THREE.Group();
+    secPivot.position.z = 0.036;
+    addBox(THREE, secPivot, g.unitBox, mats.standard("#ef4444", { roughness: 0.3 }), 0, 0.08, 0, 0.012, 0.18, 0.008, false, false);
+    if (anim && anim.clockHands) anim.clockHands.push(secPivot);
+    clk.add(rim, face, secPivot);
     cutaway.back.add(clk);
     addArt(cutaway.left, 0.04, 2.35, 6.4, Math.PI / 2, 0, 1.15, 0.88);
     addArt(cutaway.left, 0.04, 2.35, 7.9, Math.PI / 2, 1, 1.15, 0.88);
   } else {
-    // Công ty / Tập đoàn: tranh nghệ thuật phòng Giám đốc, phòng Pantry & tường hành lang + đồng hồ
+    // Công ty / Tập đoàn: tranh nghệ thuật phòng Giám đốc, phòng Pantry & tường hành lang + lam gỗ
     addArt(cutaway.back, 8.6, 2.35, 0.04, 0, 0, 0.95, 0.82);
     addArt(cutaway.back, 33.8, 2.35, 0.04, 0, 1, 1.05, 0.82);
     addArt(cutaway.left, 0.04, 2.35, 7.2, Math.PI / 2, 2, 1.25, 0.92);
-    // Lam gỗ trang trí kiến trúc sau lưng Giám đốc
-    const slatMat = mats.standard("#784820", { roughness: 0.55, tex: "wood" });
+    const slatMat = mats.standard("#784820", { roughness: 0.52, tex: "wood", normal: 0.45 });
     for (let s = 0; s < 6; s++) addBox(THREE, cutaway.back, g.unitBox, slatMat, 12.6 + s * 0.18, 1.95, 0.04, 0.07, 3.6, 0.05, false, true);
   }
 
@@ -1296,9 +1370,10 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
   const zb = plan.levels ? plan.levels * plan.levelH : 0;
   const mats = createMaterialBank(THREE, textures, glowOn);
 
+  const dark = Boolean(th.edge || th.id === "night" || th.id === "library");
   const root = new THREE.Group();
-  const cutaway = { left: new THREE.Group(), back: new THREE.Group() };
-  const anim = { trees: [], floaters: [], blinkers: [], steam: [], spinners: [], bars: [] };
+  const cutaway = { left: new THREE.Group(), back: new THREE.Group(), ceiling: new THREE.Group() };
+  const anim = { trees: [], floaters: [], blinkers: [], steam: [], spinners: [], bars: [], waters: [], clockHands: [] };
   const rigs = [];
   const agentStations = [];
 
@@ -1308,23 +1383,26 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
   const floorRoot = new THREE.Group();
   floorRoot.position.y = zb;
   root.add(floorRoot);
-  floorRoot.add(cutaway.left, cutaway.back);
+  floorRoot.add(cutaway.left, cutaway.back, cutaway.ceiling);
   floorRoot.add(buildArchitecture(THREE, sceneAssets, mats, plan, th, cutaway, anim));
 
   const props = plan.props || th.props;
   for (const p of props) {
     const obj = buildProp(THREE, sceneAssets, natureAssets, mats, {
-      ...p, iv: p.kind === "bed" && plan.props ? false : p.iv,
+      ...p, dark, glowOn, iv: p.kind === "bed" && plan.props ? false : p.iv,
     }, th, plan, cutaway, anim);
     if (obj) floorRoot.add(obj);
   }
-  // Bồn hoa rực rỡ điểm xuyết ngay trong khu Vườn & hồ bơi (Công ty / Tập đoàn)
+  // Bồn hoa rực rỡ + đèn trụ + thảm cỏ 3D & hoa dại thật ngay trong khu Vườn & hồ bơi
   if (plan.rooms && plan.rooms.some((r) => r.id === "garden")) {
     floorRoot.add(buildFlowerbed(THREE, natureAssets, mats, 30.8, 9.2, "#f43f5e"));
     floorRoot.add(buildFlowerbed(THREE, natureAssets, mats, 31.2, 13.0, "#facc15"));
     floorRoot.add(buildFlowerbed(THREE, natureAssets, mats, 40.4, 18.8, "#a855f7"));
     floorRoot.add(buildBollard(THREE, natureAssets, mats, 32.1, 14.4));
     floorRoot.add(buildBollard(THREE, natureAssets, mats, 41.2, 14.4));
+    floorRoot.add(buildInstancedLawn(THREE, natureAssets, mats, {
+      x0: 30.4, x1: 43.6, y0: 8.4, y1: 21.6, count: 340, flowers: 48,
+    }, [[32.3, 8.9, 41.7, 14.7], [40.8, 10.6, 43.8, 13.8]]));
   }
 
   // 5 bàn agent thật
@@ -1422,6 +1500,12 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
         const h = 0.35 + 0.65 * (motion ? Math.abs(Math.sin(t * 0.9 + br.phase)) : ((br.phase % 3) / 3));
         br.mesh.scale.y = h;
         br.mesh.position.y = br.baseY + h / 2;
+      }
+      for (const wm of anim.waters) {
+        wm.uniforms.uTime.value = motion ? t : 1.4;
+      }
+      for (const ch of anim.clockHands) {
+        ch.rotation.z = -(motion ? t * (Math.PI * 2 / 60) : 0.85);
       }
     },
     dispose() {

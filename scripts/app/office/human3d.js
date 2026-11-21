@@ -16,18 +16,61 @@ const OUTFIT = [
   { top: "#9d174d", inner: "#fdf2f8", pants: "#1f2937", blazer: true },
 ];
 
-export function createHumanAssets(THREE) {
-  // Biên dạng đầu giải phẫu (LatheGeometry): cằm thon → má → thái dương → đỉnh đầu.
-  const headPts = [
-    [0.0, 0.0], [0.055, 0.012], [0.105, 0.05], [0.136, 0.105], [0.15, 0.17],
-    [0.154, 0.235], [0.145, 0.295], [0.112, 0.342], [0.055, 0.365], [0.0, 0.372],
-  ].map(([r, y]) => new THREE.Vector2(r, y));
+// Tạo lưới đầu giải phẫu điêu khắc (hốc mắt, cung mày, gò má, sống mũi liền khối, xương hàm & cằm thon)
+function buildSculptedHeadGeo(THREE) {
+  const geo = new THREE.SphereGeometry(0.155, 32, 24);
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    let x = pos.getX(i);
+    let y = pos.getY(i);
+    let z = pos.getZ(i);
+    x *= 0.94;
+    y *= 1.15;
+    z *= 1.02;
+    // Thon gọn dần về xương hàm và cằm
+    if (y < -0.02) {
+      const t = Math.min(1, (-y - 0.02) / 0.16);
+      x *= 1 - t * 0.28;
+      if (z < 0) z *= 1 + t * 0.05;
+    }
+    if (z < -0.05) {
+      const front = Math.min(1, (-z - 0.05) / 0.09);
+      const ax = Math.abs(x);
+      // Cung mày nổi nhẹ
+      const brow = Math.exp(-Math.pow((y - 0.048) / 0.03, 2) - Math.pow(ax / 0.095, 2));
+      z -= brow * 0.011 * front;
+      // Hốc mắt lõm tự nhiên để nhãn cầu nằm sâu dưới cung mày
+      const sock = Math.exp(-Math.pow((ax - 0.054) / 0.027, 2) - Math.pow((y - 0.01) / 0.024, 2));
+      z += sock * 0.014 * front;
+      // Gò má đầy ấm áp
+      const cheek = Math.exp(-Math.pow((ax - 0.075) / 0.038, 2) - Math.pow((y + 0.026) / 0.032, 2));
+      z -= cheek * 0.009 * front;
+      x += Math.sign(x) * cheek * 0.005 * front;
+      // Sống mũi & đầu mũi liền khối tự nhiên
+      const bridge = Math.exp(-Math.pow(ax / 0.021, 2) - Math.pow((y + 0.014) / 0.04, 2));
+      const tip = Math.exp(-Math.pow(ax / 0.018, 2) - Math.pow((y + 0.034) / 0.018, 2));
+      z -= (bridge * 0.016 + tip * 0.022) * front;
+    }
+    pos.setXYZ(i, x, y + 0.188, z);
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
 
+export function createHumanAssets(THREE) {
   // Biên dạng thân người (LatheGeometry): eo → ngực → vai rộng → cổ áo.
   const torsoPts = [
     [0.0, 0.0], [0.155, 0.015], [0.168, 0.11], [0.182, 0.24], [0.205, 0.38],
     [0.215, 0.47], [0.175, 0.525], [0.085, 0.555], [0.0, 0.56],
   ].map(([r, y]) => new THREE.Vector2(r, y));
+
+  // Lọn tóc uốn cong điêu khắc (dùng xếp lớp mái & đỉnh đầu tự nhiên)
+  const lockCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(-0.075, 0.03, 0.02),
+    new THREE.Vector3(-0.01, 0.045, -0.02),
+    new THREE.Vector3(0.065, 0.005, -0.032),
+    new THREE.Vector3(0.11, -0.04, -0.01),
+  ]);
 
   // Đệm ghế bo góc (ExtrudeGeometry)
   const seatShape = new THREE.Shape();
@@ -59,9 +102,9 @@ export function createHumanAssets(THREE) {
   ]);
 
   const geos = {
-    head: new THREE.LatheGeometry(headPts, 22),
-    torso: new THREE.LatheGeometry(torsoPts, 20),
-    neck: new THREE.CylinderGeometry(0.062, 0.072, 0.13, 14),
+    head: buildSculptedHeadGeo(THREE),
+    torso: new THREE.LatheGeometry(torsoPts, 22),
+    neck: new THREE.CylinderGeometry(0.062, 0.074, 0.14, 16),
     hip: new THREE.SphereGeometry(0.19, 16, 12),
     upperArm: new THREE.CapsuleGeometry(0.058, 0.22, 6, 12),
     shoulderCap: new THREE.SphereGeometry(0.072, 12, 10),
@@ -70,22 +113,21 @@ export function createHumanAssets(THREE) {
     shin: new THREE.CapsuleGeometry(0.062, 0.29, 6, 12),
     shoe: new THREE.CapsuleGeometry(0.056, 0.12, 6, 12),
     sole: new THREE.BoxGeometry(0.115, 0.026, 0.245),
-    hand: new THREE.SphereGeometry(0.048, 12, 10),
-    ear: new THREE.SphereGeometry(0.036, 10, 8),
-    nose: new THREE.ConeGeometry(0.022, 0.052, 10),
-    eye: new THREE.SphereGeometry(0.022, 12, 10),
-    iris: new THREE.CircleGeometry(0.013, 12),
-    pupil: new THREE.CircleGeometry(0.007, 10),
-    glint: new THREE.CircleGeometry(0.0035, 8),
+    hand: new THREE.SphereGeometry(0.042, 12, 10),
+    finger: new THREE.CapsuleGeometry(0.0085, 0.036, 4, 6),
+    ear: new THREE.SphereGeometry(0.036, 12, 10),
+    eye: new THREE.SphereGeometry(0.022, 14, 12),
+    iris: new THREE.CircleGeometry(0.015, 16),
     lid: new THREE.SphereGeometry(0.0245, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.56),
-    brow: new THREE.CapsuleGeometry(0.008, 0.042, 4, 8),
-    lip: new THREE.CapsuleGeometry(0.009, 0.044, 4, 8),
+    brow: new THREE.CapsuleGeometry(0.0075, 0.044, 4, 8),
+    lip: new THREE.CapsuleGeometry(0.0095, 0.042, 4, 8),
     glassRim: new THREE.TorusGeometry(0.038, 0.0042, 8, 20),
     glassLens: new THREE.CircleGeometry(0.036, 16),
     glassBridge: new THREE.CylinderGeometry(0.0038, 0.0038, 0.03, 6),
     glassTemple: new THREE.CylinderGeometry(0.0035, 0.0035, 0.15, 6),
-    hairCrown: new THREE.SphereGeometry(0.165, 20, 16),
-    hairFringe: new THREE.CapsuleGeometry(0.038, 0.145, 6, 12),
+    hairCrown: new THREE.SphereGeometry(0.165, 22, 16),
+    hairLock: new THREE.TubeGeometry(lockCurve, 12, 0.026, 8, false),
+    hairFringe: new THREE.CapsuleGeometry(0.036, 0.145, 6, 12),
     hairSide: new THREE.CapsuleGeometry(0.028, 0.095, 4, 10),
     hairBack: new THREE.CapsuleGeometry(0.148, 0.16, 6, 14),
     hairBun: new THREE.SphereGeometry(0.07, 12, 10),
@@ -293,54 +335,50 @@ export function buildHumanRig(THREE, assets, mats, opts) {
   neck.position.set(0, 0.055, 0);
   head.add(neck);
 
-  const skull = new THREE.Mesh(g.head, skinMat);
+  // Đầu điêu khắc phủ vân da mặt 512px (ửng hồng má, bóng hốc mắt, sống mũi, vi kết cấu da)
+  const faceMat = mats.physical("#ffffff", {
+    roughness: 0.54, metalness: 0.0, sheen: 0.4, sheenRoughness: 0.7, sheenColor: "#ffb396", tex: "face:" + skinCol,
+  });
+  const skull = new THREE.Mesh(g.head, faceMat);
   skull.position.set(0, 0.085, 0);
-  skull.scale.set(0.95, 1.0, 1.03);
   skull.castShadow = skull.receiveShadow = true;
   head.add(skull);
 
   for (const side of [-1, 1]) {
     const ear = new THREE.Mesh(g.ear, skinMat);
-    ear.position.set(side * 0.145, 0.245, 0.005);
-    ear.scale.set(0.65, 1.25, 0.85);
+    ear.position.set(side * 0.145, 0.255, 0.008);
+    ear.scale.set(0.62, 1.24, 0.85);
     head.add(ear);
   }
 
-  // Mũi, mắt, đồng tử, ánh sáng mắt, mí mắt chớp, lông mày, môi
-  const nose = new THREE.Mesh(g.nose, skinMat);
-  nose.position.set(0, 0.228, -0.152);
-  nose.rotation.x = -Math.PI / 2 - 0.14;
-  head.add(nose);
-
-  const irisMat = mats.standard(irisCol, { roughness: 0.18, metalness: 0.1 });
+  // Mắt có vân mống mắt tỏa tia chi tiết + giác mạc bóng clearcoat + mí mắt chớp + lông mày + môi
+  const irisMat = mats.physical("#ffffff", { roughness: 0.06, clearcoat: 1.0, clearcoatRoughness: 0.03, tex: "iris:" + irisCol });
   const eyelids = [];
+  const eyeballs = [];
   for (const side of [-1, 1]) {
-    const ex = side * 0.054, ey = 0.268, ez = -0.136;
+    const ex = side * 0.052, ey = 0.278, ez = -0.132;
+    const eyePivot = new THREE.Group();
+    eyePivot.position.set(ex, ey, ez);
     const eye = new THREE.Mesh(g.eye, whiteMat);
-    eye.position.set(ex, ey, ez);
     const iris = new THREE.Mesh(g.iris, irisMat);
-    iris.position.set(ex, ey, ez - 0.022);
+    iris.position.set(0, 0, -0.0222);
     iris.rotation.y = Math.PI;
-    const pupil = new THREE.Mesh(g.pupil, darkMat);
-    pupil.position.set(ex, ey, ez - 0.023);
-    pupil.rotation.y = Math.PI;
-    const glint = new THREE.Mesh(g.glint, whiteMat);
-    glint.position.set(ex - 0.005, ey + 0.006, ez - 0.0238);
-    glint.rotation.y = Math.PI;
+    eyePivot.add(eye, iris);
+    eyeballs.push(eyePivot);
 
     const lid = new THREE.Mesh(g.lid, skinMat);
     lid.position.set(ex, ey, ez);
-    lid.rotation.x = 0.56; // mở tự nhiên về phía +z; xoay về -0.28 khi chớp mắt
+    lid.rotation.x = 0.56;
     eyelids.push(lid);
 
     const brow = new THREE.Mesh(g.brow, hairMat);
-    brow.position.set(ex, ey + 0.042, ez - 0.008);
+    brow.position.set(ex, ey + 0.04, ez - 0.01);
     brow.rotation.set(0, 0, Math.PI / 2 + side * 0.08);
-    head.add(eye, iris, pupil, glint, lid, brow);
+    head.add(eyePivot, lid, brow);
   }
 
   const lip = new THREE.Mesh(g.lip, lipMat);
-  lip.position.set(0, 0.165, -0.145);
+  lip.position.set(0, 0.178, -0.145);
   lip.rotation.z = Math.PI / 2;
   head.add(lip);
 
@@ -350,17 +388,17 @@ export function buildHumanRig(THREE, assets, mats, opts) {
     const lensMat = mats.physical("#e0f2fe", { roughness: 0.05, clearcoat: 1, transparent: true, opacity: 0.18, depthWrite: false });
     for (const side of [-1, 1]) {
       const rim = new THREE.Mesh(g.glassRim, frameMat);
-      rim.position.set(side * 0.056, 0.268, -0.165);
+      rim.position.set(side * 0.054, 0.278, -0.165);
       const lens = new THREE.Mesh(g.glassLens, lensMat);
-      lens.position.set(side * 0.056, 0.268, -0.165);
+      lens.position.set(side * 0.054, 0.278, -0.165);
       lens.rotation.y = Math.PI;
       const temple = new THREE.Mesh(g.glassTemple, frameMat);
-      temple.position.set(side * 0.118, 0.268, -0.09);
+      temple.position.set(side * 0.118, 0.278, -0.09);
       temple.rotation.set(Math.PI / 2, 0, side * 0.15);
       head.add(rim, lens, temple);
     }
     const bridge = new THREE.Mesh(g.glassBridge, frameMat);
-    bridge.position.set(0, 0.272, -0.166);
+    bridge.position.set(0, 0.282, -0.166);
     bridge.rotation.z = Math.PI / 2;
     head.add(bridge);
   }
@@ -373,13 +411,21 @@ export function buildHumanRig(THREE, assets, mats, opts) {
   crown.castShadow = true;
   head.add(crown);
 
-  // Tóc mái trước trán & tóc mai hai bên thái dương (tránh lộ trán cao giả)
+  // Tóc mái uốn lượn điêu khắc từng lọn + tóc mai hai bên thái dương
   const fringe = new THREE.Mesh(g.hairFringe, hairMat);
-  fringe.position.set(hStyle % 2 ? -0.025 : 0.025, 0.365, -0.112);
-  fringe.rotation.set(0.18, hStyle % 2 ? 0.16 : -0.16, Math.PI / 2 + (hStyle % 2 ? 0.14 : -0.14));
+  fringe.position.set(hStyle % 2 ? -0.02 : 0.02, 0.375, -0.106);
+  fringe.rotation.set(0.18, hStyle % 2 ? 0.15 : -0.15, Math.PI / 2 + (hStyle % 2 ? 0.14 : -0.14));
   fringe.scale.set(1.0, 1.05, 0.85);
   fringe.castShadow = true;
   head.add(fringe);
+
+  for (let l = 0; l < 3; l++) {
+    const lock = new THREE.Mesh(g.hairLock, hairMat);
+    lock.position.set((l - 1) * 0.045, 0.378 + (l === 1 ? 0.015 : 0), -0.088);
+    lock.rotation.set(0.1, (hStyle % 2 ? 1 : -1) * 0.25 + (l - 1) * 0.22, (l - 1) * 0.12);
+    lock.castShadow = true;
+    head.add(lock);
+  }
 
   for (const side of [-1, 1]) {
     const sb = new THREE.Mesh(g.hairSide, hairMat);
@@ -494,11 +540,24 @@ export function buildHumanRig(THREE, assets, mats, opts) {
       elbow.add(watch);
     }
 
-    const hand = new THREE.Mesh(g.hand, skinMat);
-    hand.position.set(0, -0.075, -0.32);
-    hand.scale.set(0.95, 0.65, 1.25);
-    hand.castShadow = true;
-    elbow.add(hand);
+    // Bàn tay có lòng bàn tay + 4 ngón tay hơi khum & ngón cái đặt tự nhiên lên bàn phím
+    const handGroup = new THREE.Group();
+    handGroup.position.set(0, -0.072, -0.305);
+    const palm = new THREE.Mesh(g.hand, skinMat);
+    palm.scale.set(0.96, 0.56, 1.12);
+    palm.castShadow = true;
+    handGroup.add(palm);
+    for (let f = 0; f < 4; f++) {
+      const fin = new THREE.Mesh(g.finger, skinMat);
+      fin.position.set((f - 1.5) * 0.018, -0.01, -0.048);
+      fin.rotation.x = Math.PI / 2 + 0.32;
+      handGroup.add(fin);
+    }
+    const thumb = new THREE.Mesh(g.finger, skinMat);
+    thumb.position.set(-side * 0.036, -0.008, -0.018);
+    thumb.rotation.set(Math.PI / 2 + 0.1, 0, side * 0.55);
+    handGroup.add(thumb);
+    elbow.add(handGroup);
 
     return { shoulder, elbow };
   }
@@ -507,7 +566,7 @@ export function buildHumanRig(THREE, assets, mats, opts) {
   const rightArm = makeArm(1);
 
   tagPick(root, pick);
-  return { root, swivel, body, chest, head, eyelids, leftArm, rightArm, micLed, index: i, state: seat ? seat.state : "idle" };
+  return { root, swivel, body, chest, head, eyelids, eyeballs, leftArm, rightArm, micLed, index: i, state: seat ? seat.state : "idle" };
 }
 
 export function animateHumanRig(rig, t, motion, state) {
@@ -539,10 +598,14 @@ export function animateHumanRig(rig, t, motion, state) {
   // Nhịp thở nhẹ tự nhiên
   rig.chest.scale.y = 1 + Math.sin(t * 2.1 + i * 1.3) * 0.018;
 
-  // Chớp mắt tự nhiên (mỗi ~4 giây chớp một nhịp 0.14s)
+  // Chớp mắt tự nhiên (mỗi ~4 giây chớp một nhịp 0.14s) + ánh mắt liếc nhẹ qua lại giữa 2 màn hình
   const blinkPhase = (t + i * 1.37) % 4.1;
   const blink = blinkPhase < 0.14 ? Math.sin((blinkPhase / 0.14) * Math.PI) : 0;
   for (const lid of rig.eyelids) lid.rotation.x = 0.56 - blink * 0.84;
+  if (rig.eyeballs) {
+    const gaze = Math.sin(t * 1.3 + i * 2.1) * 0.18;
+    for (const eb of rig.eyeballs) eb.rotation.y = gaze;
+  }
 
   // Tư thế & chuyển động theo trạng thái
   if (st === "wait") {
