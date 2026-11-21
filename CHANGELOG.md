@@ -6,9 +6,13 @@ Bản < 3.20.0: [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md) (T-3651; `changel
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-21
+
+Bản đầu của dòng phát hành riêng X-Office (ADR-9002, D-9008): từ đây X-Office cắt bản độc lập, không theo số X-Templates. Mọi thay đổi sau 3.34.0 gộp ở đây.
+
 ### Added
 
-- Dòng phát hành riêng của X-Office (ADR-9002): `changelog-check` nhận tiêu đề ranh giới `## Dòng kế thừa X-Templates (đến X.Y.Z)`, `latest_framework_tag` bỏ qua tag kế thừa, `registry` có trạng thái `legacy-line`.
+- Dòng phát hành riêng của X-Office (ADR-9002): `changelog-check` nhận tiêu đề ranh giới `## Dòng kế thừa X-Templates (đến X.Y.Z)`, `latest_framework_tag` bỏ qua tag kế thừa, `registry` có trạng thái `legacy-line`; `install.py` không coi nâng từ dòng kế thừa (vd 3.34.0) sang 1.x là hạ bản và in bước của mọi mục dòng mới. **Dự án đích** đang ở 3.34.0: chạy lại `install.py` để nhận 1.0.0 (registry báo `legacy-line`, vẫn tính lệch; ADR-9003).
 
 - Màn Văn phòng thêm tuỳ chọn **Quy mô**: nhóm nhỏ (1 phòng), công ty (khu 44×22 có lễ tân, giám đốc, phòng họp, server,
   pantry, ngủ trưa, khu làm việc mở 28 bàn, vườn hồ bơi, sân cỏ và hàng cây), tập đoàn (toà nhà 4 tầng mặt kính, mặt bằng
@@ -175,6 +179,10 @@ Bản < 3.20.0: [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md) (T-3651; `changel
 - `/complete` Bước 1: sau khi PR đặt `delivery_phase: harden` được merge, chạy lại `doctor` và nâng khung nếu nó báo
   bản cài cũ — trước đó `doctor` chỉ chạy ở Bước 0 khi còn `build` (pha build không báo chậm MINOR/PATCH, ADR-0081)
   nên "nâng khung ở ranh giới pha" không xảy ra (AUD-HAR-440, T-3963). Dự án đích: nhận khi chạy lại `install.py`.
+
+## Dòng kế thừa X-Templates (đến 3.34.0)
+
+Các bản dưới đây thuộc dòng X-Templates cũ, giữ nguyên làm lịch sử.
 
 ## [3.34.0] - 2026-11-19
 

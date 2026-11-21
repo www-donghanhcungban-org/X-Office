@@ -2465,21 +2465,59 @@ def step_clauses(block: list[str]) -> list[str]:
     return out
 
 
-def upgrade_steps(text: str, since: tuple[int, int, int]) -> list[tuple[str, list[str]]]:
+LEGACY_HEAD_RE = re.compile(r"^## Dòng kế thừa X-Templates \(đến \d+\.\d+\.\d+\)\s*$", re.M)  # ADR-9002
+
+
+def split_release_line(text: str) -> tuple[list[tuple[str, list[str]]], list[tuple[str, list[str]]]]:
+    """(mục dòng phát hành riêng, mục dòng kế thừa) theo VỊ TRÍ so với tiêu đề ranh giới (ADR-9002); không có ranh giới →
+    mọi mục thuộc dòng kế thừa (hành vi cũ). Phân loại theo vị trí, không theo tên: số bản có thể trùng giữa hai dòng."""
+    m = LEGACY_HEAD_RE.search(text)
+    if not m:
+        return [], changelog_sections(text)
+    return changelog_sections(text[: m.start()]), changelog_sections(text[m.end() :])
+
+
+def _names(sections: list[tuple[str, list[str]]]) -> set[str]:
+    return {name for name, _ in sections if name and name != "Unreleased"}
+
+
+def crosses_release_line(text: str, since: tuple[int, int, int], now: tuple[int, int, int]) -> bool:
+    """Nâng từ dòng kế thừa (`since` là mục sau ranh giới, không phải mục dòng mới) sang dòng phát hành riêng (`now` là
+    mục dòng mới): số bản nhỏ hơn nhưng không phải hạ bản. `since` không có ở cả hai dòng (vd. 1.0.1 khi nguồn là
+    1.0.0) → so số như thường, tức hạ bản (ADR-9002)."""
+    new, old = split_release_line(text)
+    label = ".".join(map(str, since))
+    return label in _names(old) and label not in _names(new) and ".".join(map(str, now)) in _names(new)
+
+
+def upgrade_steps(text: str, since: tuple[int, int, int], crossing: bool = False) -> list[tuple[str, list[str]]]:
     """(tên mục, mệnh đề "Dự án đích …") của mục `[Unreleased]` và mọi mục `[X.Y.Z]` có bản > `since`, thứ tự CHANGELOG;
-    mệnh đề trùng hệt in một lần — giữ lần đầu theo thứ tự CHANGELOG (bản mới nhất), mục hết mệnh đề thì bỏ (D-159)."""
+    mệnh đề trùng hệt in một lần — giữ lần đầu theo thứ tự CHANGELOG (bản mới nhất), mục hết mệnh đề thì bỏ (D-159).
+    `crossing` (sang dòng phát hành riêng): mọi mục của dòng mới tính là mới hơn `since` dù số nhỏ hơn."""
     out: list[tuple[str, list[str]]] = []
     seen: set[str] = set()
-    for name, lines in changelog_sections(text):
-        version = parse_version(name)
-        if name != "Unreleased" and (version is None or version <= since):
-            continue
-        clauses = [
-            c for c in dict.fromkeys(c for block in text_blocks(lines) for c in step_clauses(block)) if c not in seen
-        ]
-        seen.update(clauses)
-        if clauses:
-            out.append((name, clauses))
+    new, old = split_release_line(text)
+    since_in_new = ".".join(map(str, since)) in _names(new)
+    for in_new, sections in ((True, new), (False, old)):
+        for name, lines in sections:
+            version = parse_version(name)
+            older = version is None or version <= since
+            if name == "Unreleased":
+                skip = False
+            elif in_new:
+                skip = older and not crossing
+            else:
+                skip = older or since_in_new  # đang ở dòng mới: mục kế thừa không phải bước của họ
+            if skip:
+                continue
+            clauses = [
+                c
+                for c in dict.fromkeys(c for block in text_blocks(lines) for c in step_clauses(block))
+                if c not in seen
+            ]
+            seen.update(clauses)
+            if clauses:
+                out.append((name, clauses))
     return out
 
 
@@ -2507,15 +2545,19 @@ def report_upgrade_steps(previous: str | None, label: str) -> None:
         return
     title = f"Bước làm tay từ CHANGELOG ({previous} → {label}):"
     now = parse_version(source_version())
-    if now is not None and now < since:
+    try:
+        text: str | None = read_changelog(SRC)
+        error: Exception | None = None
+    except (OSError, UnicodeDecodeError) as exc:
+        text, error = None, exc
+    crossing = text is not None and now is not None and crosses_release_line(text, since, now)
+    if now is not None and now < since and not crossing:
         log(f"{title} bỏ qua — bản khung {'.'.join(map(str, now))} cũ hơn bản đã cài (hạ bản)")
         return
-    try:
-        text = read_changelog(SRC)
-    except (OSError, UnicodeDecodeError) as exc:
-        log(f"{title} không đọc được CHANGELOG.md của khung ({exc}) — xem mục 'Dự án đích' ở CHANGELOG bản mới")
+    if text is None:
+        log(f"{title} không đọc được CHANGELOG.md của khung ({error}) — xem mục 'Dự án đích' ở CHANGELOG bản mới")
         return
-    steps = upgrade_steps(text, since)
+    steps = upgrade_steps(text, since, crossing)
     if not steps and now == since:  # cài lại cùng bản: im lặng (review #191)
         return
     log(title if steps else f"{title} không có")
