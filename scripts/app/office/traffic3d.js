@@ -4,7 +4,7 @@
 // - Đèn giao thông 2 pha đồng bộ 18 cột tại nút chính & 4 ngã tư; xe buýt tự ghé trạm đón khách trên đại lộ.
 // - 13 công dân Ready Player Me có lịch trình có mục đích (giao hàng tới sảnh, chờ xe buýt, gọi cà phê vỉa hè,
 //   dạo công viên đài phun nước, qua vạch đèn đỏ và tiếp tục hành trình qua các tuyến phố).
-import { buildWalkerRig, buildHDHuman, buildMotoHDHuman, createScheduledNPC, stepScheduledNPC } from "./human3d.js";
+import { buildWalkerRig, buildHDHuman, buildMotoHDHuman, animateMotoHDHuman, createScheduledNPC, stepScheduledNPC } from "./human3d.js";
 import { instantiateGLB } from "./glb.js";
 
 const CYCLE = 18.0; // 0–8.5s ĐT Xanh/BN Đỏ · 8.5–10.5s ĐT Vàng/BN Đỏ · 10.5–16.5s ĐT Đỏ/BN Xanh · 16.5–18s ĐT Đỏ/BN Vàng
@@ -598,8 +598,8 @@ function attachMotoRider(THREE, tAssets, hdAssets, mats, root, jacketColor, helm
     visorGeo: g.visor,
   });
   if (hdRider) {
-    root.add(hdRider);
-    return;
+    root.add(hdRider.group);
+    return hdRider;
   }
   const rider = new THREE.Group();
   rider.position.set(scooter ? -0.18 : -0.12, scooter ? 0.08 : 0.02, 0);
@@ -668,7 +668,7 @@ function buildTrafficVehicle(THREE, tAssets, natureAssets, mats, s, hdAssets) {
       wheelR: 0.28,
     });
     if (hdBike) {
-      attachMotoRider(THREE, tAssets, hdAssets, mats, hdBike.root, s.j, s.h, isScooter);
+      hdBike.rider = attachMotoRider(THREE, tAssets, hdAssets, mats, hdBike.root, s.j, s.h, isScooter) || null;
       return hdBike;
     }
     return buildMotorbike(THREE, tAssets, natureAssets, mats, s.col, s.j, s.h);
@@ -861,38 +861,38 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
   }
 
   const citizensSpec = [
-    // Nhân viên giao hàng ôm kiện carton: từ xe tải đỗ ven đường → qua vạch đèn đỏ → quầy sảnh → quay về xe
+    // Nhân viên giao hàng: nhận kiện carton từ xe tải → ôm hai tay qua vạch đèn đỏ → bàn giao tại sảnh Đồng Hành Cùng Bạn → tay không quay về xe lấy kiện mới
     {
       index: 41,
       parcel: true,
       topColor: "#b45309",
       steps: [
-        { act: "wait", pos: [10.6, streetZ + 10.95], yaw: Math.PI, dur: 2.8, mode: "idle" },
-        { act: "walk", from: [10.6, streetZ + 10.95], to: [10.6, zS], speed: 1.25 },
-        { act: "walk", from: [10.6, zS], to: [xMainR, zS], speed: 1.32 },
-        { act: "walk", from: [xMainR, zS], to: [xMainR, zN], cross: "ns", speed: 2.35 },
-        { act: "walk", from: [xMainR, zN], to: [5.0, streetZ - 0.8], speed: 1.28 },
-        { act: "wait", pos: [5.0, streetZ - 0.8], yaw: Math.PI, dur: 4.5, mode: "talk" },
-        { act: "walk", from: [5.0, streetZ - 0.8], to: [xMainL, zN], speed: 1.28 },
-        { act: "walk", from: [xMainL, zN], to: [xMainL, zS], cross: "ns", speed: 2.35 },
-        { act: "walk", from: [xMainL, zS], to: [10.6, zS], speed: 1.32 },
-        { act: "walk", from: [10.6, zS], to: [10.6, streetZ + 10.95], speed: 1.25 },
+        { act: "wait", pos: [10.6, streetZ + 10.95], yaw: Math.PI, dur: 2.8, mode: "idle", carry: true },
+        { act: "walk", from: [10.6, streetZ + 10.95], to: [10.6, zS], speed: 1.22, carry: true },
+        { act: "walk", from: [10.6, zS], to: [xMainR, zS], speed: 1.28, carry: true },
+        { act: "walk", from: [xMainR, zS], to: [xMainR, zN], cross: "ns", speed: 1.65, carry: true },
+        { act: "walk", from: [xMainR, zN], to: [5.0, streetZ - 0.8], speed: 1.24, carry: true },
+        { act: "wait", pos: [5.0, streetZ - 0.8], yaw: Math.PI, dur: 4.5, mode: "talk", carry: false },
+        { act: "walk", from: [5.0, streetZ - 0.8], to: [xMainL, zN], speed: 1.32, carry: false },
+        { act: "walk", from: [xMainL, zN], to: [xMainL, zS], cross: "ns", speed: 1.7, carry: false },
+        { act: "walk", from: [xMainL, zS], to: [10.6, zS], speed: 1.32, carry: false },
+        { act: "walk", from: [10.6, zS], to: [10.6, streetZ + 10.95], speed: 1.25, carry: false },
       ],
       initIdx: 3,
     },
-    // Hành khách trạm xe buýt → đợi xe trước nhà chờ (x = 15.8..17.9, thoáng khỏi vách kính) → sang đường tới sảnh / qua ngã tư Đông
+    // Hành khách trạm xe buýt → ngóng xe & trò chuyện tại nhà chờ → sang đường tới sảnh / đi tiếp qua ngã tư Đông
     {
       index: 42,
       steps: [
-        { act: "wait", pos: [15.8, streetZ + 10.68], yaw: 0, dur: 5.0, mode: "idle" },
-        { act: "walk", from: [15.8, zS], to: [xMainR, zS], speed: 1.36 },
-        { act: "walk", from: [xMainR, zS], to: [xMainR, zN], cross: "ns", speed: 2.35 },
+        { act: "wait", pos: [15.8, streetZ + 10.68], yaw: 0, dur: 5.0, mode: "idle", look: true },
+        { act: "walk", from: [15.8, zS], to: [xMainR, zS], speed: 1.34 },
+        { act: "walk", from: [xMainR, zS], to: [xMainR, zN], cross: "ns", speed: 1.68 },
         { act: "walk", from: [xMainR, zN], to: [5.2, streetZ - 0.6], speed: 1.28 },
         { act: "wait", pos: [5.2, streetZ - 0.6], yaw: 0, dur: 3.4, mode: "talk" },
         { act: "walk", from: [5.2, streetZ - 0.6], to: [xMainR, zN], speed: 1.3 },
-        { act: "walk", from: [xMainR, zN], to: [xEW, zN], speed: 1.38 },
-        { act: "walk", from: [xEW, zN], to: [xEW, zS], cross: "ns", speed: 2.35 },
-        { act: "walk", from: [xEW, zS], to: [15.8, zS], speed: 1.35 },
+        { act: "walk", from: [xMainR, zN], to: [xEW, zN], speed: 1.36 },
+        { act: "walk", from: [xEW, zN], to: [xEW, zS], cross: "ns", speed: 1.68 },
+        { act: "walk", from: [xEW, zS], to: [15.8, zS], speed: 1.34 },
       ],
       initIdx: 0,
     },
@@ -900,47 +900,47 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
       index: 43,
       steps: [
         { act: "wait", pos: [16.85, streetZ + 10.68], yaw: 0.4, dur: 4.5, mode: "talk" },
-        { act: "walk", from: [16.85, zS], to: [xEW, zS], speed: 1.34 },
-        { act: "walk", from: [xEW, zS], to: [xEE, zS], cross: "ew", speed: 2.35 },
-        { act: "walk", from: [xEE, zS], to: [xEE, zN], cross: "ns", speed: 2.35 },
-        { act: "walk", from: [xEE, zN], to: [xEE, 17.0], speed: 1.3 },
+        { act: "walk", from: [16.85, zS], to: [xEW, zS], speed: 1.32 },
+        { act: "walk", from: [xEW, zS], to: [xEE, zS], cross: "ew", speed: 1.68 },
+        { act: "walk", from: [xEE, zS], to: [xEE, zN], cross: "ns", speed: 1.68 },
+        { act: "walk", from: [xEE, zN], to: [xEE, 17.0], speed: 1.28 },
         { act: "wait", pos: [xEE, 17.0], yaw: Math.PI / 2, dur: 4.0, mode: "talk" },
-        { act: "walk", from: [xEE, 17.0], to: [xEE, zN], speed: 1.32 },
-        { act: "walk", from: [xEE, zN], to: [xEW, zN], cross: "ew", speed: 2.35 },
-        { act: "walk", from: [xEW, zN], to: [xEW, zS], cross: "ns", speed: 2.35 },
-        { act: "walk", from: [xEW, zS], to: [16.85, zS], speed: 1.34 },
+        { act: "walk", from: [xEE, 17.0], to: [xEE, zN], speed: 1.3 },
+        { act: "walk", from: [xEE, zN], to: [xEW, zN], cross: "ew", speed: 1.68 },
+        { act: "walk", from: [xEW, zN], to: [xEW, zS], cross: "ns", speed: 1.68 },
+        { act: "walk", from: [xEW, zS], to: [16.85, zS], speed: 1.32 },
       ],
       initIdx: 2,
     },
     {
       index: 44,
       steps: [
-        { act: "wait", pos: [17.85, streetZ + 10.68], yaw: -0.35, dur: 5.2, mode: "talk" },
-        { act: "walk", from: [17.85, zS], to: [xWE, zS], speed: 1.38 },
-        { act: "walk", from: [xWE, zS], to: [xWW, zS], cross: "ew", speed: 2.35 },
-        { act: "walk", from: [xWW, zS], to: [xWW, zN], cross: "ns", speed: 2.35 },
-        { act: "walk", from: [xWW, zN], to: [xWE, zN], cross: "ew", speed: 2.35 },
-        { act: "walk", from: [xWE, zN], to: [xMainL, zN], speed: 1.36 },
-        { act: "walk", from: [xMainL, zN], to: [xMainL, zS], cross: "ns", speed: 2.35 },
-        { act: "walk", from: [xMainL, zS], to: [17.85, zS], speed: 1.35 },
+        { act: "wait", pos: [17.85, streetZ + 10.68], yaw: -0.35, dur: 5.2, mode: "idle", look: true },
+        { act: "walk", from: [17.85, zS], to: [xWE, zS], speed: 1.36 },
+        { act: "walk", from: [xWE, zS], to: [xWW, zS], cross: "ew", speed: 1.68 },
+        { act: "walk", from: [xWW, zS], to: [xWW, zN], cross: "ns", speed: 1.68 },
+        { act: "walk", from: [xWW, zN], to: [xWE, zN], cross: "ew", speed: 1.68 },
+        { act: "walk", from: [xWE, zN], to: [xMainL, zN], speed: 1.34 },
+        { act: "walk", from: [xMainL, zN], to: [xMainL, zS], cross: "ns", speed: 1.68 },
+        { act: "walk", from: [xMainL, zS], to: [17.85, zS], speed: 1.34 },
       ],
       initIdx: 5,
     },
-    // Khách cà phê vỉa hè Tây: gọi đồ trước hiên → đứng cạnh bàn dù (thoáng khỏi tán dù) → sang vạch đèn đỏ → dạo tiếp sang Đông
+    // Khách cà phê vỉa hè Tây: gọi đồ trước hiên → thưởng thức bên bàn dù → sang vạch đèn đỏ → dạo tiếp sang Đông
     {
       index: 45,
       steps: [
         { act: "wait", pos: [3.2, streetZ + 11.85], yaw: Math.PI, dur: 3.8, mode: "talk" },
-        { act: "walk", from: [3.2, streetZ + 11.85], to: [2.55, streetZ + 11.85], speed: 1.15 },
-        { act: "wait", pos: [2.55, streetZ + 11.85], yaw: Math.PI / 2, dur: 4.8, mode: "idle" },
-        { act: "walk", from: [2.55, streetZ + 11.85], to: [2.55, zS], speed: 1.25 },
-        { act: "walk", from: [2.55, zS], to: [xMainL, zS], speed: 1.25 },
-        { act: "walk", from: [xMainL, zS], to: [xMainL, zN], cross: "ns", speed: 2.35 },
-        { act: "walk", from: [xMainL, zN], to: [xEW, zN], speed: 1.38 },
-        { act: "walk", from: [xEW, zN], to: [xEE, zN], cross: "ew", speed: 2.35 },
-        { act: "walk", from: [xEE, zN], to: [xEE, zS], cross: "ns", speed: 2.35 },
-        { act: "walk", from: [xEE, zS], to: [xEW, zS], cross: "ew", speed: 2.35 },
-        { act: "walk", from: [xEW, zS], to: [3.2, zS], speed: 1.38 },
+        { act: "walk", from: [3.2, streetZ + 11.85], to: [2.55, streetZ + 11.85], speed: 1.12 },
+        { act: "wait", pos: [2.55, streetZ + 11.85], yaw: Math.PI / 2, dur: 4.8, mode: "idle", look: true },
+        { act: "walk", from: [2.55, streetZ + 11.85], to: [2.55, zS], speed: 1.24 },
+        { act: "walk", from: [2.55, zS], to: [xMainL, zS], speed: 1.24 },
+        { act: "walk", from: [xMainL, zS], to: [xMainL, zN], cross: "ns", speed: 1.68 },
+        { act: "walk", from: [xMainL, zN], to: [xEW, zN], speed: 1.36 },
+        { act: "walk", from: [xEW, zN], to: [xEE, zN], cross: "ew", speed: 1.68 },
+        { act: "walk", from: [xEE, zN], to: [xEE, zS], cross: "ns", speed: 1.68 },
+        { act: "walk", from: [xEE, zS], to: [xEW, zS], cross: "ew", speed: 1.68 },
+        { act: "walk", from: [xEW, zS], to: [3.2, zS], speed: 1.36 },
         { act: "walk", from: [3.2, zS], to: [3.2, streetZ + 11.85], speed: 1.15 },
       ],
       initIdx: 4,
@@ -951,13 +951,13 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
       steps: [
         { act: "wait", pos: [28.9, streetZ + 11.85], yaw: Math.PI, dur: 4.2, mode: "talk" },
         { act: "walk", from: [28.9, streetZ + 11.85], to: [28.4, streetZ + 12.1], speed: 1.1 },
-        { act: "wait", pos: [28.4, streetZ + 12.1], yaw: 0, dur: 4.0, mode: "idle" },
-        { act: "walk", from: [28.4, streetZ + 12.1], to: [28.4, zS], speed: 1.25 },
-        { act: "walk", from: [28.4, zS], to: [xMainR, zS], speed: 1.36 },
-        { act: "walk", from: [xMainR, zS], to: [xMainR, zN], cross: "ns", speed: 2.35 },
-        { act: "walk", from: [xMainR, zN], to: [xEW, zN], speed: 1.36 },
-        { act: "walk", from: [xEW, zN], to: [xEW, zS], cross: "ns", speed: 2.35 },
-        { act: "walk", from: [xEW, zS], to: [28.9, zS], speed: 1.34 },
+        { act: "wait", pos: [28.4, streetZ + 12.1], yaw: 0, dur: 4.0, mode: "idle", look: true },
+        { act: "walk", from: [28.4, streetZ + 12.1], to: [28.4, zS], speed: 1.24 },
+        { act: "walk", from: [28.4, zS], to: [xMainR, zS], speed: 1.34 },
+        { act: "walk", from: [xMainR, zS], to: [xMainR, zN], cross: "ns", speed: 1.68 },
+        { act: "walk", from: [xMainR, zN], to: [xEW, zN], speed: 1.34 },
+        { act: "walk", from: [xEW, zN], to: [xEW, zS], cross: "ns", speed: 1.68 },
+        { act: "walk", from: [xEW, zS], to: [28.9, zS], speed: 1.32 },
         { act: "walk", from: [28.9, zS], to: [28.9, streetZ + 11.85], speed: 1.15 },
       ],
       initIdx: 4,
@@ -967,59 +967,66 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
       index: 47,
       steps: [
         { act: "wait", pos: [xWW, 24.0], yaw: Math.PI / 2, dur: 4.5, mode: "talk" },
-        { act: "walk", from: [xWW, 24.0], to: [xWW, zN], speed: 1.32 },
-        { act: "walk", from: [xWW, zN], to: [xWW, zS], cross: "ns", speed: 2.35 },
-        { act: "walk", from: [xWW, zS], to: [xWE, zS], cross: "ew", speed: 2.35 },
-        { act: "walk", from: [xWE, zS], to: [xWE, zN], cross: "ns", speed: 2.35 },
-        { act: "walk", from: [xWE, zN], to: [xWW, zN], cross: "ew", speed: 2.35 },
-        { act: "walk", from: [xWW, zN], to: [xWW, 24.0], speed: 1.32 },
+        { act: "walk", from: [xWW, 24.0], to: [xWW, zN], speed: 1.3 },
+        { act: "walk", from: [xWW, zN], to: [xWW, zS], cross: "ns", speed: 1.68 },
+        { act: "walk", from: [xWW, zS], to: [xWE, zS], cross: "ew", speed: 1.68 },
+        { act: "walk", from: [xWE, zS], to: [xWE, zN], cross: "ns", speed: 1.68 },
+        { act: "walk", from: [xWE, zN], to: [xWW, zN], cross: "ew", speed: 1.68 },
+        { act: "walk", from: [xWW, zN], to: [xWW, 24.0], speed: 1.3 },
       ],
       initIdx: 2,
     },
-    // Nhân viên quán cà phê đứng đón khách thoáng cạnh dù & bảng menu
+    // Nhân viên quán cà phê phục vụ năng động: đón khách bên bảng menu → kiểm tra bàn ngoài trời → ghé quầy pha chế
     {
       index: 48,
-      steps: [{ act: "wait", pos: [4.25, streetZ + 11.95], yaw: 0.35, dur: 12.0, mode: "talk" }],
+      steps: [
+        { act: "wait", pos: [4.25, streetZ + 11.95], yaw: 0.2, dur: 4.5, mode: "talk" },
+        { act: "walk", from: [4.25, streetZ + 11.95], to: [2.85, streetZ + 11.8], speed: 1.08 },
+        { act: "wait", pos: [2.85, streetZ + 11.8], yaw: Math.PI * 0.72, dur: 3.4, mode: "idle", look: true },
+        { act: "walk", from: [2.85, streetZ + 11.8], to: [3.6, streetZ + 12.15], speed: 1.08 },
+        { act: "wait", pos: [3.6, streetZ + 12.15], yaw: Math.PI, dur: 3.2, mode: "talk" },
+        { act: "walk", from: [3.6, streetZ + 12.15], to: [4.25, streetZ + 11.95], speed: 1.08 },
+      ],
       initIdx: 0,
     },
-    // Khách tham quan công viên & đài phun nước Nam (đứng gọn quanh bồn nước, tuyệt đối không đâm vào bồn)
+    // Khách tham quan công viên & đài phun nước Nam (quay mặt về phía vòi nước ngắm cảnh rồi dạo phố)
     {
       index: 49,
       steps: [
-        { act: "wait", pos: [17.65, streetZ + 16.8], yaw: -0.65, dur: 5.0, mode: "talk" },
+        { act: "wait", pos: [17.65, streetZ + 16.8], yaw: -Math.PI / 2, dur: 5.0, mode: "idle", look: true },
         { act: "walk", from: [17.65, streetZ + 16.8], to: [18.1, streetZ + 14.3], speed: 1.15 },
-        { act: "wait", pos: [18.1, streetZ + 14.3], yaw: Math.PI / 2, dur: 4.5, mode: "idle" },
-        { act: "walk", from: [18.1, streetZ + 14.3], to: [xPark, streetZ + 13.6], speed: 1.25 },
-        { act: "walk", from: [xPark, streetZ + 13.6], to: [xPark, zS], speed: 1.25 },
-        { act: "walk", from: [xPark, zS], to: [xMainL, zS], speed: 1.38 },
-        { act: "walk", from: [xMainL, zS], to: [xMainL, zN], cross: "ns", speed: 2.35 },
-        { act: "walk", from: [xMainL, zN], to: [xMainR, zN], speed: 1.25 },
-        { act: "walk", from: [xMainR, zN], to: [xMainR, zS], cross: "ns", speed: 2.35 },
-        { act: "walk", from: [xMainR, zS], to: [xPark, zS], speed: 1.38 },
-        { act: "walk", from: [xPark, zS], to: [xPark, streetZ + 13.6], speed: 1.25 },
-        { act: "walk", from: [xPark, streetZ + 13.6], to: [17.65, streetZ + 16.8], speed: 1.22 },
+        { act: "wait", pos: [18.1, streetZ + 14.3], yaw: -Math.PI * 0.72, dur: 4.5, mode: "talk" },
+        { act: "walk", from: [18.1, streetZ + 14.3], to: [xPark, streetZ + 13.6], speed: 1.24 },
+        { act: "walk", from: [xPark, streetZ + 13.6], to: [xPark, zS], speed: 1.24 },
+        { act: "walk", from: [xPark, zS], to: [xMainL, zS], speed: 1.34 },
+        { act: "walk", from: [xMainL, zS], to: [xMainL, zN], cross: "ns", speed: 1.68 },
+        { act: "walk", from: [xMainL, zN], to: [xMainR, zN], speed: 1.24 },
+        { act: "walk", from: [xMainR, zN], to: [xMainR, zS], cross: "ns", speed: 1.68 },
+        { act: "walk", from: [xMainR, zS], to: [xPark, zS], speed: 1.34 },
+        { act: "walk", from: [xPark, zS], to: [xPark, streetZ + 13.6], speed: 1.24 },
+        { act: "walk", from: [xPark, streetZ + 13.6], to: [17.65, streetZ + 16.8], speed: 1.2 },
       ],
       initIdx: 0,
     },
     {
       index: 50,
       steps: [
-        { act: "wait", pos: [23.5, streetZ + 17.5], yaw: 1.2, dur: 4.8, mode: "idle" },
-        { act: "walk", from: [23.5, streetZ + 17.5], to: [22.8, streetZ + 13.8], speed: 1.25 },
-        { act: "walk", from: [22.8, streetZ + 13.8], to: [xPark, zS], speed: 1.25 },
-        { act: "walk", from: [xPark, zS], to: [xEW, zS], speed: 1.38 },
-        { act: "walk", from: [xEW, zS], to: [xEW, zN], cross: "ns", speed: 2.35 },
-        { act: "walk", from: [xEW, zN], to: [xEW, zNS], speed: 1.35 },
-        { act: "walk", from: [xEW, zNS], to: [xEW, zNN], cross: "ns", speed: 2.35 },
-        { act: "walk", from: [xEW, zNN], to: [15.2, zNN], speed: 1.35 },
+        { act: "wait", pos: [23.5, streetZ + 17.5], yaw: Math.PI / 2, dur: 4.8, mode: "idle", look: true },
+        { act: "walk", from: [23.5, streetZ + 17.5], to: [22.8, streetZ + 13.8], speed: 1.22 },
+        { act: "walk", from: [22.8, streetZ + 13.8], to: [xPark, zS], speed: 1.24 },
+        { act: "walk", from: [xPark, zS], to: [xEW, zS], speed: 1.34 },
+        { act: "walk", from: [xEW, zS], to: [xEW, zN], cross: "ns", speed: 1.68 },
+        { act: "walk", from: [xEW, zN], to: [xEW, zNS], speed: 1.34 },
+        { act: "walk", from: [xEW, zNS], to: [xEW, zNN], cross: "ns", speed: 1.68 },
+        { act: "walk", from: [xEW, zNN], to: [15.2, zNN], speed: 1.34 },
         { act: "wait", pos: [15.2, zNN], yaw: 0, dur: 3.8, mode: "talk" },
-        { act: "walk", from: [15.2, zNN], to: [xEW, zNN], speed: 1.35 },
-        { act: "walk", from: [xEW, zNN], to: [xEW, zNS], cross: "ns", speed: 2.35 },
-        { act: "walk", from: [xEW, zNS], to: [xEW, zN], speed: 1.35 },
-        { act: "walk", from: [xEW, zN], to: [xEW, zS], cross: "ns", speed: 2.35 },
-        { act: "walk", from: [xEW, zS], to: [xPark, zS], speed: 1.36 },
-        { act: "walk", from: [xPark, zS], to: [22.8, streetZ + 13.8], speed: 1.25 },
-        { act: "walk", from: [22.8, streetZ + 13.8], to: [23.5, streetZ + 17.5], speed: 1.22 },
+        { act: "walk", from: [15.2, zNN], to: [xEW, zNN], speed: 1.34 },
+        { act: "walk", from: [xEW, zNN], to: [xEW, zNS], cross: "ns", speed: 1.68 },
+        { act: "walk", from: [xEW, zNS], to: [xEW, zN], speed: 1.34 },
+        { act: "walk", from: [xEW, zN], to: [xEW, zS], cross: "ns", speed: 1.68 },
+        { act: "walk", from: [xEW, zS], to: [xPark, zS], speed: 1.34 },
+        { act: "walk", from: [xPark, zS], to: [22.8, streetZ + 13.8], speed: 1.24 },
+        { act: "walk", from: [22.8, streetZ + 13.8], to: [23.5, streetZ + 17.5], speed: 1.2 },
       ],
       initIdx: 3,
     },
@@ -1027,43 +1034,43 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
     {
       index: 51,
       steps: [
-        { act: "walk", from: [xWW, zN], to: [xWW, zNS], speed: 1.42 },
-        { act: "walk", from: [xWW, zNS], to: [xWW, zNN], cross: "ns", speed: 2.35 },
-        { act: "walk", from: [xWW, zNN], to: [xWE, zNN], cross: "ew", speed: 2.35 },
-        { act: "walk", from: [xWE, zNN], to: [xEW, zNN], speed: 1.42 },
-        { act: "walk", from: [xEW, zNN], to: [xEE, zNN], cross: "ew", speed: 2.35 },
-        { act: "walk", from: [xEE, zNN], to: [xEE, zNS], cross: "ns", speed: 2.35 },
-        { act: "walk", from: [xEE, zNS], to: [xEE, zN], speed: 1.42 },
-        { act: "walk", from: [xEE, zN], to: [xEE, zS], cross: "ns", speed: 2.35 },
-        { act: "walk", from: [xEE, zS], to: [xEW, zS], cross: "ew", speed: 2.35 },
-        { act: "walk", from: [xEW, zS], to: [xWE, zS], speed: 1.42 },
-        { act: "walk", from: [xWE, zS], to: [xWW, zS], cross: "ew", speed: 2.35 },
-        { act: "walk", from: [xWW, zS], to: [xWW, zN], cross: "ns", speed: 2.35 },
+        { act: "walk", from: [xWW, zN], to: [xWW, zNS], speed: 1.38 },
+        { act: "walk", from: [xWW, zNS], to: [xWW, zNN], cross: "ns", speed: 1.68 },
+        { act: "walk", from: [xWW, zNN], to: [xWE, zNN], cross: "ew", speed: 1.68 },
+        { act: "walk", from: [xWE, zNN], to: [xEW, zNN], speed: 1.38 },
+        { act: "walk", from: [xEW, zNN], to: [xEE, zNN], cross: "ew", speed: 1.68 },
+        { act: "walk", from: [xEE, zNN], to: [xEE, zNS], cross: "ns", speed: 1.68 },
+        { act: "walk", from: [xEE, zNS], to: [xEE, zN], speed: 1.38 },
+        { act: "walk", from: [xEE, zN], to: [xEE, zS], cross: "ns", speed: 1.68 },
+        { act: "walk", from: [xEE, zS], to: [xEW, zS], cross: "ew", speed: 1.68 },
+        { act: "walk", from: [xEW, zS], to: [xWE, zS], speed: 1.38 },
+        { act: "walk", from: [xWE, zS], to: [xWW, zS], cross: "ew", speed: 1.68 },
+        { act: "walk", from: [xWW, zS], to: [xWW, zN], cross: "ns", speed: 1.68 },
       ],
       initIdx: 7,
     },
     {
       index: 52,
       steps: [
-        { act: "walk", from: [xMainR, zN], to: [xWE, zN], speed: 1.38 },
-        { act: "walk", from: [xWE, zN], to: [xWW, zN], cross: "ew", speed: 2.35 },
-        { act: "walk", from: [xWW, zN], to: [xWW, zS], cross: "ns", speed: 2.35 },
-        { act: "walk", from: [xWW, zS], to: [xWE, zS], cross: "ew", speed: 2.35 },
-        { act: "walk", from: [xWE, zS], to: [xMainR, zS], speed: 1.38 },
-        { act: "walk", from: [xMainR, zS], to: [xMainR, zN], cross: "ns", speed: 2.35 },
+        { act: "walk", from: [xMainR, zN], to: [xWE, zN], speed: 1.36 },
+        { act: "walk", from: [xWE, zN], to: [xWW, zN], cross: "ew", speed: 1.68 },
+        { act: "walk", from: [xWW, zN], to: [xWW, zS], cross: "ns", speed: 1.68 },
+        { act: "walk", from: [xWW, zS], to: [xWE, zS], cross: "ew", speed: 1.68 },
+        { act: "walk", from: [xWE, zS], to: [xMainR, zS], speed: 1.36 },
+        { act: "walk", from: [xMainR, zS], to: [xMainR, zN], cross: "ns", speed: 1.68 },
       ],
       initIdx: 1,
     },
     {
       index: 53,
       steps: [
-        { act: "walk", from: [xWE, zNN], to: [xWE, zNS], cross: "ns", speed: 2.35 },
+        { act: "walk", from: [xWE, zNN], to: [xWE, zNS], cross: "ns", speed: 1.68 },
         { act: "walk", from: [xWE, zNS], to: [xWE, zN], speed: 1.36 },
-        { act: "walk", from: [xWE, zN], to: [xWE, zS], cross: "ns", speed: 2.35 },
+        { act: "walk", from: [xWE, zN], to: [xWE, zS], cross: "ns", speed: 1.68 },
         { act: "walk", from: [xWE, zS], to: [xEW, zS], speed: 1.38 },
-        { act: "walk", from: [xEW, zS], to: [xEW, zN], cross: "ns", speed: 2.35 },
+        { act: "walk", from: [xEW, zS], to: [xEW, zN], cross: "ns", speed: 1.68 },
         { act: "walk", from: [xEW, zN], to: [xEW, zNS], speed: 1.36 },
-        { act: "walk", from: [xEW, zNS], to: [xEW, zNN], cross: "ns", speed: 2.35 },
+        { act: "walk", from: [xEW, zNS], to: [xEW, zNN], cross: "ns", speed: 1.68 },
         { act: "walk", from: [xEW, zNN], to: [xWE, zNN], speed: 1.38 },
       ],
       initIdx: 3,
@@ -1268,6 +1275,7 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
         if (v.axis === "x") v.root.position.x = v.pos;
         else v.root.position.z = v.pos;
         syncVehiclePhysics(v, idx);
+        if (v.rider) animateMotoHDHuman(v.rider, t, v.speed, braking, idx);
         const dSpin = (v.speed * dt) / v.wheelR;
         for (const w of v.wheels) w.rotation.z -= dSpin;
         if (v.mixer && v.speed > 0.05) v.mixer.update(dt * (v.speed / 3.8));

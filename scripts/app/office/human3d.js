@@ -928,25 +928,56 @@ export function buildHDHuman(THREE, hdAssets, mats, opts = {}) {
     });
   }
 
+  const bones = {};
+  inst.root.traverse((o) => {
+    if (o.name) bones[o.name] = o;
+    if (o.isSkinnedMesh) o.frustumCulled = false;
+  });
+
   if (!HD_SHADOW_GEO.geo) HD_SHADOW_GEO.geo = new THREE.PlaneGeometry(0.95, 0.95);
   const sh = new THREE.Mesh(HD_SHADOW_GEO.geo, mats.shadow());
   sh.rotation.x = -Math.PI / 2;
   sh.position.y = 0.016;
   inst.group.add(sh);
 
+  let parcelGroup = null;
   if (opts.parcel) {
+    parcelGroup = new THREE.Group();
+    parcelGroup.position.set(0, 1.02, -0.32);
     const box = new THREE.Mesh(
       new THREE.BoxGeometry(0.32, 0.22, 0.28),
       mats.standard("#c89d66", { roughness: 0.84 }),
     );
-    box.position.set(0, 0.96, -0.27);
     box.castShadow = true;
     const tape = new THREE.Mesh(
       new THREE.BoxGeometry(0.324, 0.025, 0.06),
       mats.standard("#fef3c7", { roughness: 0.45 }),
     );
-    tape.position.set(0, 1.072, -0.27);
-    inst.group.add(box, tape);
+    tape.position.set(0, 0.112, 0);
+    parcelGroup.add(box, tape);
+    inst.group.add(parcelGroup);
+  }
+
+  let cupGroup = null;
+  if (opts.holdCup) {
+    cupGroup = new THREE.Group();
+    const mug = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.044, 0.038, 0.105, 12),
+      mats.physical("#f8fafc", { roughness: 0.18, clearcoat: 0.8 }),
+    );
+    const coffee = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.038, 0.038, 0.012, 10),
+      mats.standard("#4a2c18", { roughness: 0.22 }),
+    );
+    coffee.position.y = 0.048;
+    cupGroup.add(mug, coffee);
+    if (bones.RightHand) {
+      cupGroup.position.set(0, 0.07, 0.04);
+      bones.RightHand.add(cupGroup);
+    } else {
+      cupGroup.position.set(0.18, 1.08, -0.26);
+      inst.group.add(cupGroup);
+    }
   }
 
   const mixer = new THREE.AnimationMixer(inst.root);
@@ -971,6 +1002,13 @@ export function buildHDHuman(THREE, hdAssets, mats, opts = {}) {
 
   return {
     root: inst.group,
+    meshRoot: inst.root,
+    bones,
+    parcelGroup,
+    cupGroup,
+    carryingParcel: Boolean(opts.parcel),
+    holdingCup: Boolean(opts.holdCup),
+    lookAround: false,
     isHD: true,
     mixer,
     actions,
@@ -987,13 +1025,29 @@ export function setHDHumanMode(h, mode) {
   if (!nextKey || nextKey === h.curMode) return;
   const prev = h.curMode ? h.actions[h.curMode] : null;
   const next = h.actions[nextKey];
-  if (prev) prev.fadeOut(0.18);
-  next.reset().fadeIn(0.18).play();
+  if (prev) prev.fadeOut(0.22);
+  next.reset().fadeIn(0.22).play();
   h.curMode = nextKey;
 }
 
-export function animateHDHuman(h, t, dt, motion, modeOverride) {
+const _postQ = { v: null };
+const _postAxis = { v: null };
+function nudgeLocalBone(bone, ax, ay, az, angle) {
+  if (!bone || !angle) return;
+  if (!_postQ.v) {
+    _postQ.v = bone.quaternion.clone();
+    _postAxis.v = bone.position.clone();
+  }
+  _postAxis.v.set(ax, ay, az).normalize();
+  _postQ.v.setFromAxisAngle(_postAxis.v, angle);
+  bone.quaternion.multiply(_postQ.v);
+}
+
+export function animateHDHuman(h, t, dt, motion, modeOverride, speedScale = 1) {
   if (!h || !h.mixer) return;
+  if (h.parcelGroup) h.parcelGroup.visible = Boolean(h.carryingParcel);
+  if (h.cupGroup) h.cupGroup.visible = Boolean(h.holdingCup);
+
   if (!motion) {
     setHDHumanMode(h, modeOverride || "idle");
     h.mixer.update(0);
@@ -1024,10 +1078,34 @@ export function animateHDHuman(h, t, dt, motion, modeOverride) {
     while (diff < -Math.PI) diff += Math.PI * 2;
     h.root.rotation.y += diff * 0.18;
     setHDHumanMode(h, "walk");
-    h.mixer.update(dt * (h.speed / 0.85));
+    h.mixer.update(dt * Math.max(0.55, Math.min(1.5, h.speed / 1.32)));
   } else {
-    setHDHumanMode(h, modeOverride || h.curMode || "idle");
-    h.mixer.update(dt);
+    const targetMode = modeOverride || h.curMode || "idle";
+    setHDHumanMode(h, targetMode);
+    const rate = targetMode === "walk" ? Math.max(0.55, Math.min(1.65, speedScale)) : 1.0;
+    h.mixer.update(dt * rate);
+  }
+
+  // Tư thế tay tự nhiên sau mocap: ôm kiện hàng hai tay / cầm cốc cà phê ngay ngắn / ngoái nhìn quanh tự nhiên
+  const b = h.bones;
+  if (b) {
+    if (h.carryingParcel && h.parcelGroup) {
+      const bob = h.curMode === "walk" ? Math.sin(t * 7.2 + h.index) * 0.018 : Math.sin(t * 2.1 + h.index) * 0.006;
+      h.parcelGroup.position.y = 1.02 + bob;
+      // Khóa hai tay đưa ra trước ôm chắc hai bên thùng carton thay vì vung tay tự do
+      if (b.LeftArm) b.LeftArm.rotation.set(0.62, 0.22, -0.92);
+      if (b.RightArm) b.RightArm.rotation.set(0.62, -0.22, 0.92);
+      if (b.LeftForeArm) b.LeftForeArm.rotation.set(0.82, 0.35, 0.18);
+      if (b.RightForeArm) b.RightForeArm.rotation.set(0.82, -0.35, -0.18);
+    } else if (h.holdingCup && b.RightArm && b.RightForeArm) {
+      // Tay phải gập nhẹ ngang ngực giữ cốc cà phê thăng bằng khi đi bộ hoặc trò chuyện
+      b.RightArm.rotation.set(0.32, -0.12, 1.08);
+      b.RightForeArm.rotation.set(1.05, -0.15, -0.1);
+    }
+    if (h.lookAround && h.curMode !== "walk" && b.Head) {
+      nudgeLocalBone(b.Head, 0, 1, 0, Math.sin(t * 0.65 + h.index * 1.9) * 0.36);
+      nudgeLocalBone(b.Head, 1, 0, 0, Math.sin(t * 0.42 + h.index) * 0.08);
+    }
   }
 }
 
@@ -1182,6 +1260,8 @@ export function buildSeatedHDHuman(THREE, assets, hdAssets, mats, opts = {}) {
     animBones,
     micLed,
     index: i,
+    role: opts.role || (isAgent ? "agent" : "desk"),
+    meetingIdx: opts.meetingIdx !== undefined ? opts.meetingIdx : -1,
     state: seat ? seat.state : "idle",
   };
 }
@@ -1275,7 +1355,41 @@ export function buildMotoHDHuman(THREE, hdAssets, mats, opts = {}) {
   // Xoay mặt người lái từ +Z sang +X (khớp trục đầu xe)
   inst.group.rotation.y = Math.PI / 2;
   inst.group.position.set(scooter ? -0.18 : -0.14, 0, 0);
-  return inst.group;
+  const headBone = bones.Head || null;
+  const spineBone = bones.Spine1 || bones.Spine || null;
+  return {
+    group: inst.group,
+    headBone,
+    spineBone,
+    baseHeadQ: headBone ? headBone.quaternion.clone() : null,
+    baseSpineQ: spineBone ? spineBone.quaternion.clone() : null,
+    headYawAxis: headBone ? worldAxisToLocal(THREE, headBone, 0, 1, 0) : null,
+    spinePitchAxis: spineBone ? worldAxisToLocal(THREE, spineBone, 1, 0, 0) : null,
+    scooter,
+  };
+}
+
+export function animateMotoHDHuman(rider, t, speed, braking, idx = 0) {
+  if (!rider) return;
+  const stopped = speed < 0.25;
+  if (rider.spineBone && rider.baseSpineQ && rider.spinePitchAxis) {
+    // Rung nhẹ theo nhịp động cơ khi dừng đèn đỏ, rướn nhẹ về trước khi tăng ga, ghì thẳng khi phanh
+    const lean = braking ? -0.07 : (stopped ? Math.sin(t * 2.4 + idx) * 0.018 : Math.min(0.11, speed * 0.02));
+    rider.spineBone.quaternion.copy(rider.baseSpineQ);
+    if (!_qDelta.v) _qDelta.v = rider.baseSpineQ.clone();
+    _qDelta.v.setFromAxisAngle(rider.spinePitchAxis, lean);
+    rider.spineBone.quaternion.multiply(_qDelta.v);
+  }
+  if (rider.headBone && rider.baseHeadQ && rider.headYawAxis) {
+    // Khi dừng đèn đỏ quay đầu quan sát giao lộ hai bên; khi chạy nhìn tập trung phía trước kèm liếc gương nhẹ
+    const yaw = stopped
+      ? Math.sin(t * 0.95 + idx * 1.7) * 0.34
+      : Math.sin(t * 0.55 + idx * 2.1) * 0.09;
+    rider.headBone.quaternion.copy(rider.baseHeadQ);
+    if (!_qDelta.v) _qDelta.v = rider.baseHeadQ.clone();
+    _qDelta.v.setFromAxisAngle(rider.headYawAxis, yaw);
+    rider.headBone.quaternion.multiply(_qDelta.v);
+  }
 }
 
 function applyBoneOffsets(ab, pitch, yaw, roll) {
@@ -1304,50 +1418,139 @@ export function animateSeatedHDHuman(rig, t, motion, state) {
     return;
   }
 
-  const breath = Math.sin(t * 2.1 + i * 1.3) * 0.022;
+  const breath = Math.sin(t * 2.1 + i * 1.3) * 0.018;
   applyBoneOffsets(b.Spine1, breath, 0, 0);
 
+  // 1. Phòng họp: luân phiên 1 người trình bày (cử chỉ tay tự nhiên), 5 người còn lại quay nhìn & gật đầu lắng nghe / ghi chép
+  if (rig.role === "meeting") {
+    const mIdx = rig.meetingIdx >= 0 ? rig.meetingIdx : (i % 6);
+    const speaker = Math.floor(t / 5.6) % 6;
+    const isSpeaker = mIdx === speaker;
+    const isNorthRow = mIdx < 3;
+    const spNorthRow = speaker < 3;
+    const colDiff = (speaker % 3) - (mIdx % 3);
+    if (isSpeaker) {
+      rig.swivel.rotation.y = Math.sin(t * 0.55 + i) * 0.06;
+      applyBoneOffsets(b.Spine1, 0.055 + breath, 0, 0);
+      applyBoneOffsets(b.Head, -0.02 + Math.sin(t * 2.2) * 0.04, Math.sin(t * 0.85) * 0.24, Math.sin(t * 1.3) * 0.03);
+      const gest = Math.sin(t * 3.2 + i) * 0.16;
+      applyBoneOffsets(b.LeftArm, -0.18 + gest * 0.4, 0, -0.06);
+      applyBoneOffsets(b.RightArm, -0.22 - gest * 0.5, 0, 0.08);
+      applyBoneOffsets(b.LeftForeArm, -0.25 + gest * 0.7, 0.12, 0);
+      applyBoneOffsets(b.RightForeArm, -0.32 - gest * 0.8, -0.14, 0);
+    } else {
+      const lookScreen = Math.sin(t * 0.35 + mIdx * 1.4) > 0.65;
+      const baseYaw = lookScreen
+        ? (isNorthRow ? 0.28 * (mIdx - 1) : 0.14 * (1 - (mIdx % 3)))
+        : Math.max(-0.42, Math.min(0.42, (isNorthRow ? -1 : 1) * colDiff * 0.22 + (isNorthRow === spNorthRow ? (colDiff >= 0 ? 0.16 : -0.16) : 0)));
+      const nodPhase = (t + mIdx * 1.3) % 4.6;
+      const nod = nodPhase < 0.75 ? Math.sin((nodPhase / 0.75) * Math.PI * 2) * 0.075 : 0;
+      const takingNotes = Math.sin(t * 0.4 + mIdx * 2.3) > 0.45;
+      rig.swivel.rotation.y = Math.sin(t * 0.25 + mIdx) * 0.025;
+      applyBoneOffsets(b.Head, (takingNotes ? 0.1 : -0.01) + nod, baseYaw + Math.sin(t * 0.6 + mIdx) * 0.05, 0);
+      applyBoneOffsets(b.LeftArm, 0.04, 0, 0);
+      applyBoneOffsets(b.RightArm, takingNotes ? 0.02 : 0.05, takingNotes ? -0.08 : 0, 0);
+      applyBoneOffsets(b.LeftForeArm, 0.06, 0.08, 0);
+      applyBoneOffsets(b.RightForeArm, takingNotes ? Math.sin(t * 6.5 + mIdx) * 0.04 : 0.06, takingNotes ? -0.14 : -0.08, 0);
+    }
+    return;
+  }
+
+  // 2. Giám đốc: phong thái điều hành điềm tĩnh (xem báo cáo màn hình lớn, gõ chậm, ngả lưng suy nghĩ, quan sát văn phòng)
+  if (rig.role === "director") {
+    const phase = (t * 0.14) % 3;
+    if (phase < 1.2) {
+      rig.swivel.rotation.y = Math.sin(t * 0.35) * 0.04;
+      applyBoneOffsets(b.Spine1, 0.03 + breath, 0, 0);
+      applyBoneOffsets(b.Head, 0.04 + Math.sin(t * 1.1) * 0.025, Math.sin(t * 0.5) * 0.14, 0);
+      applyBoneOffsets(b.LeftArm, 0.02, 0, 0);
+      applyBoneOffsets(b.RightArm, 0, -0.12, 0);
+      applyBoneOffsets(b.LeftForeArm, 0.04, 0.06, 0);
+      applyBoneOffsets(b.RightForeArm, Math.sin(t * 2.2) * 0.025, -0.15 + Math.sin(t * 1.8) * 0.06, 0);
+    } else if (phase < 2.1) {
+      rig.swivel.rotation.y = Math.sin(t * 0.4) * 0.11;
+      applyBoneOffsets(b.Spine1, -0.07 + breath, 0, 0);
+      applyBoneOffsets(b.Head, -0.03, Math.sin(t * 0.45) * 0.22, Math.sin(t * 0.3) * 0.03);
+      applyBoneOffsets(b.LeftArm, 0.08, 0, 0);
+      applyBoneOffsets(b.RightArm, 0.08, 0, 0);
+      applyBoneOffsets(b.LeftForeArm, 0.12, 0.12, 0);
+      applyBoneOffsets(b.RightForeArm, 0.12, -0.12, 0);
+    } else {
+      const tap = Math.sin(t * 7.8) * 0.05;
+      rig.swivel.rotation.y = Math.sin(t * 0.28) * 0.02;
+      applyBoneOffsets(b.Spine1, 0.04 + breath, 0, 0);
+      applyBoneOffsets(b.Head, 0.05, Math.sin(t * 0.7) * 0.08, 0);
+      applyBoneOffsets(b.LeftArm, 0, 0, 0);
+      applyBoneOffsets(b.RightArm, 0, 0, 0);
+      applyBoneOffsets(b.LeftForeArm, tap, 0.06, 0);
+      applyBoneOffsets(b.RightForeArm, -tap, -0.06, 0);
+    }
+    return;
+  }
+
+  // 3. Agent & nhân viên tại bàn làm việc: gõ phím theo đợt tự nhiên + đọc màn hình + rê chuột + chờ duyệt / debug / nghỉ
   if (st === "wait") {
-    rig.swivel.rotation.y = Math.sin(t * 1.2 + i) * 0.06;
-    applyBoneOffsets(b.Head, -0.05, Math.sin(t * 1.5) * 0.2, Math.sin(t * 2.0) * 0.05);
-    applyBoneOffsets(b.LeftArm, 0, 0, 0);
-    applyBoneOffsets(b.LeftForeArm, 0, 0, 0);
-    applyBoneOffsets(b.RightArm, -0.78, 0, 0.22 + Math.sin(t * 4.5) * 0.14);
-    applyBoneOffsets(b.RightForeArm, -0.42 + Math.sin(t * 4.5 + 0.5) * 0.18, 0, 0);
+    rig.swivel.rotation.y = Math.sin(t * 0.7 + i) * 0.06;
+    applyBoneOffsets(b.Spine1, -0.02 + breath, 0, 0);
+    applyBoneOffsets(b.Head, -0.04, Math.sin(t * 0.9 + i) * 0.22, Math.sin(t * 1.1 + i) * 0.03);
+    const waveCycle = (t + i * 1.3) % 5.2;
+    const raise = waveCycle < 1.8 ? Math.sin((waveCycle / 1.8) * Math.PI) : 0;
+    applyBoneOffsets(b.LeftArm, 0.04, 0, 0);
+    applyBoneOffsets(b.LeftForeArm, 0.06, 0, 0);
+    applyBoneOffsets(b.RightArm, -0.58 * raise, 0, 0.16 * raise);
+    applyBoneOffsets(b.RightForeArm, -0.32 * raise + Math.sin(t * 4.2) * 0.08 * raise, 0, 0);
   } else if (st === "done") {
-    rig.swivel.rotation.y = Math.sin(t * 2.1) * 0.09;
-    applyBoneOffsets(b.Spine1, breath - 0.05, 0, 0);
-    applyBoneOffsets(b.Head, -0.08, Math.sin(t * 2.3) * 0.16, 0);
-    const cheer = Math.sin(t * 6.5) * 0.14;
-    applyBoneOffsets(b.LeftArm, -0.85 - cheer, 0, -0.24);
-    applyBoneOffsets(b.LeftForeArm, -0.3, 0, 0);
-    applyBoneOffsets(b.RightArm, -0.85 + cheer, 0, 0.24);
-    applyBoneOffsets(b.RightForeArm, -0.3, 0, 0);
+    rig.swivel.rotation.y = Math.sin(t * 1.1 + i) * 0.08;
+    const donePulse = Math.max(0, Math.sin(t * 1.2 + i));
+    applyBoneOffsets(b.Spine1, breath - 0.05 * donePulse, 0, 0);
+    applyBoneOffsets(b.Head, -0.05 + Math.sin(t * 2.8) * 0.04, Math.sin(t * 1.1) * 0.14, 0);
+    const cheer = Math.sin(t * 5.2) * 0.12 * donePulse;
+    applyBoneOffsets(b.LeftArm, -0.62 * donePulse - cheer, 0, -0.18 * donePulse);
+    applyBoneOffsets(b.LeftForeArm, -0.24 * donePulse, 0, 0);
+    applyBoneOffsets(b.RightArm, -0.62 * donePulse + cheer, 0, 0.18 * donePulse);
+    applyBoneOffsets(b.RightForeArm, -0.24 * donePulse, 0, 0);
   } else if (st === "fail") {
     rig.swivel.rotation.y = 0;
-    applyBoneOffsets(b.Spine1, 0.07 + breath, 0, 0);
-    applyBoneOffsets(b.Head, 0.08, Math.sin(t * 6.0) * 0.14, Math.sin(t * 3.5) * 0.04);
-    const fast = Math.sin(t * 15 + i) * 0.1;
+    applyBoneOffsets(b.Spine1, 0.08 + breath, 0, 0);
+    const shakeCycle = (t + i) % 3.8;
+    const shake = shakeCycle < 1.1 ? Math.sin((shakeCycle / 1.1) * Math.PI * 3) * 0.14 : 0;
+    applyBoneOffsets(b.Head, 0.09, shake, 0.03);
+    const burst = Math.sin(t * 1.6 + i) > -0.2 ? Math.sin(t * 10.5 + i) * 0.065 : 0;
     applyBoneOffsets(b.LeftArm, 0, 0, 0);
     applyBoneOffsets(b.RightArm, 0, 0, 0);
-    applyBoneOffsets(b.LeftForeArm, fast, 0, 0);
-    applyBoneOffsets(b.RightForeArm, -fast, 0, 0);
+    applyBoneOffsets(b.LeftForeArm, burst, 0.05, 0);
+    applyBoneOffsets(b.RightForeArm, -burst, -0.05, 0);
   } else if (busy) {
-    rig.swivel.rotation.y = Math.sin(t * 0.7 + i) * 0.035;
-    applyBoneOffsets(b.Head, 0.04 + Math.sin(t * 2.2 + i) * 0.04, Math.sin(t * 0.9 + i * 2.1) * 0.18, 0);
-    const tap = Math.sin(t * 11.5 + i * 1.7) * 0.085;
-    const useMouse = Math.sin(t * 0.45 + i) > 0.35;
+    const workCycle = (t + i * 2.17) % 5.0;
+    const typing = workCycle < 3.1;
+    const useMouse = workCycle >= 3.1 && workCycle < 4.35;
+    rig.swivel.rotation.y = Math.sin(t * 0.42 + i * 1.3) * 0.035;
+    applyBoneOffsets(b.Spine1, (typing ? 0.035 : 0.005) + breath, 0, 0);
+    applyBoneOffsets(
+      b.Head,
+      (typing ? 0.05 : 0.02) + Math.sin(t * 1.4 + i) * 0.025,
+      Math.sin(t * 0.65 + i * 2.1) * 0.16,
+      0,
+    );
+    const tapL = typing ? Math.sin(t * 9.2 + i * 1.7) * 0.055 : 0.02;
+    const tapR = typing ? Math.sin(t * 9.8 + i * 2.3 + 1.1) * 0.055 : 0.02;
     applyBoneOffsets(b.LeftArm, 0, 0, 0);
-    applyBoneOffsets(b.LeftForeArm, tap, 0, 0);
+    applyBoneOffsets(b.LeftForeArm, tapL, 0.05, 0);
     applyBoneOffsets(b.RightArm, 0, useMouse ? -0.14 : 0, 0);
-    applyBoneOffsets(b.RightForeArm, useMouse ? Math.sin(t * 3.5 + i) * 0.03 : -tap, useMouse ? -0.18 + Math.sin(t * 2.8 + i) * 0.08 : 0, 0);
+    applyBoneOffsets(
+      b.RightForeArm,
+      useMouse ? Math.sin(t * 2.8 + i) * 0.025 : tapR,
+      useMouse ? -0.18 + Math.sin(t * 2.1 + i) * 0.07 : -0.05,
+      0,
+    );
   } else {
-    rig.swivel.rotation.y = Math.sin(t * 0.45 + i * 1.9) * 0.07;
-    applyBoneOffsets(b.Head, 0.02, Math.sin(t * 0.55 + i * 2.7) * 0.22, Math.sin(t * 0.4 + i) * 0.03);
-    applyBoneOffsets(b.LeftArm, 0, 0, 0);
-    applyBoneOffsets(b.RightArm, 0, 0, 0);
-    applyBoneOffsets(b.LeftForeArm, 0, 0, 0);
-    applyBoneOffsets(b.RightForeArm, 0, 0, 0);
+    rig.swivel.rotation.y = Math.sin(t * 0.35 + i * 1.9) * 0.08;
+    applyBoneOffsets(b.Spine1, -0.03 + breath, 0, 0);
+    applyBoneOffsets(b.Head, 0.01, Math.sin(t * 0.45 + i * 2.7) * 0.24, Math.sin(t * 0.35 + i) * 0.03);
+    applyBoneOffsets(b.LeftArm, 0.05, 0, 0);
+    applyBoneOffsets(b.RightArm, 0.05, 0, 0);
+    applyBoneOffsets(b.LeftForeArm, 0.08, 0.08, 0);
+    applyBoneOffsets(b.RightForeArm, 0.08, -0.08, 0);
   }
 }
 
@@ -1399,13 +1602,13 @@ export function createScheduledNPC(rig, steps, initStepIdx = 0, initElapsed = 0,
   };
 }
 
-function playNPCPose(w, t, dt, spd, mode, walking) {
+function playNPCPose(w, t, dt, actualSpeed, mode, walking) {
   if (w.isHD) {
     if (walking) {
-      w.speed = spd;
-      animateHDHuman(w, t, dt * (spd / 1.15), true, "walk");
+      w.speed = actualSpeed;
+      animateHDHuman(w, t, dt, true, "walk", actualSpeed / 1.32);
     } else {
-      animateHDHuman(w, t, dt, true, mode || "idle");
+      animateHDHuman(w, t, dt, true, mode || "idle", 1.0);
     }
     return;
   }
@@ -1453,6 +1656,11 @@ export function stepScheduledNPC(npc, t, dt, motion, opts = {}) {
   const s = npc.steps[npc.stepIdx];
   if (!s) return;
 
+  // Cập nhật đạo cụ (ôm kiện hàng / cầm cốc cà phê) & hướng nhìn quan sát khớp đúng từng bước công việc
+  if (w.parcelGroup && s.carry !== undefined) w.carryingParcel = Boolean(s.carry);
+  if (w.cupGroup && s.cup !== undefined) w.holdingCup = Boolean(s.cup);
+  w.lookAround = Boolean(s.look);
+
   const advanceStep = () => {
     npc.stepIdx = (npc.stepIdx + 1) % npc.steps.length;
     npc.elapsed = 0;
@@ -1492,7 +1700,7 @@ export function stepScheduledNPC(npc, t, dt, motion, opts = {}) {
         npc.stallTime = 2.0;
       } else if (mv > 0.008) {
         w.root.rotation.y = lerpAngle(w.root.rotation.y, Math.atan2(-mvX, -mvZ), Math.min(1, dt * 7.0));
-        playNPCPose(w, t, dt, 1.2, "walk", true);
+        playNPCPose(w, t, dt, mv / Math.max(dt, 1e-3), "walk", true);
         if (physics) physics.setHuman(layer, npc.id, npc.x, npc.z, 0.36);
         return;
       } else {
@@ -1537,6 +1745,8 @@ export function stepScheduledNPC(npc, t, dt, motion, opts = {}) {
       w.root.position.set(npc.x, 0, npc.z);
       w.root.rotation.y = lerpAngle(w.root.rotation.y, Math.atan2(-(s.to[0] - npc.x), -(s.to[1] - npc.z)), Math.min(1, dt * 7.5));
       if (physics) physics.setHuman(layer, npc.id, npc.x, npc.z, 0.36);
+      // Khi đứng đợi đèn đỏ, khẽ quay đầu quan sát xe cộ hai bên một cách tự nhiên
+      w.lookAround = true;
       playNPCPose(w, t, dt, 0, "idle", false);
       return;
     }
@@ -1621,10 +1831,11 @@ export function stepScheduledNPC(npc, t, dt, motion, opts = {}) {
     }
   }
 
-  if (moved > 0.008) {
+  const actualSpd = moved / Math.max(dt, 1e-3);
+  if (moved > 0.008 && actualSpd > 0.16) {
     const faceYaw = Math.atan2(-mvX, -mvZ);
     w.root.rotation.y = lerpAngle(w.root.rotation.y, faceYaw, threat ? 0.85 : Math.min(1, dt * 7.5));
-    playNPCPose(w, t, dt, spd, "walk", true);
+    playNPCPose(w, t, dt, actualSpd, "walk", true);
   } else {
     w.root.rotation.y = lerpAngle(w.root.rotation.y, Math.atan2(-dirX, -dirZ), Math.min(1, dt * 5.0));
     playNPCPose(w, t, dt, 0, "idle", false);
