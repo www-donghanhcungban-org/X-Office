@@ -4,7 +4,7 @@
 // - Đèn giao thông 2 pha đồng bộ 18 cột tại nút chính & 4 ngã tư; xe buýt tự ghé trạm đón khách trên đại lộ.
 // - 13 công dân Ready Player Me có lịch trình có mục đích (giao hàng tới sảnh, chờ xe buýt, gọi cà phê vỉa hè,
 //   dạo công viên đài phun nước, qua vạch đèn đỏ và tiếp tục hành trình qua các tuyến phố).
-import { buildWalkerRig, buildHDHuman, createScheduledNPC, stepScheduledNPC } from "./human3d.js";
+import { buildWalkerRig, buildHDHuman, buildMotoHDHuman, createScheduledNPC, stepScheduledNPC } from "./human3d.js";
 import { instantiateGLB } from "./glb.js";
 
 const CYCLE = 18.0; // 0–8.5s ĐT Xanh/BN Đỏ · 8.5–10.5s ĐT Vàng/BN Đỏ · 10.5–16.5s ĐT Đỏ/BN Xanh · 16.5–18s ĐT Đỏ/BN Vàng
@@ -79,28 +79,33 @@ export function upgradeVehicleGLB(THREE, natureAssets, mats, hdAssets, key, opts
   const headMat = mats.standard("#fffbeb", {
     roughness: 0.08,
     emissive: "#fef3c7",
-    emissiveIntensity: opts.parked ? 0.08 : 1.85,
+    emissiveIntensity: opts.parked ? 0.08 : 1.95,
   });
   const tailMat = mats.freshStandard("#ef4444", {
     roughness: 0.12,
     emissive: "#ef4444",
-    emissiveIntensity: opts.parked ? 0.06 : 0.75,
+    emissiveIntensity: opts.parked ? 0.06 : 0.78,
   });
   const policeLightMat = key === "veh_police"
-    ? mats.freshStandard("#38bdf8", { roughness: 0.12, emissive: "#38bdf8", emissiveIntensity: opts.parked ? 0.05 : 2.1 })
+    ? mats.freshStandard("#38bdf8", { roughness: 0.12, emissive: "#38bdf8", emissiveIntensity: opts.parked ? 0.05 : 2.2 })
     : null;
 
   let hasTailMesh = false;
+  let hasHeadMesh = false;
+  let hasTexturedBody = false;
+  const physCache = new Map();
   inst.group.traverse((o) => {
     if (!o.isMesh) return;
     o.castShadow = true;
     o.receiveShadow = true;
-    const mn = (o.material && o.material.name) || "";
+    const srcMat = o.material;
+    const mn = (srcMat && srcMat.name) || "";
     if (mn === "lightBack" || mn === "Taillight_Glass") {
       o.material = tailMat;
       hasTailMesh = true;
     } else if (mn === "lightFront" || mn === "Projector_Glass") {
       o.material = headMat;
+      hasHeadMesh = true;
     } else if (mn === "lightBlue" && policeLightMat) {
       o.material = policeLightMat;
     } else if (mn === "window" || mn === "Glass_Gray") {
@@ -115,15 +120,67 @@ export function upgradeVehicleGLB(THREE, natureAssets, mats, hdAssets, key, opts
       o.material = whitePaintMat;
     } else if (mn.startsWith("paint") || mn === "Body_Color" || mn === "Paint 1 Carmine") {
       o.material = paintMat;
+    } else if (srcMat && srcMat.map) {
+      hasTexturedBody = true;
+      // Bảo toàn toàn bộ texture PBR 2K (lưới tản nhiệt, logo, đèn, la-zăng) và nâng lên lớp sơn phủ bóng clearcoat
+      if (!physCache.has(srcMat)) {
+        const isGlass = Boolean(srcMat.transparent) && srcMat.alphaTest === 0;
+        const pm = new THREE.MeshPhysicalMaterial({
+          color: srcMat.color ? srcMat.color.clone() : new THREE.Color("#ffffff"),
+          map: srcMat.map,
+          normalMap: srcMat.normalMap || null,
+          roughnessMap: srcMat.roughnessMap || null,
+          metalnessMap: srcMat.metalnessMap || null,
+          roughness: isGlass ? 0.06 : Math.min(srcMat.roughness !== undefined ? srcMat.roughness : 0.38, 0.34),
+          metalness: isGlass ? 0.25 : Math.max(srcMat.metalness !== undefined ? srcMat.metalness : 0.22, 0.22),
+          clearcoat: isGlass ? 1.0 : 0.92,
+          clearcoatRoughness: isGlass ? 0.03 : 0.07,
+          envMapIntensity: isGlass ? 1.55 : 1.35,
+          transparent: Boolean(srcMat.transparent),
+          opacity: isGlass ? Math.max(srcMat.opacity !== undefined ? srcMat.opacity : 0.65, 0.72) : (srcMat.opacity !== undefined ? srcMat.opacity : 1),
+          alphaTest: srcMat.alphaTest || 0,
+          side: srcMat.side !== undefined ? srcMat.side : THREE.FrontSide,
+        });
+        physCache.set(srcMat, pm);
+      }
+      o.material = physCache.get(srcMat);
     }
   });
   root.add(inst.group);
 
-  if (!hasTailMesh && !opts.parked) {
-    const tl = new THREE.Mesh(natureAssets.geos.unitBox, tailMat);
-    tl.position.set(-halfLen + 0.14, 0.72, 0);
-    tl.scale.set(0.06, 0.09, 1.38);
-    root.add(tl);
+  // Gắn đèn phanh HDR ôm sát đuôi xe (không gắn khối đèn trước lồi ra ngoài cản cho xe đã có texture 2K đầy đủ)
+  if (!opts.parked && (!hasTailMesh || (!hasHeadMesh && !hasTexturedBody) || policeLightMat)) {
+    inst.group.updateMatrixWorld(true);
+    const bb = new THREE.Box3().setFromObject(inst.group);
+    const w = Math.max(0.4, bb.max.z - bb.min.z);
+    const h = Math.max(0.6, bb.max.y - bb.min.y);
+    const singleTrack = opts.singleTrack === true;
+    const zOffs = singleTrack ? [0] : [-w * 0.28, w * 0.28];
+    const lampW = singleTrack ? 0.11 : Math.min(0.24, w * 0.13);
+    if (!hasHeadMesh && !hasTexturedBody) {
+      const hy = bb.min.y + h * (singleTrack ? 0.62 : 0.41);
+      for (const lz of zOffs) {
+        const hl = new THREE.Mesh(natureAssets.geos.unitBox, headMat);
+        hl.position.set(bb.max.x - 0.12, hy, lz);
+        hl.scale.set(0.05, singleTrack ? 0.09 : 0.08, lampW);
+        root.add(hl);
+      }
+    }
+    if (!hasTailMesh) {
+      const ty = bb.min.y + h * (singleTrack ? 0.56 : 0.48);
+      for (const lz of zOffs) {
+        const tl = new THREE.Mesh(natureAssets.geos.unitBox, tailMat);
+        tl.position.set(bb.min.x + (hasTexturedBody ? 0.12 : 0.05), ty, lz);
+        tl.scale.set(0.04, singleTrack ? 0.06 : 0.075, lampW);
+        root.add(tl);
+      }
+    }
+    if (policeLightMat) {
+      const bar = new THREE.Mesh(natureAssets.geos.unitBox, policeLightMat);
+      bar.position.set((bb.min.x + bb.max.x) * 0.5, bb.max.y + 0.02, 0);
+      bar.scale.set(0.16, 0.08, Math.min(0.84, w * 0.44));
+      root.add(bar);
+    }
   }
 
   return {
@@ -414,24 +471,103 @@ function buildMotorbike(THREE, tAssets, natureAssets, mats, bodyColor, jacketCol
   return { root, wheels, mixer: null, tailMat, policeLightMat: null, halfLen: 1.05, halfW: 0.42, wheelR: 0.24 };
 }
 
+function attachMotoRider(THREE, tAssets, hdAssets, mats, root, jacketColor, helmetColor, scooter = false) {
+  const g = tAssets.geos;
+  const hdRider = buildMotoHDHuman(THREE, hdAssets, mats, {
+    jacketColor,
+    helmetColor,
+    scooter,
+    helmetGeo: g.helmet,
+    visorGeo: g.visor,
+  });
+  if (hdRider) {
+    root.add(hdRider);
+    return;
+  }
+  const rider = new THREE.Group();
+  rider.position.set(scooter ? -0.18 : -0.12, scooter ? 0.08 : 0.02, 0);
+  root.add(rider);
+
+  const jacketMat = mats.physical(jacketColor || "#1d4ed8", { roughness: 0.82, sheen: 0.12 });
+  const pantsMat = mats.standard("#1e293b", { roughness: 0.86 });
+  const helmetMat = mats.physical(helmetColor || "#f8fafc", { roughness: 0.14, clearcoat: 1.0, clearcoatRoughness: 0.05 });
+  const visorMat = mats.physical("#0f172a", { roughness: 0.08, clearcoat: 1.0 });
+
+  const torso = new THREE.Mesh(g.riderTorso, jacketMat);
+  torso.position.set(-0.08, 1.08, 0);
+  torso.rotation.z = scooter ? -0.08 : -0.26;
+  torso.castShadow = true;
+  rider.add(torso);
+
+  for (const side of [-1, 1]) {
+    const leg = new THREE.Mesh(g.riderLimb, pantsMat);
+    leg.position.set(0.12, 0.56, side * 0.2);
+    leg.rotation.z = scooter ? -0.22 : -0.34;
+    const arm = new THREE.Mesh(g.riderArm, jacketMat);
+    arm.position.set(0.2, 1.04, side * 0.24);
+    arm.rotation.set(0, side * -0.15, -1.02);
+    arm.castShadow = true;
+    rider.add(leg, arm);
+  }
+
+  const helm = new THREE.Mesh(g.helmet, helmetMat);
+  helm.position.set(scooter ? -0.04 : 0.04, 1.48, 0);
+  helm.castShadow = true;
+  const visor = new THREE.Mesh(g.visor, visorMat);
+  visor.position.set(scooter ? -0.02 : 0.06, 1.48, 0);
+  visor.rotation.y = Math.PI / 2;
+  rider.add(helm, visor);
+}
+
 const VEHICLE_GLB_TABLE = {
-  suv: ["veh_suv", 4.75, 2.48, -Math.PI / 2, false, 0.36, 1.08],
-  sedan: ["veh_sedan", 4.55, 2.38, -Math.PI / 2, false, 0.33, 1.04],
-  sedan_classic: ["veh_sedan_classic", 4.45, 2.34, -Math.PI / 2, false, 0.32, 1.02],
-  hatchback: ["veh_hatchback", 4.05, 2.12, -Math.PI / 2, false, 0.31, 0.98],
-  taxi: ["veh_taxi", 4.45, 2.32, -Math.PI / 2, false, 0.32, 1.02],
-  van: ["veh_van", 4.95, 2.58, -Math.PI / 2, false, 0.35, 1.12],
-  delivery: ["veh_delivery", 5.15, 2.68, -Math.PI / 2, true, 0.36, 1.12],
-  pickup: ["veh_pickup", 4.85, 2.54, -Math.PI / 2, false, 0.37, 1.08],
-  police: ["veh_police", 4.55, 2.38, -Math.PI / 2, true, 0.33, 1.04],
+  suv: ["veh_suv", 4.78, 2.48, Math.PI / 2, false, 0.36, 1.08],
+  sedan: ["veh_sedan", 4.68, 2.44, Math.PI / 2, false, 0.33, 1.04],
+  sedan_classic: ["veh_sedan_classic", 4.55, 2.38, Math.PI / 2, false, 0.32, 1.02],
+  hatchback: ["veh_hatchback", 4.42, 2.3, Math.PI / 2, false, 0.32, 1.0],
+  sports: ["veh_sports", 4.56, 2.38, Math.PI / 2, false, 0.33, 1.04],
+  rancher: ["veh_rancher", 4.82, 2.52, Math.PI / 2, false, 0.36, 1.08],
+  taxi: ["veh_taxi", 4.62, 2.4, Math.PI / 2, false, 0.33, 1.04],
+  van: ["veh_van", 5.35, 2.76, Math.PI / 2, true, 0.36, 1.12],
+  delivery: ["veh_delivery", 5.95, 3.08, Math.PI / 2, true, 0.38, 1.14],
+  pickup: ["veh_pickup", 5.05, 2.62, Math.PI / 2, false, 0.37, 1.08],
+  police: ["veh_police", 4.72, 2.45, Math.PI / 2, true, 0.33, 1.04],
+  bus: ["veh_bus", 8.65, 4.42, Math.PI / 2, false, 0.42, 1.18],
   ferrari: ["veh_ferrari", 4.52, 2.36, -Math.PI / 2, false, 0.33, 1.04],
   car: ["car", 4.55, 2.35, Math.PI / 2, false, 0.32, 1.04],
   truck: ["truck", 5.2, 2.75, Math.PI / 2, false, 0.4, 1.14],
 };
 
 function buildTrafficVehicle(THREE, tAssets, natureAssets, mats, s, hdAssets) {
-  if (s.kind === "moto") return buildMotorbike(THREE, tAssets, natureAssets, mats, s.col, s.j, s.h);
-  if (s.kind === "bus") return buildCityBus(THREE, natureAssets, mats, s.col);
+  if (s.kind === "moto" || s.kind === "scooter") {
+    const isScooter = s.kind === "scooter";
+    const hdBike = upgradeVehicleGLB(THREE, natureAssets, mats, hdAssets, isScooter ? "veh_scooter" : "veh_moto", {
+      targetLength: isScooter ? 1.98 : 2.18,
+      targetWidth: 0.92,
+      halfLen: isScooter ? 1.02 : 1.12,
+      halfW: 0.44,
+      rotY: Math.PI / 2,
+      singleTrack: true,
+      wheelR: 0.28,
+    });
+    if (hdBike) {
+      attachMotoRider(THREE, tAssets, hdAssets, mats, hdBike.root, s.j, s.h, isScooter);
+      return hdBike;
+    }
+    return buildMotorbike(THREE, tAssets, natureAssets, mats, s.col, s.j, s.h);
+  }
+  if (s.kind === "bus") {
+    const cfg = VEHICLE_GLB_TABLE.bus;
+    const hdBus = upgradeVehicleGLB(THREE, natureAssets, mats, hdAssets, cfg[0], {
+      targetLength: cfg[1],
+      targetWidth: 2.75,
+      halfLen: cfg[2],
+      rotY: cfg[3],
+      wheelR: cfg[5],
+      halfW: cfg[6],
+    });
+    if (hdBus) return hdBus;
+    return buildCityBus(THREE, natureAssets, mats, s.col);
+  }
 
   const cfg = VEHICLE_GLB_TABLE[s.kind];
   if (cfg) {
@@ -506,43 +642,43 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
 
   const vehicleSpecs = [
     // Đại lộ chính Nam (Eastbound +X)
-    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.75, pos: -48.0, maxV: 4.4, kind: "truck", col: "#f1f5f9", stopLines: mainEastStop },
+    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.75, pos: -48.0, maxV: 4.4, kind: "delivery", col: "#f1f5f9", stopLines: mainEastStop },
     { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.75, pos: -32.0, maxV: 4.8, kind: "pickup", col: "#991b1b", stopLines: mainEastStop },
-    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.2, pos: -18.0, maxV: 4.6, kind: "moto", col: "#dc2626", j: "#1d4ed8", h: "#f8fafc", stopLines: mainEastStop },
+    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.2, pos: -18.0, maxV: 4.6, kind: "scooter", col: "#dc2626", j: "#1d4ed8", h: "#f8fafc", stopLines: mainEastStop },
     { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.75, pos: -2.5, maxV: 4.3, kind: "bus", col: "#059669", busStopX: 16.8, stopLines: mainEastStop },
     { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 2.25, pos: 13.0, maxV: 4.7, kind: "moto", col: "#0f766e", j: "#334155", h: "#111827", stopLines: mainEastStop },
     { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.75, pos: 29.0, maxV: 5.0, kind: "ferrari", col: "#dc2626", stopLines: mainEastStop },
     { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.75, pos: 46.0, maxV: 4.9, kind: "suv", col: "#e2e8f0", stopLines: mainEastStop },
-    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.2, pos: eastRoadX + 26.0, maxV: 4.7, kind: "moto", col: "#ea580c", j: "#1e293b", h: "#f8fafc", stopLines: mainEastStop },
+    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.2, pos: eastRoadX + 26.0, maxV: 4.7, kind: "scooter", col: "#ea580c", j: "#1e293b", h: "#f8fafc", stopLines: mainEastStop },
     // Đại lộ chính Nam (Westbound -X)
     { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.75, pos: eastRoadX + 36.0, maxV: 4.9, kind: "police", col: "#1e3a8a", stopLines: mainWestStop },
     { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.75, pos: eastRoadX + 18.0, maxV: 4.9, kind: "taxi", col: "#eab308", stopLines: mainWestStop },
-    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 2.25, pos: 40.0, maxV: 4.5, kind: "moto", col: "#f8fafc", j: "#15803d", h: "#dc2626", stopLines: mainWestStop },
+    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 2.25, pos: 40.0, maxV: 4.5, kind: "scooter", col: "#f8fafc", j: "#15803d", h: "#dc2626", stopLines: mainWestStop },
     { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.75, pos: 26.0, maxV: 4.8, kind: "sedan", col: "#3b82f6", stopLines: mainWestStop },
     { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.25, pos: 14.0, maxV: 4.6, kind: "moto", col: "#1e3a8a", j: "#c2410c", h: "#facc15", stopLines: mainWestStop },
-    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.75, pos: -2.0, maxV: 4.7, kind: "van", col: "#64748b", stopLines: mainWestStop },
+    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.75, pos: -2.0, maxV: 4.9, kind: "sports", col: "#0f172a", stopLines: mainWestStop },
     { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.75, pos: -24.0, maxV: 5.0, kind: "hatchback", col: "#0284c7", stopLines: mainWestStop },
-    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.25, pos: -46.0, maxV: 4.5, kind: "moto", col: "#18181b", j: "#6d28d9", h: "#e2e8f0", stopLines: mainWestStop },
+    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.25, pos: -46.0, maxV: 4.5, kind: "scooter", col: "#18181b", j: "#6d28d9", h: "#e2e8f0", stopLines: mainWestStop },
     // Đại lộ phía Bắc (sau lưng văn phòng, chạy suốt tuyến)
     { axis: "x", sigAxis: "ew", dir: 1, lane: northRoadZ + 1.55, pos: -32.0, maxV: 4.8, kind: "sedan_classic", col: "#cbd5e1", stopLines: northEastStop },
     { axis: "x", sigAxis: "ew", dir: 1, lane: northRoadZ + 1.55, pos: 14.0, maxV: 4.7, kind: "moto", col: "#0284c7", j: "#0f172a", h: "#f8fafc", stopLines: northEastStop },
-    { axis: "x", sigAxis: "ew", dir: 1, lane: northRoadZ + 1.55, pos: eastRoadX + 18.0, maxV: 4.9, kind: "suv", col: "#1d4ed8", stopLines: northEastStop },
+    { axis: "x", sigAxis: "ew", dir: 1, lane: northRoadZ + 1.55, pos: eastRoadX + 18.0, maxV: 4.9, kind: "rancher", col: "#1d4ed8", stopLines: northEastStop },
     { axis: "x", sigAxis: "ew", dir: -1, lane: northRoadZ - 1.55, pos: eastRoadX + 24.0, maxV: 4.5, kind: "delivery", col: "#0f766e", stopLines: northWestStop },
-    { axis: "x", sigAxis: "ew", dir: -1, lane: northRoadZ - 1.55, pos: 22.0, maxV: 4.6, kind: "moto", col: "#b91c1c", j: "#1e293b", h: "#facc15", stopLines: northWestStop },
+    { axis: "x", sigAxis: "ew", dir: -1, lane: northRoadZ - 1.55, pos: 22.0, maxV: 4.6, kind: "scooter", col: "#b91c1c", j: "#1e293b", h: "#facc15", stopLines: northWestStop },
     { axis: "x", sigAxis: "ew", dir: -1, lane: northRoadZ - 1.55, pos: -26.0, maxV: 4.8, kind: "taxi", col: "#eab308", stopLines: northWestStop },
     // Đại lộ nhánh Tây (Bắc-Nam)
     { axis: "z", sigAxis: "ns", dir: 1, lane: westRoadX - 1.65, pos: -34.0, maxV: 4.8, kind: "car", col: "#f8fafc", stopLines: nsSouthStop },
     { axis: "z", sigAxis: "ns", dir: 1, lane: westRoadX - 1.2, pos: 6.0, maxV: 4.5, kind: "moto", col: "#dc2626", j: "#1d4ed8", h: "#f8fafc", stopLines: nsSouthStop },
     { axis: "z", sigAxis: "ns", dir: 1, lane: westRoadX - 1.65, pos: mainRoadZ + 18.0, maxV: 4.9, kind: "pickup", col: "#0284c7", stopLines: nsSouthStop },
     { axis: "z", sigAxis: "ns", dir: -1, lane: westRoadX + 1.65, pos: mainRoadZ + 28.0, maxV: 4.8, kind: "sedan", col: "#334155", stopLines: nsNorthStop },
-    { axis: "z", sigAxis: "ns", dir: -1, lane: westRoadX + 1.2, pos: 14.0, maxV: 4.4, kind: "moto", col: "#0f766e", j: "#c2410c", h: "#f8fafc", stopLines: nsNorthStop },
-    { axis: "z", sigAxis: "ns", dir: -1, lane: westRoadX + 1.65, pos: -24.0, maxV: 4.7, kind: "hatchback", col: "#b91c1c", stopLines: nsNorthStop },
+    { axis: "z", sigAxis: "ns", dir: -1, lane: westRoadX + 1.2, pos: 14.0, maxV: 4.4, kind: "scooter", col: "#0f766e", j: "#c2410c", h: "#f8fafc", stopLines: nsNorthStop },
+    { axis: "z", sigAxis: "ns", dir: -1, lane: westRoadX + 1.65, pos: -24.0, maxV: 4.9, kind: "sports", col: "#b91c1c", stopLines: nsNorthStop },
     // Đại lộ nhánh Đông (Bắc-Nam)
     { axis: "z", sigAxis: "ns", dir: 1, lane: eastRoadX - 1.65, pos: -28.0, maxV: 4.3, kind: "bus", col: "#0369a1", stopLines: nsSouthStop },
     { axis: "z", sigAxis: "ns", dir: 1, lane: eastRoadX - 1.2, pos: 9.0, maxV: 4.5, kind: "moto", col: "#1e3a8a", j: "#334155", h: "#facc15", stopLines: nsSouthStop },
     { axis: "z", sigAxis: "ns", dir: 1, lane: eastRoadX - 1.65, pos: mainRoadZ + 20.0, maxV: 4.7, kind: "van", col: "#15803d", stopLines: nsSouthStop },
-    { axis: "z", sigAxis: "ns", dir: -1, lane: eastRoadX + 1.65, pos: mainRoadZ + 32.0, maxV: 4.8, kind: "suv", col: "#f1f5f9", stopLines: nsNorthStop },
-    { axis: "z", sigAxis: "ns", dir: -1, lane: eastRoadX + 1.2, pos: 17.0, maxV: 4.4, kind: "moto", col: "#ea580c", j: "#1d4ed8", h: "#f8fafc", stopLines: nsNorthStop },
+    { axis: "z", sigAxis: "ns", dir: -1, lane: eastRoadX + 1.65, pos: mainRoadZ + 32.0, maxV: 4.8, kind: "rancher", col: "#f1f5f9", stopLines: nsNorthStop },
+    { axis: "z", sigAxis: "ns", dir: -1, lane: eastRoadX + 1.2, pos: 17.0, maxV: 4.4, kind: "scooter", col: "#ea580c", j: "#1d4ed8", h: "#f8fafc", stopLines: nsNorthStop },
     { axis: "z", sigAxis: "ns", dir: -1, lane: eastRoadX + 1.65, pos: -22.0, maxV: 4.8, kind: "sedan_classic", col: "#0284c7", stopLines: nsNorthStop },
   ];
 

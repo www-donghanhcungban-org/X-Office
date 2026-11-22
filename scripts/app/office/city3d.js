@@ -658,19 +658,19 @@ export function buildSurroundingCity(THREE, cityAssets, natureAssets, sgAssets, 
     false,
   );
 
-  // Xe ô tô & xe bán tải đỗ tự nhiên dọc lề đường & trước sân nhà phố (như xe ngoài đời thật)
+  // Xe ô tô & xe bán tải HD đỗ tự nhiên dọc lề đường & trước sân nhà phố (như xe ngoài đời thật)
   const parkedSpecs = [
-    ["veh_delivery", "#f1f5f9", 10.8, streetZ + 12.6, 0, 5.05, true],
-    ["veh_pickup", "#991b1b", -14.8, streetZ + 12.8, 0.04, 4.75, false],
-    ["veh_pickup", "#1e293b", -22.4, streetZ + 12.7, Math.PI, 4.75, false],
-    ["veh_suv", "#e2e8f0", 41.2, streetZ + 12.6, Math.PI, 4.7, false],
-    ["veh_sedan_classic", "#334155", -13.0, 14.0, Math.PI / 2, 4.4, false],
-    ["veh_hatchback", "#0f766e", eastRoadX + 6.4, 13.8, -Math.PI / 2, 4.0, false],
+    ["veh_delivery", "#f1f5f9", 10.8, streetZ + 12.6, 0, 5.85, true],
+    ["veh_pickup", "#991b1b", -14.8, streetZ + 12.8, 0.04, 4.95, false],
+    ["veh_rancher", "#1e293b", -22.4, streetZ + 12.7, Math.PI, 4.8, false],
+    ["veh_suv", "#e2e8f0", 41.2, streetZ + 12.6, Math.PI, 4.75, false],
+    ["veh_sedan_classic", "#334155", -13.0, 14.0, Math.PI / 2, 4.5, false],
+    ["veh_sports", "#0f766e", eastRoadX + 6.4, 13.8, -Math.PI / 2, 4.55, false],
   ];
   for (const [key, color, px, pz, ry, targetLength, keepWhite] of parkedSpecs) {
     const pv = upgradeVehicleGLB(THREE, natureAssets, mats, hdAssets, key, {
       targetLength,
-      rotY: -Math.PI / 2,
+      rotY: Math.PI / 2,
       color,
       keepWhitePaint: keepWhite,
       parked: true,

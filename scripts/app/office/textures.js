@@ -648,6 +648,75 @@ function drawRoad(ctx, s) {
   for (let x = 24; x < s; x += 128) ctx.fillRect(x, s * 0.485, 72, s * 0.03);
 }
 
+// Biển tên tòa nhà & sảnh lễ tân: "ĐỒNG HÀNH CÙNG BẠN" · "www.donghanhcungban.org"
+function drawBrandSign(ctx, w, h, lobby = false) {
+  const bg = ctx.createLinearGradient(0, 0, w, h);
+  if (lobby) {
+    bg.addColorStop(0, "#0c1b33");
+    bg.addColorStop(0.55, "#12294b");
+    bg.addColorStop(1, "#0a1628");
+  } else {
+    bg.addColorStop(0, "#091529");
+    bg.addColorStop(0.5, "#102442");
+    bg.addColorStop(1, "#0b1a33");
+  }
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, w, h);
+
+  const glow = ctx.createRadialGradient(w * 0.16, h * 0.5, 8, w * 0.16, h * 0.5, w * 0.34);
+  glow.addColorStop(0, "rgba(56,189,248,0.28)");
+  glow.addColorStop(0.6, "rgba(250,204,21,0.09)");
+  glow.addColorStop(1, "rgba(15,23,42,0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, w, h);
+
+  ctx.strokeStyle = "#d4a84f";
+  ctx.lineWidth = 6;
+  ctx.strokeRect(12, 12, w - 24, h - 24);
+  ctx.strokeStyle = "rgba(147,197,253,0.3)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(22, 22, w - 44, h - 44);
+
+  // Biểu trưng hình học bên trái (hai vòng tròn đồng hành lồng nhau)
+  const cx = 130;
+  const cy = h * 0.5;
+  ctx.save();
+  ctx.lineWidth = 10;
+  ctx.strokeStyle = "#f5c451";
+  ctx.beginPath();
+  ctx.arc(cx - 18, cy, 48, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.strokeStyle = "#38bdf8";
+  ctx.beginPath();
+  ctx.arc(cx + 22, cy, 48, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.arc(cx + 2, cy, 13, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.fillStyle = "rgba(212,168,79,0.58)";
+  ctx.fillRect(222, 56, 3, h - 112);
+
+  // Dòng chữ chính "ĐỒNG HÀNH CÙNG BẠN" + tên miền "www.donghanhcungban.org"
+  ctx.save();
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.shadowColor = "rgba(0,0,0,0.5)";
+  ctx.shadowBlur = 10;
+  ctx.shadowOffsetY = 3;
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "800 56px 'Segoe UI', system-ui, -apple-system, sans-serif";
+  ctx.fillText("ĐỒNG HÀNH CÙNG BẠN", 252, h * 0.39);
+
+  ctx.shadowBlur = 4;
+  ctx.fillStyle = "#f8d477";
+  ctx.font = "600 36px 'Segoe UI', system-ui, -apple-system, sans-serif";
+  ctx.fillText("www.donghanhcungban.org", 254, h * 0.71);
+  ctx.restore();
+}
+
 // Vỉa hè bê tông cắt khe giãn nở
 function drawSidewalk(ctx, s) {
   ctx.fillStyle = "#d9d6cf";
@@ -835,6 +904,16 @@ export function createTextureBank(THREE, onReady) {
       drawIris(ctx, 128, hex);
       const tex = new THREE.CanvasTexture(canvas);
       tex.colorSpace = THREE.SRGBColorSpace;
+      tex.needsUpdate = true;
+      cache.set(kind, tex);
+      return tex;
+    }
+    if (kind === "brandSign" || kind === "brandSign:lobby") {
+      const [canvas, ctx] = makeCanvas(1024, 320);
+      drawBrandSign(ctx, 1024, 320, kind === "brandSign:lobby");
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = 8;
       tex.needsUpdate = true;
       cache.set(kind, tex);
       return tex;

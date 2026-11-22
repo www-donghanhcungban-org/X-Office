@@ -1186,6 +1186,98 @@ export function buildSeatedHDHuman(THREE, assets, hdAssets, mats, opts = {}) {
   };
 }
 
+// Người lái mô tô / xe tay ga chuẩn Ready Player Me HD ngồi đúng tư thế tay nắm ghi-đông & đội mũ bảo hiểm
+export function buildMotoHDHuman(THREE, hdAssets, mats, opts = {}) {
+  const parsed = hdAssets && (hdAssets.get("human_rpm_a") || hdAssets.get("human_rpm_b"));
+  if (!parsed) return null;
+  const scooter = Boolean(opts.scooter);
+  const inst = instantiateGLB(THREE, parsed, { targetHeight: 1.64, rotY: 0, centerXZ: false, groundY: false });
+  inst.root.position.set(0, 0, 0);
+
+  const bones = {};
+  inst.root.traverse((o) => {
+    if (o.name) bones[o.name] = o;
+    if (o.isSkinnedMesh) o.frustumCulled = false;
+    if (!o.isMesh || !o.material) return;
+    const mn = o.material.name || "";
+    if (mn === "Wolf3D_Outfit_Top" || mn === "Wolf3D_Outfit_Bottom") {
+      const m = o.material.clone();
+      if (mn === "Wolf3D_Outfit_Top") {
+        m.color.set(opts.jacketColor || "#1d4ed8");
+        m.roughness = 0.82;
+      } else {
+        m.color.set("#1e293b");
+        m.roughness = 0.86;
+      }
+      m.map = null;
+      m.needsUpdate = true;
+      mats.own(m);
+      o.material = m;
+    }
+  });
+
+  if (bones.Hips) {
+    bones.Hips.position.y = scooter ? 0.69 : 0.73;
+    bones.Hips.position.z = 0;
+  }
+  inst.root.updateMatrixWorld(true);
+
+  if (bones.LeftUpLeg) {
+    rotateBoneWorld(THREE, bones.LeftUpLeg, -1, 0, 0, scooter ? 1.32 : 1.12);
+    rotateBoneWorld(THREE, bones.LeftUpLeg, 0, 1, 0, scooter ? 0.16 : 0.28);
+  }
+  if (bones.RightUpLeg) {
+    rotateBoneWorld(THREE, bones.RightUpLeg, -1, 0, 0, scooter ? 1.32 : 1.12);
+    rotateBoneWorld(THREE, bones.RightUpLeg, 0, 1, 0, scooter ? -0.16 : -0.28);
+  }
+  inst.root.updateMatrixWorld(true);
+
+  if (bones.LeftLeg) rotateBoneWorld(THREE, bones.LeftLeg, 1, 0, 0, scooter ? 1.28 : 1.38);
+  if (bones.RightLeg) rotateBoneWorld(THREE, bones.RightLeg, 1, 0, 0, scooter ? 1.28 : 1.38);
+  if (bones.Spine) rotateBoneWorld(THREE, bones.Spine, 1, 0, 0, scooter ? 0.12 : 0.34);
+  if (bones.Spine1) rotateBoneWorld(THREE, bones.Spine1, 1, 0, 0, scooter ? 0.06 : 0.18);
+  if (bones.Head) rotateBoneWorld(THREE, bones.Head, -1, 0, 0, scooter ? 0.12 : 0.38);
+  inst.root.updateMatrixWorld(true);
+
+  if (bones.LeftArm) {
+    rotateBoneWorld(THREE, bones.LeftArm, 0, 0, -1, 0.56);
+    rotateBoneWorld(THREE, bones.LeftArm, -1, 0, 0, scooter ? 0.92 : 1.04);
+  }
+  if (bones.RightArm) {
+    rotateBoneWorld(THREE, bones.RightArm, 0, 0, 1, 0.56);
+    rotateBoneWorld(THREE, bones.RightArm, -1, 0, 0, scooter ? 0.92 : 1.04);
+  }
+  inst.root.updateMatrixWorld(true);
+
+  if (bones.LeftForeArm) rotateBoneWorld(THREE, bones.LeftForeArm, -1, 0, 0, 0.34);
+  if (bones.RightForeArm) rotateBoneWorld(THREE, bones.RightForeArm, -1, 0, 0, 0.34);
+  inst.root.updateMatrixWorld(true);
+
+  // Mũ bảo hiểm bóng clearcoat + kính râm ôm khít đầu Ready Player Me
+  if (bones.Head && opts.helmetGeo && opts.visorGeo) {
+    const qHeadW = new THREE.Quaternion();
+    bones.Head.getWorldQuaternion(qHeadW);
+    const qInvHead = qHeadW.clone().invert();
+    const hMount = new THREE.Group();
+    hMount.quaternion.copy(qInvHead);
+    hMount.position.set(0, 0.11, 0.015).applyQuaternion(qInvHead);
+    const helmetMat = mats.physical(opts.helmetColor || "#f8fafc", { roughness: 0.14, clearcoat: 1.0, clearcoatRoughness: 0.05 });
+    const visorMat = mats.physical("#0f172a", { roughness: 0.08, clearcoat: 1.0 });
+    const helm = new THREE.Mesh(opts.helmetGeo, helmetMat);
+    helm.scale.set(0.84, 0.86, 0.92);
+    helm.castShadow = true;
+    const visor = new THREE.Mesh(opts.visorGeo, visorMat);
+    visor.scale.set(0.84, 0.86, 0.92);
+    hMount.add(helm, visor);
+    bones.Head.add(hMount);
+  }
+
+  // Xoay mặt người lái từ +Z sang +X (khớp trục đầu xe)
+  inst.group.rotation.y = Math.PI / 2;
+  inst.group.position.set(scooter ? -0.18 : -0.14, 0, 0);
+  return inst.group;
+}
+
 function applyBoneOffsets(ab, pitch, yaw, roll) {
   if (!ab) return;
   ab.bone.quaternion.copy(ab.baseQ);

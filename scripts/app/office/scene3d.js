@@ -131,6 +131,7 @@ export function createMaterialBank(THREE, textures, glowOn) {
     const t = textures.get(opts.tex);
     if (!t) return;
     params.map = t;
+    if (opts.emissiveMap && glowOn) params.emissiveMap = t;
     if (glowOn && opts.normal) {
       const nm = textures.normal(opts.tex);
       if (nm) {
@@ -183,7 +184,7 @@ export function createMaterialBank(THREE, textures, glowOn) {
   }
 
   function keyOf(kind, color, opts) {
-    return kind + "|" + color + "|" + (opts.tex || "") + "|" + (opts.normal || 0) + "|" + (opts.roughMap ? 1 : 0) +
+    return kind + "|" + color + "|" + (opts.tex || "") + "|" + (opts.emissiveMap ? 1 : 0) + "|" + (opts.normal || 0) + "|" + (opts.roughMap ? 1 : 0) +
       "|" + (opts.roughness ?? "") + "|" + (opts.metalness ?? "") + "|" + (opts.opacity ?? 1) +
       "|" + (opts.alphaTest ?? 0) + "|" + (opts.emissive || "") + "|" + (opts.emissiveIntensity ?? "") +
       "|" + (opts.clearcoat ?? "") + "|" + (opts.sheen ?? "") + "|" + (opts.sheenColor || "") +
@@ -355,6 +356,57 @@ function buildOutdoor(THREE, sceneAssets, natureAssets, humanAssets, trafficAsse
   walk.scale.set(3.9, pad, 1);
   walk.receiveShadow = true;
   group.add(curb, walk);
+
+  // Cổng chào kiến trúc & biển tên tòa nhà phát sáng: "ĐỒNG HÀNH CÙNG BẠN · www.donghanhcungban.org"
+  const portalSteel = mats.standard("#1e293b", { roughness: 0.28, metalness: 0.72 });
+  const portalGold = mats.standard("#d4a84f", { roughness: 0.24, metalness: 0.82 });
+  const canopyGlass = mats.physical("#93c5fd", { roughness: 0.08, metalness: 0.15, clearcoat: 1.0, transparent: true, opacity: 0.42 });
+  const signFaceMat = mats.standard("#ffffff", {
+    roughness: 0.24,
+    metalness: 0.1,
+    tex: "brandSign",
+    emissive: "#ffffff",
+    emissiveMap: true,
+    emissiveIntensity: 0.42,
+  });
+
+  const portalZ = plan.D + 0.42;
+  for (const px of [2.72, 7.28]) {
+    addBox(THREE, group, g.unitBox, portalSteel, px, 2.15, portalZ, 0.28, 4.3, 0.34, true, true);
+    addBox(THREE, group, g.unitBox, portalGold, px, 0.16, portalZ, 0.36, 0.32, 0.42, false, true);
+    if (physics) physics.addBox("outdoor", px - 0.22, portalZ - 0.24, px + 0.22, portalZ + 0.24, "portal_col");
+  }
+  addBox(THREE, group, g.unitBox, portalSteel, 5.0, 3.84, portalZ + 0.35, 5.15, 0.14, 1.35, true, true);
+  addBox(THREE, group, g.unitBox, canopyGlass, 5.0, 3.92, portalZ + 0.35, 4.85, 0.05, 1.15, false, false);
+  // Hộp biển tên chính trên đỉnh cổng sảnh (2 mặt trước/sau)
+  addBox(THREE, group, g.unitBox, portalSteel, 5.0, 4.68, portalZ + 0.24, 5.65, 1.56, 0.24, true, true);
+  addBox(THREE, group, g.unitBox, portalGold, 5.0, 5.49, portalZ + 0.24, 5.72, 0.06, 0.28, false, false);
+  const frontSign = new THREE.Mesh(g.unitPlane, signFaceMat);
+  frontSign.position.set(5.0, 4.68, portalZ + 0.37);
+  frontSign.scale.set(5.48, 1.44, 1);
+  group.add(frontSign);
+  const backSign = new THREE.Mesh(g.unitPlane, signFaceMat);
+  backSign.position.set(5.0, 4.68, portalZ + 0.11);
+  backSign.rotation.y = Math.PI;
+  backSign.scale.set(5.48, 1.44, 1);
+  group.add(backSign);
+
+  // Biển trụ đá & đèn LED ngang tầm mắt ngay mặt tiền đại lộ (đọc rõ khi đi Dạo phố)
+  const monX = 9.55;
+  const monZ = plan.D + pad - 0.48;
+  addBox(THREE, group, g.unitBox, curbMat, monX, 0.24, monZ, 3.6, 0.48, 0.56, true, true);
+  addBox(THREE, group, g.unitBox, portalSteel, monX, 1.24, monZ, 3.38, 1.54, 0.28, true, true);
+  addBox(THREE, group, g.unitBox, portalGold, monX, 2.04, monZ, 3.46, 0.06, 0.32, false, false);
+  const monFace = new THREE.Mesh(g.unitPlane, signFaceMat);
+  monFace.position.set(monX, 1.24, monZ + 0.15);
+  monFace.scale.set(3.22, 1.04, 1);
+  group.add(monFace);
+  const monBack = new THREE.Mesh(g.unitPlane, signFaceMat);
+  monBack.position.set(monX, 1.24, monZ - 0.15);
+  monBack.rotation.y = Math.PI;
+  monBack.scale.set(3.22, 1.04, 1);
+  group.add(monBack);
+  if (physics) physics.addBox("outdoor", monX - 1.85, monZ - 0.36, monX + 1.85, monZ + 0.36, "monument_sign");
 
   // Hàng rào cây xanh & hoa bao quanh
   group.add(buildFence(THREE, natureAssets, mats, { axis: "x", x: 7.4, y: plan.D + pad - 1.0, len: plan.W - 7.4 + pad - 1 }));
@@ -1330,12 +1382,21 @@ function buildProp(THREE, sceneAssets, natureAssets, hdAssets, mats, p, th, plan
 
   if (p.kind === "logo") {
     const lg = new THREE.Group();
-    lg.position.set(p.x + p.w / 2, 2.9, 0.05);
-    addBox(THREE, lg, g.unitBox, mats.standard(th.trim, { roughness: 0.32, metalness: 0.25, emissive: th.edge || null, emissiveIntensity: 0.5 }), 0, 0, 0, p.w, 1.2, 0.06, false, false);
-    const wm = mats.standard("#ffffff", { roughness: 0.2, emissive: "#ffffff", emissiveIntensity: 0.35 });
-    addBox(THREE, lg, g.unitBox, wm, -p.w / 2 + 0.65, 0, 0.05, 0.68, 0.68, 0.04, false, false);
-    addBox(THREE, lg, g.unitBox, wm, 0.45, 0.14, 0.05, p.w - 1.7, 0.2, 0.04, false, false);
-    addBox(THREE, lg, g.unitBox, mats.standard(shade(th.trim, 0.6), { roughness: 0.3 }), 0.05, -0.16, 0.05, (p.w - 1.7) * 0.6, 0.13, 0.04, false, false);
+    lg.position.set(p.x + p.w / 2, 2.78, 0.05);
+    addBox(THREE, lg, g.unitBox, mats.standard("#1e293b", { roughness: 0.28, metalness: 0.65 }), 0, 0, 0, p.w, 1.32, 0.08, false, false);
+    addBox(THREE, lg, g.unitBox, mats.standard("#d4a84f", { roughness: 0.24, metalness: 0.82 }), 0, 0.68, 0, p.w + 0.06, 0.05, 0.1, false, false);
+    const lMat = mats.standard("#ffffff", {
+      roughness: 0.24,
+      metalness: 0.1,
+      tex: "brandSign:lobby",
+      emissive: "#ffffff",
+      emissiveMap: true,
+      emissiveIntensity: 0.38,
+    });
+    const face = new THREE.Mesh(g.unitPlane, lMat);
+    face.position.set(0, 0, 0.048);
+    face.scale.set(p.w - 0.14, 1.2, 1);
+    lg.add(face);
     cutaway.back.add(lg);
     return null;
   }
