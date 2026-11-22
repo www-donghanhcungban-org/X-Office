@@ -648,10 +648,17 @@ function drawRoad(ctx, s) {
   for (let x = 24; x < s; x += 128) ctx.fillRect(x, s * 0.485, 72, s * 0.03);
 }
 
-// Biển tên tòa nhà & sảnh lễ tân: "ĐỒNG HÀNH CÙNG BẠN" · "www.donghanhcungban.org"
-function drawBrandSign(ctx, w, h, lobby = false) {
+// Biển tên tòa nhà, tháp cao tầng & sảnh lễ tân: "ĐỒNG HÀNH CÙNG BẠN" · "www.donghanhcungban.org"
+function drawBrandSign(ctx, w, h, variant = "portal") {
+  const tower = variant === "tower";
+  const lobby = variant === "lobby";
   const bg = ctx.createLinearGradient(0, 0, w, h);
-  if (lobby) {
+  if (tower) {
+    bg.addColorStop(0, "#050f22");
+    bg.addColorStop(0.42, "#0d2346");
+    bg.addColorStop(0.76, "#0b1c3a");
+    bg.addColorStop(1, "#050d1e");
+  } else if (lobby) {
     bg.addColorStop(0, "#0c1b33");
     bg.addColorStop(0.55, "#12294b");
     bg.addColorStop(1, "#0a1628");
@@ -663,57 +670,97 @@ function drawBrandSign(ctx, w, h, lobby = false) {
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, w, h);
 
-  const glow = ctx.createRadialGradient(w * 0.16, h * 0.5, 8, w * 0.16, h * 0.5, w * 0.34);
-  glow.addColorStop(0, "rgba(56,189,248,0.28)");
-  glow.addColorStop(0.6, "rgba(250,204,21,0.09)");
+  // Vệt phản chiếu kính kiến trúc chéo nhẹ tạo chiều sâu sang trọng
+  const sheen = ctx.createLinearGradient(w * 0.15, 0, w * 0.65, h);
+  sheen.addColorStop(0, "rgba(255,255,255,0)");
+  sheen.addColorStop(0.45, "rgba(186,230,253,0.08)");
+  sheen.addColorStop(0.55, "rgba(254,240,138,0.06)");
+  sheen.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = sheen;
+  ctx.fillRect(0, 0, w, h);
+
+  const glow = ctx.createRadialGradient(w * 0.15, h * 0.5, 8, w * 0.15, h * 0.5, w * 0.34);
+  glow.addColorStop(0, "rgba(56,189,248,0.32)");
+  glow.addColorStop(0.55, "rgba(250,204,21,0.12)");
   glow.addColorStop(1, "rgba(15,23,42,0)");
   ctx.fillStyle = glow;
   ctx.fillRect(0, 0, w, h);
 
-  ctx.strokeStyle = "#d4a84f";
-  ctx.lineWidth = 6;
-  ctx.strokeRect(12, 12, w - 24, h - 24);
-  ctx.strokeStyle = "rgba(147,197,253,0.3)";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(22, 22, w - 44, h - 44);
+  const pad = tower ? 20 : 12;
+  const padIn = tower ? 36 : 22;
+  ctx.strokeStyle = "#e0b65a";
+  ctx.lineWidth = tower ? 9 : 6;
+  ctx.strokeRect(pad, pad, w - pad * 2, h - pad * 2);
+  ctx.strokeStyle = "rgba(147,197,253,0.34)";
+  ctx.lineWidth = tower ? 3 : 2;
+  ctx.strokeRect(padIn, padIn, w - padIn * 2, h - padIn * 2);
 
-  // Biểu trưng hình học bên trái (hai vòng tròn đồng hành lồng nhau)
-  const cx = 130;
+  // Điểm nhấn kim cương vàng ở 4 góc viền bảng tháp
+  if (tower) {
+    ctx.fillStyle = "#f5cf76";
+    for (const [dx, dy] of [[padIn, padIn], [w - padIn, padIn], [padIn, h - padIn], [w - padIn, h - padIn]]) {
+      ctx.save();
+      ctx.translate(dx, dy);
+      ctx.rotate(Math.PI / 4);
+      ctx.fillRect(-7, -7, 14, 14);
+      ctx.restore();
+    }
+  }
+
+  // Biểu trưng hình học bên trái (hai vòng tròn đồng hành lồng nhau tỏa sáng)
+  const sc = tower ? 1.65 : 1.0;
+  const cx = tower ? 255 : 130;
   const cy = h * 0.5;
   ctx.save();
-  ctx.lineWidth = 10;
-  ctx.strokeStyle = "#f5c451";
+  ctx.shadowColor = "rgba(245,196,81,0.45)";
+  ctx.shadowBlur = 16 * sc;
+  ctx.lineWidth = 10 * sc;
+  ctx.strokeStyle = "#f6c959";
   ctx.beginPath();
-  ctx.arc(cx - 18, cy, 48, 0, Math.PI * 2);
+  ctx.arc(cx - 18 * sc, cy, 48 * sc, 0, Math.PI * 2);
   ctx.stroke();
+  ctx.shadowColor = "rgba(56,189,248,0.5)";
   ctx.strokeStyle = "#38bdf8";
   ctx.beginPath();
-  ctx.arc(cx + 22, cy, 48, 0, Math.PI * 2);
+  ctx.arc(cx + 22 * sc, cy, 48 * sc, 0, Math.PI * 2);
   ctx.stroke();
+  ctx.shadowColor = "rgba(255,255,255,0.8)";
   ctx.fillStyle = "#ffffff";
   ctx.beginPath();
-  ctx.arc(cx + 2, cy, 13, 0, Math.PI * 2);
+  ctx.arc(cx + 2 * sc, cy, 13 * sc, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 
-  ctx.fillStyle = "rgba(212,168,79,0.58)";
-  ctx.fillRect(222, 56, 3, h - 112);
+  const divX = tower ? 430 : 222;
+  ctx.fillStyle = "rgba(224,182,90,0.65)";
+  ctx.fillRect(divX, tower ? 84 : 56, tower ? 5 : 3, h - (tower ? 168 : 112));
 
-  // Dòng chữ chính "ĐỒNG HÀNH CÙNG BẠN" + tên miền "www.donghanhcungban.org"
+  // Dòng chữ chính "ĐỒNG HÀNH CÙNG BẠN" + đường kẻ trang trí + "www.donghanhcungban.org"
+  const tx = tower ? 486 : 252;
   ctx.save();
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
-  ctx.shadowColor = "rgba(0,0,0,0.5)";
-  ctx.shadowBlur = 10;
-  ctx.shadowOffsetY = 3;
+  ctx.shadowColor = "rgba(0,0,0,0.55)";
+  ctx.shadowBlur = tower ? 18 : 10;
+  ctx.shadowOffsetY = tower ? 5 : 3;
   ctx.fillStyle = "#ffffff";
-  ctx.font = "800 56px 'Segoe UI', system-ui, -apple-system, sans-serif";
-  ctx.fillText("ĐỒNG HÀNH CÙNG BẠN", 252, h * 0.39);
+  ctx.font = `800 ${tower ? 114 : 56}px 'Segoe UI', system-ui, -apple-system, sans-serif`;
+  ctx.fillText("ĐỒNG HÀNH CÙNG BẠN", tx, h * (tower ? 0.37 : 0.39));
 
-  ctx.shadowBlur = 4;
-  ctx.fillStyle = "#f8d477";
-  ctx.font = "600 36px 'Segoe UI', system-ui, -apple-system, sans-serif";
-  ctx.fillText("www.donghanhcungban.org", 254, h * 0.71);
+  if (tower) {
+    const lineGrad = ctx.createLinearGradient(tx, 0, w - 120, 0);
+    lineGrad.addColorStop(0, "#f5cf76");
+    lineGrad.addColorStop(0.55, "#38bdf8");
+    lineGrad.addColorStop(1, "rgba(56,189,248,0)");
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = lineGrad;
+    ctx.fillRect(tx, h * 0.565, w - tx - 120, 4);
+  }
+
+  ctx.shadowBlur = tower ? 8 : 4;
+  ctx.fillStyle = "#fde08d";
+  ctx.font = `600 ${tower ? 66 : 36}px 'Segoe UI', system-ui, -apple-system, sans-serif`;
+  ctx.fillText("www.donghanhcungban.org", tx + 2, h * (tower ? 0.725 : 0.71));
   ctx.restore();
 }
 
@@ -908,12 +955,15 @@ export function createTextureBank(THREE, onReady) {
       cache.set(kind, tex);
       return tex;
     }
-    if (kind === "brandSign" || kind === "brandSign:lobby") {
-      const [canvas, ctx] = makeCanvas(1024, 320);
-      drawBrandSign(ctx, 1024, 320, kind === "brandSign:lobby");
+    if (kind === "brandSign" || kind === "brandSign:lobby" || kind === "brandSign:tower") {
+      const isTower = kind === "brandSign:tower";
+      const cw = isTower ? 2048 : 1024;
+      const ch = isTower ? 480 : 320;
+      const [canvas, ctx] = makeCanvas(cw, ch);
+      drawBrandSign(ctx, cw, ch, isTower ? "tower" : (kind === "brandSign:lobby" ? "lobby" : "portal"));
       const tex = new THREE.CanvasTexture(canvas);
       tex.colorSpace = THREE.SRGBColorSpace;
-      tex.anisotropy = 8;
+      tex.anisotropy = isTower ? 16 : 8;
       tex.needsUpdate = true;
       cache.set(kind, tex);
       return tex;
