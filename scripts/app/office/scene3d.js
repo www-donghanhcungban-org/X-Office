@@ -1481,6 +1481,10 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
           path: [[5.8, 4.6], [5.8, 7.3], [3.4, 7.3], [3.4, 8.5], [1.8, 8.5], [3.4, 8.5], [3.4, 7.3], [5.8, 7.3]],
           x: 5.8, z: 5.6, holdCup: false, speed: 0.68,
         },
+        // Nhân viên lễ tân đứng sau quầy & khách đang trao đổi tại sảnh
+        { index: 35, x: 3.7, z: 2.05, rotY: 0, holdCup: false },
+        { index: 36, x: 3.9, z: 4.35, rotY: Math.PI, holdCup: false },
+        // Hai đồng nghiệp trò chuyện tại quầy Pantry
         { index: 33, x: 31.4, z: 2.55, rotY: -1.35, holdCup: true },
         { index: 34, x: 32.6, z: 2.65, rotY: 1.55, holdCup: false },
       ];
@@ -1488,6 +1492,26 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
         const w = buildWalkerRig(THREE, humanAssets, mats, spec);
         floorRoot.add(w.root);
         walkers.push(w);
+      }
+
+      // Giám đốc ngồi ghế da sau bàn lớn + 6 thành viên đang họp trong Phòng họp
+      const seatedRoles = [
+        { index: 37, x: 10.9, z: 4.55, rotY: 0, state: "work" }, // Giám đốc
+        { index: 38, x: 16.5, z: 2.52, rotY: Math.PI, state: "work" },
+        { index: 39, x: 19.0, z: 2.52, rotY: Math.PI, state: "work" },
+        { index: 40, x: 21.5, z: 2.52, rotY: Math.PI, state: "wait" },
+        { index: 41, x: 16.5, z: 4.88, rotY: 0, state: "work" },
+        { index: 42, x: 19.0, z: 4.88, rotY: 0, state: "wait" },
+        { index: 43, x: 21.5, z: 4.88, rotY: 0, state: "work" },
+      ];
+      for (const r of seatedRoles) {
+        const rig = buildHumanRig(THREE, humanAssets, mats, {
+          index: r.index, theme: th, seat: { state: r.state }, season: opts.season, noChair: true,
+        });
+        rig.root.position.set(r.x, 0, r.z);
+        rig.root.rotation.y = r.rotY;
+        floorRoot.add(rig.root);
+        rigs.push(rig);
       }
     }
   }
