@@ -10,6 +10,10 @@ import { createHumanAssets } from "./human3d.js";
 import { createNatureAssets } from "./nature3d.js";
 import { createTrafficAssets } from "./traffic3d.js";
 import { createCityAssets } from "./city3d.js";
+import { createSaigonAssets } from "./saigon3d.js";
+import { buildAtmosphericSky } from "./atmosphere3d.js";
+import { createHDAssetManager, parseGLB, instantiateGLB } from "./glb.js";
+import { parseSplatBuffer, createSplatCloud } from "./splat3d.js";
 import { buildOfficeScene, createSceneAssets } from "./scene3d.js";
 import { createPostFX } from "./postfx.js";
 
@@ -88,9 +92,20 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
   const natureAssets = createNatureAssets(THREE);
   const trafficAssets = createTrafficAssets(THREE);
   const cityAssets = createCityAssets(THREE);
+  const sgAssets = createSaigonAssets(THREE);
+  const skyDome = buildAtmosphericSky(THREE);
+  skyDome.mesh.visible = false;
+  scene.add(skyDome.mesh);
+  const userGroup = new THREE.Group();
+  scene.add(userGroup);
+  const hdAssets = createHDAssetManager(THREE, () => {
+    structKey = "";
+    api.dirty = true;
+  });
   const postfx = createPostFX(THREE, renderer);
 
   let officeObj = null;
+  let userAsset = null;
   let structKey = "";
   let pickables = [];
   let lastPlan = null;
@@ -210,6 +225,14 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
   }
 
   let curDist = 20;
+  const sunDir = new THREE.Vector3(0.6, 0.7, 0.4).normalize();
+  const sunUv = new THREE.Vector2(0.5, 0.5);
+  const sunTmp = new THREE.Vector3();
+  const walk = {
+    active: false, x: 22, z: 38.6, yaw: -2.42, pitch: 0.20, dist: 2.65, phase: 0, moving: false, seeded: false,
+    keys: new Set(),
+  };
+
   function place(zoom, v, plan, mood) {
     target.set((v.x0 + v.x1) / 2 + view.panX, (v.z0 + v.z1) / 2, (v.y0 + v.y1) / 2 + view.panZ);
     const sh = Math.max(plan.W, plan.D) * 0.78 + 5;
@@ -217,19 +240,45 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
     sun.shadow.camera.updateProjectionMatrix();
     sun.target.position.set(plan.W / 2, 0, plan.D / 2);
     if (mood === "sunset") {
-      sun.position.set(plan.W / 2 + sh * 1.25, sh * 0.56 + (v.z1 || 0), plan.D / 2 + sh * 0.45);
+      // Nắng chiều thấp phía Tây-Bắc tỏa qua hàng cây và công trình biểu tượng dọc đại lộ
+      sun.position.set(plan.W / 2 - sh * 1.55, sh * 0.24 + (v.z1 || 0), plan.D / 2 - sh * 0.45);
     } else if (mood === "night") {
       sun.position.set(plan.W / 2 - sh * 0.75, sh * 1.05 + (v.z1 || 0), plan.D / 2 + sh * 0.7);
     } else {
       sun.position.set(plan.W / 2 + sh * 0.92, sh * 1.05 + (v.z1 || 0), plan.D / 2 + sh * 0.62);
     }
+    sunDir.copy(sun.position).sub(sun.target.position).normalize();
 
     const aspect = view.w / view.h;
+    if (walk.active) {
+      const fx = Math.sin(walk.yaw), fz = Math.cos(walk.yaw);
+      const rx = -fz, rz = fx;
+      const shoulderOffset = walk.dist > 1.2 ? 0.56 : 0.0;
+      const lookTargetX = walk.x + fx * 14.0 + rx * 0.55;
+      const lookTargetY = 1.55 + Math.sin(walk.pitch) * 14.0;
+      const lookTargetZ = walk.z + fz * 14.0 + rz * 0.55;
+      perspCam.fov = 46;
+      perspCam.aspect = aspect;
+      perspCam.near = 0.2;
+      perspCam.far = 270;
+      perspCam.position.set(
+        walk.x - fx * walk.dist + rx * shoulderOffset,
+        Math.max(0.85, 1.68 + (walk.dist - 2.65) * 0.12 - Math.sin(walk.pitch) * 0.45),
+        walk.z - fz * walk.dist + rz * shoulderOffset,
+      );
+      perspCam.lookAt(lookTargetX, lookTargetY, lookTargetZ);
+      perspCam.updateProjectionMatrix();
+      perspCam.updateMatrixWorld();
+      curDist = walk.dist;
+      return perspCam;
+    }
+
     const dx = Math.sin(view.az) * Math.cos(view.el);
     const dy = Math.sin(view.el);
     const dz = Math.cos(view.az) * Math.cos(view.el);
 
     if (view.perspective) {
+      perspCam.fov = FOV_DEG;
       // Đặt tạm PerspectiveCamera xa để lấy hệ trục camera chính xác, sau đó giải khoảng cách ôm gọn 8 góc viewBox
       const probeR = 120;
       perspCam.position.set(target.x + dx * probeR, target.y + dy * probeR, target.z + dz * probeR);
@@ -311,6 +360,11 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
   canvas.addEventListener("wheel", (e) => {
     if (e.ctrlKey) return;
     e.preventDefault();
+    if (walk.active) {
+      walk.dist = Math.min(6.5, Math.max(0.7, walk.dist + (e.deltaY > 0 ? 0.35 : -0.35)));
+      api.dirty = true;
+      return;
+    }
     const f = e.deltaY < 0 ? 1.12 : 0.89;
     const minF = 0.3 / Math.max(0.5, lastZoom);
     const maxF = 8 / Math.max(0.5, lastZoom);
@@ -320,7 +374,10 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
   }, { passive: false });
   canvas.addEventListener("pointerdown", (e) => {
     const pan = e.button === 2 || e.shiftKey;
-    drag = { x: e.clientX, y: e.clientY, az: view.az, el: view.el, panX: view.panX, panZ: view.panZ, pan };
+    drag = {
+      x: e.clientX, y: e.clientY, az: view.az, el: view.el, panX: view.panX, panZ: view.panZ,
+      yaw: walk.yaw, pitch: walk.pitch, pan,
+    };
     moved = 0;
     canvas.setPointerCapture(e.pointerId);
   });
@@ -328,7 +385,10 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
     if (drag) {
       const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
       moved = Math.max(moved, Math.hypot(dx, dy));
-      if (drag.pan) {
+      if (walk.active) {
+        walk.yaw = drag.yaw - dx * 0.0055;
+        walk.pitch = Math.min(0.65, Math.max(-0.28, drag.pitch - dy * 0.0045));
+      } else if (drag.pan) {
         const s = 0.025 / Math.max(0.3, curZoom || 1);
         const cosA = Math.cos(view.az), sinA = Math.sin(view.az);
         view.panX = drag.panX - (dx * cosA + dy * sinA) * s;
@@ -342,7 +402,7 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
       canvas.dataset.hover = "";
       return;
     }
-    const hit = pickAt(e.clientX, e.clientY);
+    const hit = walk.active ? null : pickAt(e.clientX, e.clientY);
     canvas.dataset.hover = hit ? "1" : "";
     if (onHover) onHover(hit);
   });
@@ -351,7 +411,7 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
     if (onHover) onHover(null);
   });
   const stop = (e) => {
-    if (drag && !drag.pan && moved < 5 && e.type === "pointerup" && onTagClick) {
+    if (drag && !drag.pan && moved < 5 && e.type === "pointerup" && onTagClick && !walk.active) {
       const hit = pickAt(e.clientX, e.clientY);
       if (hit) onTagClick(hit.kind, hit.id);
     }
@@ -359,8 +419,15 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
   };
   canvas.addEventListener("pointerup", stop);
   canvas.addEventListener("pointercancel", stop);
+  const WALK_KEYS = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
   canvas.addEventListener("keydown", (e) => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (walk.active && WALK_KEYS.has(e.code)) {
+      e.preventDefault();
+      walk.keys.add(e.code);
+      api.dirty = true;
+      return;
+    }
     const step = { ArrowLeft: [0.1, 0], ArrowRight: [-0.1, 0], ArrowUp: [0, 0.08], ArrowDown: [0, -0.08] }[e.key];
     if (!step) return;
     e.preventDefault();
@@ -368,6 +435,17 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
     view.el = Math.min(EL[1], Math.max(EL[0], view.el + step[1]));
     api.dirty = true;
   });
+  const onKeyUp = (e) => { walk.keys.delete(e.code); };
+  const onBlur = () => { walk.keys.clear(); };
+  window.addEventListener("keyup", onKeyUp);
+  canvas.addEventListener("blur", onBlur);
+
+  function disposeUserAsset() {
+    if (!userAsset) return;
+    userGroup.clear();
+    if (userAsset.dispose) userAsset.dispose();
+    userAsset = null;
+  }
 
   const api = {
     canvas,
@@ -381,6 +459,48 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
     setPerspective(on) {
       view.perspective = Boolean(on);
       api.dirty = true;
+    },
+    walkMode() {
+      return walk.active;
+    },
+    setWalkMode(on) {
+      walk.active = Boolean(on);
+      walk.seeded = false;
+      walk.keys.clear();
+      labels.style.display = walk.active ? "none" : "";
+      if (walk.active) {
+        view.perspective = true;
+        if (onHover) onHover(null);
+      }
+      api.dirty = true;
+    },
+    async loadUserAsset(file) {
+      const name = (file && file.name ? file.name : "").toLowerCase();
+      const buf = await file.arrayBuffer();
+      const pad = lastPlan && lastPlan.levels ? 6 : 4;
+      const sx = lastPlan ? Math.max(10, lastPlan.W * 0.28) : 11;
+      const sz = lastPlan ? lastPlan.D + pad * 0.45 : 14;
+      if (name.endsWith(".splat")) {
+        const data = parseSplatBuffer(buf);
+        const cloud = createSplatCloud(THREE, data, { targetSize: 11 });
+        cloud.root.position.set(walk.active ? walk.x + Math.sin(walk.yaw) * 6 : sx, 0, walk.active ? walk.z + Math.cos(walk.yaw) * 6 : sz);
+        disposeUserAsset();
+        userGroup.add(cloud.root);
+        userAsset = { kind: "splat", cloud, count: cloud.count, dispose: () => cloud.dispose() };
+        api.dirty = true;
+        return { kind: "splat", count: cloud.count };
+      }
+      if (name.endsWith(".glb")) {
+        const parsed = await parseGLB(THREE, buf);
+        const inst = instantiateGLB(THREE, parsed, { targetHeight: 2.8 });
+        inst.group.position.set(walk.active ? walk.x + Math.sin(walk.yaw) * 5 : sx, 0, walk.active ? walk.z + Math.cos(walk.yaw) * 5 : sz);
+        disposeUserAsset();
+        userGroup.add(inst.group);
+        userAsset = { kind: "glb", mixer: inst.mixer, dispose: () => parsed.dispose() };
+        api.dirty = true;
+        return { kind: "glb" };
+      }
+      throw new Error("Chỉ hỗ trợ tệp .glb hoặc .splat");
     },
     resetFreeZoom() {
       view.freeZoom = 1;
@@ -446,7 +566,7 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
           scene.remove(officeObj.root);
           officeObj.dispose();
         }
-        officeObj = buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natureAssets, trafficAssets, cityAssets, opts);
+        officeObj = buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natureAssets, trafficAssets, cityAssets, sgAssets, hdAssets, opts);
         scene.add(officeObj.root);
         pickables = [];
         officeObj.root.traverse((o) => { if (o.isMesh && o.userData.pick) pickables.push(o); });
@@ -475,11 +595,45 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
       accentB.position.set(plan.W * 0.78, zb + 3.2, plan.D * 0.72);
       accentB.intensity = glowOn ? (dark ? 22 : 4.5) : 0;
 
-      // Chuyển động nhân vật, cây cối, sóng nước GLSL, đồng hồ, LED
+      // Chuyển động nhân vật, cây cối, sóng nước GLSL, đồng hồ, LED, đi bộ Dạo phố & tài sản người dùng nạp
       const tNow = opts.t || 0;
-      if (opts.motion && prevT) textures.animate(Math.min(0.1, Math.max(0, tNow - prevT)));
+      const dtFrame = prevT ? Math.min(0.08, Math.max(0, tNow - prevT)) : 0.016;
+      if (opts.motion && prevT) textures.animate(dtFrame);
       prevT = tNow;
       officeObj.animate(tNow, opts.motion);
+      if (userAsset && userAsset.mixer && opts.motion) userAsset.mixer.update(dtFrame);
+
+      if (walk.active && !walk.seeded) {
+        const pad = plan.levels ? 6 : 4;
+        walk.x = Math.min(plan.W - 6, Math.max(10, 13.2));
+        walk.z = plan.D + pad + 10.05;
+        walk.yaw = Math.atan2(-26 - walk.x, -17 - walk.z);
+        walk.pitch = 0.20;
+        walk.dist = 2.65;
+        walk.seeded = true;
+      }
+      let walkMoving = false;
+      if (walk.active) {
+        let fwdMove = 0, strMove = 0;
+        if (walk.keys.has("KeyW") || walk.keys.has("ArrowUp")) fwdMove += 1;
+        if (walk.keys.has("KeyS") || walk.keys.has("ArrowDown")) fwdMove -= 1;
+        if (walk.keys.has("KeyA") || walk.keys.has("ArrowLeft")) strMove -= 1;
+        if (walk.keys.has("KeyD") || walk.keys.has("ArrowRight")) strMove += 1;
+        if (fwdMove || strMove) {
+          walkMoving = true;
+          const speed = 4.6 * dtFrame;
+          const fx = Math.sin(walk.yaw), fz = Math.cos(walk.yaw);
+          const rx = -fz, rz = fx;
+          walk.x = Math.max(-42, Math.min(plan.W + 32, walk.x + (fx * fwdMove + rx * strMove) * speed));
+          walk.z = Math.max(-22, Math.min(plan.D + 38, walk.z + (fz * fwdMove + rz * strMove) * speed));
+          walk.phase += dtFrame * 7.2;
+        }
+        if (officeObj.setHero) {
+          officeObj.setHero(true, walk.x, walk.z, walk.yaw + Math.PI, walk.phase, walkMoving, tNow);
+        }
+      } else if (officeObj.setHero) {
+        officeObj.setHero(false, 0, 0, 0, 0, false, tNow);
+      }
 
       // Hệ hạt 3D (tuyết / mưa neon / sao / bụi nắng)
       const pKind = opts.season === "noel" ? "snow" : opts.theme.ambient;
@@ -529,6 +683,12 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
         } else curZoom = dstZoom;
       }
       const camera = place(curZoom, curBox, plan, mood);
+      skyDome.mesh.visible = Boolean(plan.outdoor && glowOn);
+      if (skyDome.mesh.visible) skyDome.update(camera.position, mood, sunDir, tNow, opts.motion);
+      if (userAsset && userAsset.cloud) {
+        const dpr = renderer.getPixelRatio();
+        userAsset.cloud.update(camera, view.w * dpr, view.h * dpr);
+      }
       if (plan.outdoor) {
         const fogCol = dark ? 0x0f172a : sunset ? 0xf5c89e : 0xcfe4fb;
         const near = view.perspective ? curDist + 48 : 115;
@@ -542,12 +702,25 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
       } else {
         scene.fog = null;
       }
+      let sunVis = 0;
+      if (walk.active && view.perspective && !dark && glowOn && postfx) {
+        sunTmp.copy(camera.position).addScaledVector(sunDir, 150).project(camera);
+        if (sunTmp.z < 1 && Math.abs(sunTmp.x) < 1.35 && Math.abs(sunTmp.y) < 1.35) {
+          sunUv.set((sunTmp.x + 1) * 0.5, (sunTmp.y + 1) * 0.5);
+          sunVis = Math.max(0, 1 - Math.hypot(sunTmp.x, sunTmp.y) * 0.42);
+        }
+      }
       if (glowOn && postfx) {
-        const dofStrength = view.perspective ? Math.max(0, Math.min(0.62, (curZoom - 1.5) * 0.42)) : 0;
+        const dofStrength = walk.active
+          ? 0.26
+          : (view.perspective ? Math.max(0, Math.min(0.62, (curZoom - 1.5) * 0.42)) : 0);
         postfx.render(scene, camera, {
           dark,
           sunset,
-          focusDist: curDist,
+          walkMode: walk.active,
+          sunUv,
+          sunVis,
+          focusDist: walk.active ? walk.dist : curDist,
           dofStrength,
           exposure: dark ? 1.18 : sunset ? 1.08 : 1.05,
           aoStrength: dark ? 0.48 : 0.56,
@@ -558,8 +731,8 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
         renderer.setRenderTarget(null);
         renderer.render(scene, camera);
       }
-      syncTags(officeObj.getTags(opts), opts.focus, plan, camera);
-      api.dirty = moving;
+      if (!walk.active) syncTags(officeObj.getTags(opts), opts.focus, plan, camera);
+      api.dirty = moving || walkMoving;
     },
     dispose() {
       if (officeObj) {
@@ -567,12 +740,18 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
         officeObj.dispose();
         officeObj = null;
       }
+      window.removeEventListener("keyup", onKeyUp);
+      canvas.removeEventListener("blur", onBlur);
+      disposeUserAsset();
       if (postfx) postfx.dispose();
       sceneAssets.dispose();
       humanAssets.dispose();
       natureAssets.dispose();
       trafficAssets.dispose();
       cityAssets.dispose();
+      sgAssets.dispose();
+      skyDome.dispose();
+      hdAssets.dispose();
       textures.dispose();
       pGeo.dispose();
       pMat.dispose();

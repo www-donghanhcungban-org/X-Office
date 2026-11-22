@@ -4,6 +4,7 @@
 // - Xe tự giữ khoảng cách an toàn, dừng đúng vạch trắng đèn đỏ ở mọi ngã tư và sáng đèn phanh HDR.
 // - Người đi bộ dạo trên vỉa hè cả 4 tuyến phố và qua đường đúng nhịp đèn đỏ tại nút chính + các ngã tư.
 import { buildWalkerRig, animateWalkerRig } from "./human3d.js";
+import { instantiateGLB } from "./glb.js";
 
 const CYCLE = 18.0; // 0–8.5s ĐT Xanh/BN Đỏ · 8.5–10.5s ĐT Vàng/BN Đỏ · 10.5–16.5s ĐT Đỏ/BN Xanh · 16.5–18s ĐT Đỏ/BN Vàng
 
@@ -99,10 +100,28 @@ function buildTrafficLight(THREE, tAssets, mats, x, z, dirZ, rotY, sigAxis) {
 }
 
 // ---------------------------------------------------------------- Ô tô chạy đường bộ (bánh xoay + đèn phanh HDR)
-function buildTrafficCar(THREE, natureAssets, mats, color) {
+function buildTrafficCar(THREE, natureAssets, mats, color, hdAssets) {
   const g = natureAssets.geos;
   const root = new THREE.Group();
   addShadow(THREE, root, natureAssets, mats, 4.9, 2.35);
+
+  const carParsed = hdAssets && hdAssets.get("car");
+  const tailMat = mats.freshStandard("#ef4444", { roughness: 0.12, emissive: "#ef4444", emissiveIntensity: 0.75 });
+  if (carParsed) {
+    const inst = instantiateGLB(THREE, carParsed, { targetLength: 4.55 });
+    const carPaint = mats.physical(color, { roughness: 0.16, metalness: 0.65, clearcoat: 1.0, clearcoatRoughness: 0.06 });
+    inst.group.traverse((o) => {
+      if (o.isMesh && o.material && o.material.name === "Paint 1 Carmine") o.material = carPaint;
+    });
+    const sz = new THREE.Box3().setFromObject(inst.group).getSize(new THREE.Vector3());
+    if (sz.z > sz.x) inst.group.rotation.y = Math.PI / 2;
+    root.add(inst.group);
+    const tl = new THREE.Mesh(g.unitBox, tailMat);
+    tl.position.set(-2.22, 0.72, 0);
+    tl.scale.set(0.06, 0.09, 1.38);
+    root.add(tl);
+    return { root, wheels: [], tailMat, halfLen: 2.35, wheelR: 0.32 };
+  }
 
   const paintMat = mats.physical(color, { roughness: 0.15, metalness: 0.72, clearcoat: 1.0, clearcoatRoughness: 0.05 });
   const glassMat = mats.physical("#0f172a", { roughness: 0.06, metalness: 0.15, clearcoat: 1.0, clearcoatRoughness: 0.04 });
@@ -119,7 +138,6 @@ function buildTrafficCar(THREE, natureAssets, mats, color) {
   root.add(cabin);
 
   const headMat = mats.standard("#ffffff", { roughness: 0.1, emissive: "#fef9c3", emissiveIntensity: 1.6 });
-  const tailMat = mats.freshStandard("#ef4444", { roughness: 0.12, emissive: "#ef4444", emissiveIntensity: 0.75 });
   for (const sz of [-0.56, 0.56]) {
     const hl = new THREE.Mesh(g.unitBox, headMat);
     hl.position.set(2.22, 0.62, sz);
@@ -241,7 +259,7 @@ function buildMotorbike(THREE, tAssets, natureAssets, mats, bodyColor, jacketCol
 }
 
 // ---------------------------------------------------------------- Hệ thống giao thông hoàn chỉnh toàn khu phố
-export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, mats, plan, streetZ) {
+export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, mats, plan, streetZ, hdAssets) {
   const root = new THREE.Group();
   const pad = plan.levels ? 6 : 4;
   const W = plan.W;
@@ -326,7 +344,7 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
 
   const vehicles = vehicleSpecs.map((s) => {
     const v = s.kind === "car"
-      ? buildTrafficCar(THREE, natureAssets, mats, s.col)
+      ? buildTrafficCar(THREE, natureAssets, mats, s.col, hdAssets)
       : buildMotorbike(THREE, tAssets, natureAssets, mats, s.col, s.j, s.h);
     if (s.axis === "x") {
       v.root.position.set(s.pos, 0, s.lane);
@@ -355,8 +373,11 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
     };
   });
 
-  // 3. Người đi bộ dạo trên vỉa hè cả 4 tuyến đường bao quanh khu phố
-  const sidewalkWalkers = [
+  // 3. Người đi bộ dạo trên vỉa hè cả 4 tuyến đường bao quanh khu phố (dùng mô hình xương .glb nếu có)
+  const humanParsed = hdAssets && hdAssets.get("human");
+  const glbWalkers = [];
+  const sidewalkWalkers = [];
+  [
     { index: 41, path: [[9.5, streetZ + 1.15], [W + 1.5, streetZ + 1.15]], x: 16.0, z: streetZ + 1.15, holdCup: true, speed: 0.78 },
     { index: 42, path: [[W + 0.5, streetZ + 1.55], [10.0, streetZ + 1.55]], x: 28.0, z: streetZ + 1.55, holdCup: false, speed: 0.72 },
     { index: 43, path: [[8.5, streetZ + 10.4], [W + 2.0, streetZ + 10.4]], x: 14.0, z: streetZ + 10.4, holdCup: false, speed: 0.75 },
@@ -364,10 +385,19 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
     { index: 47, path: [[0.5, -10.8], [W + 2.0, -10.8]], x: 12.0, z: -10.8, holdCup: false, speed: 0.74 },
     { index: 48, path: [[-11.3, 1.0], [-11.3, streetZ - 1.5]], x: -11.3, z: 10.0, holdCup: true, speed: 0.76 },
     { index: 49, path: [[eastRoadX + 4.5, streetZ - 1.5], [eastRoadX + 4.5, 1.0]], x: eastRoadX + 4.5, z: 14.0, holdCup: false, speed: 0.73 },
-  ].map((spec) => {
-    const w = buildWalkerRig(THREE, humanAssets, mats, spec);
-    root.add(w.root);
-    return w;
+  ].forEach((spec, idx) => {
+    if (humanParsed && idx < 3) {
+      const inst = instantiateGLB(THREE, humanParsed, { targetHeight: 1.72 });
+      inst.group.position.set(spec.x, 0, spec.z);
+      root.add(inst.group);
+      const [p0, p1] = spec.path;
+      const dist = Math.max(1, Math.hypot(p1[0] - p0[0], p1[1] - p0[1]));
+      glbWalkers.push({ inst, p0, p1, dist, speed: (spec.speed || 0.75) * 1.4, phase: idx * 3.1 });
+    } else {
+      const w = buildWalkerRig(THREE, humanAssets, mats, spec);
+      root.add(w.root);
+      sidewalkWalkers.push(w);
+    }
   });
 
   // 4. Người đi bộ băng qua vạch trắng tại nút chính & các ngã tư (tuân thủ đèn đỏ từng hướng!)
@@ -420,6 +450,11 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
           v.tailMat.emissiveIntensity = 0.75;
         }
         for (const sw of sidewalkWalkers) animateWalkerRig(sw, 0, false);
+        for (const gw of glbWalkers) {
+          if (gw.inst.mixer) {
+            gw.inst.mixer.setTime(0.25);
+          }
+        }
         for (const cr of crossers) {
           const p = cr.from0 ? cr.p0 : cr.p1;
           if (cr.axis === "z") cr.rig.root.position.z = p;
@@ -475,6 +510,18 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
       }
 
       for (const sw of sidewalkWalkers) animateWalkerRig(sw, t, true);
+      for (const gw of glbWalkers) {
+        const uRaw = (((t + gw.phase) * gw.speed) / gw.dist) % 2;
+        const forward = uRaw <= 1;
+        const u = forward ? uRaw : 2 - uRaw;
+        const x = gw.p0[0] + (gw.p1[0] - gw.p0[0]) * u;
+        const z = gw.p0[1] + (gw.p1[1] - gw.p0[1]) * u;
+        const dx = (gw.p1[0] - gw.p0[0]) * (forward ? 1 : -1);
+        const dz = (gw.p1[1] - gw.p0[1]) * (forward ? 1 : -1);
+        gw.inst.group.position.set(x, 0, z);
+        gw.inst.group.rotation.y = Math.atan2(dx, dz);
+        if (gw.inst.mixer) gw.inst.mixer.update(dt * 1.15);
+      }
 
       // Người qua đường tại các vạch kẻ ngã tư & nút chính
       for (const cr of crossers) {

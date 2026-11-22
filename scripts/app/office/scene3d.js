@@ -10,6 +10,7 @@ import { STATE_TEXT, roomLabelAt, wallSegments } from "./scene.js";
 import { buildHumanRig, animateHumanRig, buildWalkerRig, animateWalkerRig } from "./human3d.js";
 import { buildStreetTraffic } from "./traffic3d.js";
 import { buildSurroundingCity } from "./city3d.js";
+import { instantiateGLB } from "./glb.js";
 import {
   buildBench, buildBollard, buildFence, buildFlowerbed, buildInstancedLawn, buildPlant,
   buildPool, buildRock, buildSeasonTree, buildStreetlamp, buildTree, buildUmbrella,
@@ -298,7 +299,7 @@ function addBox(THREE, parent, geo, mat, x, y, z, sx, sy, sz, cast = true, recv 
 }
 
 // ---------------------------------------------------------------- Ngoại cảnh: sân cỏ, lối vào, cây cối, bồn hoa, đèn đường
-function buildOutdoor(THREE, sceneAssets, natureAssets, humanAssets, trafficAssets, cityAssets, mats, plan, anim) {
+function buildOutdoor(THREE, sceneAssets, natureAssets, humanAssets, trafficAssets, cityAssets, sgAssets, hdAssets, mats, plan, anim) {
   const group = new THREE.Group();
   const g = sceneAssets.geos;
   const pad = plan.levels ? 6 : 4;
@@ -430,14 +431,14 @@ function buildOutdoor(THREE, sceneAssets, natureAssets, humanAssets, trafficAsse
 
   // Hệ thống giao thông chạy thật: đèn tín hiệu Đỏ/Vàng/Xanh, ô tô, xe máy kèm người lái và người đi bộ
   if (trafficAssets) {
-    const traffic = buildStreetTraffic(THREE, trafficAssets, natureAssets, humanAssets, mats, plan, streetZ);
+    const traffic = buildStreetTraffic(THREE, trafficAssets, natureAssets, humanAssets, mats, plan, streetZ, hdAssets);
     group.add(traffic.root);
     anim.traffics.push(traffic);
   }
 
   // Khu phố đô thị hoàn chỉnh bao quanh 4 phía (nhà phố, quán cà phê, cao ốc kính, công viên, trạm buýt, skyline)
   if (cityAssets) {
-    const city = buildSurroundingCity(THREE, cityAssets, natureAssets, mats, plan, streetZ, anim);
+    const city = buildSurroundingCity(THREE, cityAssets, natureAssets, sgAssets, hdAssets, mats, plan, streetZ, anim);
     group.add(city.root);
     anim.cities.push(city);
   }
@@ -762,9 +763,17 @@ function buildArchitecture(THREE, sceneAssets, mats, plan, th, cutaway, anim) {
 }
 
 // ---------------------------------------------------------------- Nội thất văn phòng cao cấp (đọc dữ liệu plans/themes)
-function buildProp(THREE, sceneAssets, natureAssets, mats, p, th, plan, cutaway, anim) {
+function buildProp(THREE, sceneAssets, natureAssets, hdAssets, mats, p, th, plan, cutaway, anim) {
   const g = sceneAssets.geos;
-  if (p.kind === "plant") return buildPlant(THREE, natureAssets, mats, p, anim);
+  if (p.kind === "plant") {
+    const plantParsed = hdAssets && hdAssets.get("potted_plant");
+    if (plantParsed) {
+      const inst = instantiateGLB(THREE, plantParsed, { targetHeight: 1.35 });
+      inst.group.position.set(p.x + 0.35, 0, p.y + 0.35);
+      return inst.group;
+    }
+    return buildPlant(THREE, natureAssets, mats, p, anim);
+  }
   if (p.kind === "tree") return buildTree(THREE, natureAssets, mats, p, anim);
   if (p.kind === "pool") return buildPool(THREE, natureAssets, mats, p, anim);
   if (p.kind === "umbrella") return buildUmbrella(THREE, natureAssets, mats, p);
@@ -811,6 +820,15 @@ function buildProp(THREE, sceneAssets, natureAssets, mats, p, th, plan, cutaway,
   }
 
   if (p.kind === "sofa") {
+    const sofaParsed = hdAssets && hdAssets.get("sofa");
+    if (sofaParsed) {
+      const inst = instantiateGLB(THREE, sofaParsed, { targetLength: 2.9 });
+      const sz = new THREE.Box3().setFromObject(inst.group).getSize(new THREE.Vector3());
+      if (sz.z > sz.x) inst.group.rotation.y = Math.PI / 2;
+      inst.group.position.set(p.x + 1.6, 0, p.y + 0.6);
+      root.add(inst.group);
+      return root;
+    }
     const col = p.color || "#475569";
     const fabMat = mats.standard(col, { roughness: 0.85, tex: "fabric", bump: 0.02 });
     const legMat = mats.standard("#5c3a21", { roughness: 0.65, tex: "wood" });
@@ -884,6 +902,15 @@ function buildProp(THREE, sceneAssets, natureAssets, mats, p, th, plan, cutaway,
   }
 
   if (p.kind === "counter") {
+    const cartParsed = p.x > 20 && hdAssets && hdAssets.get("coffee_cart");
+    if (cartParsed) {
+      const inst = instantiateGLB(THREE, cartParsed, { targetLength: 3.1 });
+      const sz = new THREE.Box3().setFromObject(inst.group).getSize(new THREE.Vector3());
+      if (sz.z > sz.x) inst.group.rotation.y = Math.PI / 2;
+      inst.group.position.set(p.x + 1.7, 0, p.y + 0.55);
+      root.add(inst.group);
+      return root;
+    }
     const cg = new THREE.Group();
     cg.position.set(p.x + 1.7, 0, p.y + 0.5);
     const wood = mats.standard("#6f4e37", { roughness: 0.62, tex: "wood", bump: 0.02 });
@@ -1400,7 +1427,7 @@ function buildWorkstation(THREE, sceneAssets, humanAssets, mats, textures, opts)
 }
 
 // ---------------------------------------------------------------- Dựng trọn cảnh 3D bền vững
-export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natureAssets, trafficAssets, cityAssets, opts) {
+export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natureAssets, trafficAssets, cityAssets, sgAssets, hdAssets, opts) {
   const th = opts.theme;
   const glowOn = opts.quality !== "low";
   const plan = planFor(opts.scale || "team", opts.layout || "open");
@@ -1414,7 +1441,7 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
   const rigs = [];
   const agentStations = [];
 
-  if (plan.outdoor) root.add(buildOutdoor(THREE, sceneAssets, natureAssets, humanAssets, trafficAssets, cityAssets, mats, plan, anim));
+  if (plan.outdoor) root.add(buildOutdoor(THREE, sceneAssets, natureAssets, humanAssets, trafficAssets, cityAssets, sgAssets, hdAssets, mats, plan, anim));
   if (plan.levels) root.add(buildBuilding(THREE, sceneAssets, mats, plan, th));
 
   const floorRoot = new THREE.Group();
@@ -1425,7 +1452,7 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
 
   const props = plan.props || th.props;
   for (const p of props) {
-    const obj = buildProp(THREE, sceneAssets, natureAssets, mats, {
+    const obj = buildProp(THREE, sceneAssets, natureAssets, hdAssets, mats, {
       ...p, dark, glowOn, iv: p.kind === "bed" && plan.props ? false : p.iv,
     }, th, plan, cutaway, anim);
     if (obj) floorRoot.add(obj);
@@ -1522,11 +1549,43 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
     buildSeasonWall(THREE, sceneAssets, mats, opts.season, plan, cutaway, anim);
   }
 
+  // Nhân vật dạo phố (chế độ Dạo phố ngang mắt người thứ ba) — mặc sơ mi đen & quần tối như ngoài đường phố
+  let hero = null;
+  if (plan.outdoor) {
+    hero = buildWalkerRig(THREE, humanAssets, mats, {
+      index: 99,
+      hair: "#111827",
+      outfit: { top: "#16181d", inner: "#f8fafc", pants: "#18181b" },
+    });
+    hero.root.visible = false;
+    root.add(hero.root);
+  }
+
   return {
     root,
     plan,
     zb,
     cutaway,
+    setHero(visible, x, z, rotY, walkPhase, moving, t) {
+      if (!hero) return;
+      hero.root.visible = Boolean(visible);
+      if (!visible) return;
+      hero.root.position.set(x, 0, z);
+      hero.root.rotation.y = rotY;
+      if (moving) {
+        const stride = Math.sin(walkPhase);
+        hero.body.position.y = 0.835 + Math.abs(Math.cos(walkPhase)) * 0.032;
+        hero.leftLeg.rotation.x = stride * 0.44;
+        hero.rightLeg.rotation.x = -stride * 0.44;
+        hero.leftArm.rotation.x = -stride * 0.34;
+        hero.rightArm.rotation.x = stride * 0.34;
+      } else {
+        hero.body.position.y = 0.835;
+        hero.leftLeg.rotation.x = hero.rightLeg.rotation.x = 0;
+        hero.leftArm.rotation.x = hero.rightArm.rotation.x = 0.06;
+        hero.chest.scale.y = 1 + Math.sin((t || 0) * 2.1) * 0.015;
+      }
+    },
     updateSeats(nextSeats) {
       (nextSeats || []).slice(0, agentStations.length).forEach((s, i) => agentStations[i].update(s));
     },
@@ -1628,6 +1687,7 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
       }
     },
     dispose() {
+      for (const ct of anim.cities) if (ct.dispose) ct.dispose();
       mats.dispose();
     },
   };

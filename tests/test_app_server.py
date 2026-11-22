@@ -625,3 +625,23 @@ class SmokeAndErrorTest(unittest.TestCase):
                     self.assertEqual("ValueError" in err.getvalue(), printed)
             finally:
                 srv.server_close()
+
+    def test_hd_assets_mount_and_default_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            base = Path(td)
+            srv_empty, _ = server.make_server(None, base, base, base, routes={})
+            hd = base / ".xoffice-hd"
+            hd.mkdir()
+            (hd / "manifest.json").write_text('{"car":"car.glb"}', encoding="utf-8")
+            (hd / "car.glb").write_bytes(b"glTF")
+            (hd / "scene.splat").write_bytes(b"SPLAT")
+            srv_full, _ = server.make_server(None, base, base, base, routes={})
+            try:
+                self.assertEqual(srv_empty.static.get("/hd-assets/manifest.json"), (b"{}", "application/json"))
+                self.assertEqual(srv_full.static.get("/hd-assets/car.glb"), (b"glTF", "model/gltf-binary"))
+                self.assertEqual(
+                    srv_full.static.get("/hd-assets/scene.splat"), (b"SPLAT", "application/octet-stream")
+                )
+            finally:
+                srv_empty.server_close()
+                srv_full.server_close()

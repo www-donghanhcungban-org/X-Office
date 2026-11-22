@@ -671,9 +671,9 @@ export function buildWalkerRig(THREE, assets, mats, opts) {
   root.rotation.y = rotY;
 
   const skinCol = SKIN[i % SKIN.length];
-  const hairCol = HAIR[(i * 3 + 1) % HAIR.length];
+  const hairCol = opts.hair || HAIR[(i * 3 + 1) % HAIR.length];
   const irisCol = IRIS[(i * 2 + 1) % IRIS.length];
-  const outfit = OUTFIT[(i + 2) % OUTFIT.length];
+  const outfit = opts.outfit || OUTFIT[(i + 2) % OUTFIT.length];
 
   const skinMat = mats.physical(skinCol, { roughness: 0.56, sheen: 0.38, sheenRoughness: 0.72, sheenColor: "#ffb396" });
   const faceMat = mats.physical("#ffffff", { roughness: 0.54, sheen: 0.4, sheenRoughness: 0.7, sheenColor: "#ffb396", tex: "face:" + skinCol });

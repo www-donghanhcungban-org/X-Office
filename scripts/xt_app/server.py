@@ -54,6 +54,8 @@ CONTENT_TYPES: Dict[str, str] = {
     ".png": "image/png",
     ".jpg": "image/jpeg",
     ".hdr": "application/octet-stream",
+    ".glb": "model/gltf-binary",
+    ".splat": "application/octet-stream",
     ".woff2": "font/woff2",
 }
 
@@ -403,6 +405,9 @@ def make_server(
     if not token:
         raise ValueError("token rỗng")
     table = static_table(static_root)
+    for rel, item in static_table(base / ".xoffice-hd").items():
+        table["/hd-assets" + rel] = item
+    table.setdefault("/hd-assets/manifest.json", (b"{}", "application/json"))
     table_routes = load_routes() if routes is None else dict(routes)
     server = AppServer(port, xt=xt, base=base, framework=framework, static=table, routes=table_routes, token=token)
     server.smoke = load_smoke() if routes is None else {}
