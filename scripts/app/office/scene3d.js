@@ -7,7 +7,11 @@
 import { inkOn, shade } from "./iso.js";
 import { planFor } from "./plans.js";
 import { STATE_TEXT, roomLabelAt, wallSegments } from "./scene.js";
-import { buildHumanRig, animateHumanRig, buildWalkerRig, animateWalkerRig, buildHDHuman, animateHDHuman } from "./human3d.js";
+import {
+  buildHumanRig, animateHumanRig, buildWalkerRig, animateWalkerRig,
+  buildHDHuman, animateHDHuman, buildSeatedHDHuman, animateSeatedHDHuman,
+  createScheduledNPC, stepScheduledNPC,
+} from "./human3d.js";
 import { buildStreetTraffic } from "./traffic3d.js";
 import { buildSurroundingCity } from "./city3d.js";
 import { instantiateGLB } from "./glb.js";
@@ -389,7 +393,7 @@ function buildOutdoor(THREE, sceneAssets, natureAssets, humanAssets, trafficAsse
   // Vỉa hè bê tông + đại lộ nhựa + vạch qua đường + 2 xe ô tô điện bóng clearcoat đỗ gọn trước văn phòng
   const streetZ = plan.D + pad;
   const swMat = mats.standard("#dedad2", { roughness: 0.85, tex: "sidewalk", normal: 0.55 });
-  const roadMat = mats.standard("#cfd4dc", { roughness: 0.86, tex: "road", normal: 0.65, roughMap: true });
+  const roadMat = mats.standard("#8a919c", { roughness: 0.88, tex: "road", normal: 0.65, roughMap: true });
   const curbCol = mats.standard("#a8a29e", { roughness: 0.82, tex: "stone", normal: 0.5, roughMap: true });
   const swW = plan.W + pad + 2.6;
   const swX = (plan.W + pad - 1.5) / 2;
@@ -418,11 +422,12 @@ function buildOutdoor(THREE, sceneAssets, natureAssets, humanAssets, trafficAsse
   southWalk.receiveShadow = true;
   group.add(southWalk);
 
-  // Vạch phân làn đứt nét giữa đại lộ + vạch dừng đèn đỏ + vạch kẻ người đi bộ qua đường
+  // Vạch phân làn đứt nét màu vàng + vạch trắng dừng đèn đỏ & qua đường
   const stripeMat = mats.standard("#f1f5f9", { roughness: 0.72, polygonOffset: true, offsetUnits: -2 });
+  const centerLineMat = mats.standard("#e5a93c", { roughness: 0.72, polygonOffset: true, offsetUnits: -2 });
   for (let dx = -2.2; dx < plan.W + pad + 0.5; dx += 4.2) {
     if (dx > 1.8 && dx < 8.4) continue;
-    const ln = new THREE.Mesh(g.unitPlane, stripeMat);
+    const ln = new THREE.Mesh(g.unitPlane, centerLineMat);
     ln.rotation.x = -Math.PI / 2;
     ln.position.set(dx, -0.016, streetZ + 5.9);
     ln.scale.set(2.1, 0.16, 1);
@@ -513,11 +518,11 @@ function buildArchitecture(THREE, sceneAssets, mats, hdAssets, plan, th, cutaway
   const woodFloor = th.id === "studio" || th.id === "library" || th.id === "cafe";
   const floorTex = woodFloor ? "wood" : "tileFloor";
   const floorMatA = mats.physical(th.floor[0], {
-    roughness: woodFloor ? 0.72 : 0.62, metalness: 0.04, clearcoat: woodFloor ? 0.25 : 0.35, clearcoatRoughness: 0.28,
+    roughness: woodFloor ? 0.72 : 0.74, metalness: 0.03, clearcoat: woodFloor ? 0.2 : 0.12, clearcoatRoughness: woodFloor ? 0.32 : 0.45,
     tex: floorTex, normal: 0.45, roughMap: true,
   });
   const floorMatB = mats.physical(th.floor[1], {
-    roughness: woodFloor ? 0.76 : 0.66, metalness: 0.04, clearcoat: woodFloor ? 0.22 : 0.32, clearcoatRoughness: 0.3,
+    roughness: woodFloor ? 0.76 : 0.78, metalness: 0.03, clearcoat: woodFloor ? 0.18 : 0.1, clearcoatRoughness: woodFloor ? 0.34 : 0.48,
     tex: floorTex, normal: 0.45, roughMap: true,
   });
 
@@ -1520,10 +1525,11 @@ function buildWorkstation(THREE, sceneAssets, humanAssets, hdAssets, mats, textu
 
   if (pick) root.traverse((o) => { if (o.isMesh) o.userData.pick = pick; });
 
-  // Nhân vật ngồi làm việc (nếu bàn có người)
+  // Nhân vật ngồi làm việc (ưu tiên Ready Player Me sắc nét, tự fallback khi chưa có gói .xoffice-hd)
   let rig = null;
   if (isAgent || seat.state === "npc") {
-    rig = buildHumanRig(THREE, humanAssets, mats, { index, theme, seat, season, pick });
+    rig = buildSeatedHDHuman(THREE, humanAssets, hdAssets, mats, { index, theme, seat, season, pick })
+      || buildHumanRig(THREE, humanAssets, mats, { index, theme, seat, season, pick });
     rig.root.position.set(1.4, 0, 1.32);
     root.add(rig.root);
   }
@@ -1644,19 +1650,62 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
       if (st.rig) rigs.push(st.rig);
     });
     if (plan.rooms && plan.rooms.length) {
-      // Lộ trình kiểm chứng va chạm 100% thông thoáng (tránh trọn hồ bơi, cây, ghế đá, cây Noel/Tết, sofa sảnh & mọi vách ngăn)
+      // Nhân viên nội bộ hành động có mục tiêu rõ ràng (pha cà phê → trò chuyện → sân vườn hồ bơi; check-in lễ tân → khu làm việc → trở lại quầy)
       const OFFICE_SHIRTS = ["#2563eb", "#0f766e", "#6d28d9", "#be123c", "#15803d", "#0369a1"];
-      const ambientStaff = [
+      const scheduledIndoor = [
         {
           index: 31,
-          path: [[33.4, 14.9], [37.5, 14.9], [37.5, 18.3], [35.4, 18.3], [37.5, 18.3], [37.5, 14.9]],
-          x: 33.4, z: 14.9, holdCup: true, speed: 0.62,
+          holdCup: true,
+          steps: [
+            { act: "wait", pos: [32.6, 2.7], yaw: Math.PI, dur: 3.6, mode: "talk" },
+            { act: "walk", from: [32.6, 2.7], to: [32.6, 8.2], speed: 0.85 },
+            { act: "walk", from: [32.6, 8.2], to: [31.4, 8.8], speed: 0.85 },
+            { act: "walk", from: [31.4, 8.8], to: [31.4, 14.9], speed: 0.85 },
+            { act: "walk", from: [31.4, 14.9], to: [35.6, 14.9], speed: 0.82 },
+            { act: "walk", from: [35.6, 14.9], to: [36.0, 16.0], speed: 0.78 },
+            { act: "wait", pos: [36.0, 16.0], yaw: 0.25, dur: 4.5, mode: "idle" },
+            { act: "walk", from: [36.0, 16.0], to: [35.6, 14.9], speed: 0.78 },
+            { act: "walk", from: [35.6, 14.9], to: [31.4, 14.9], speed: 0.82 },
+            { act: "walk", from: [31.4, 14.9], to: [31.4, 8.8], speed: 0.85 },
+            { act: "walk", from: [31.4, 8.8], to: [32.6, 8.2], speed: 0.85 },
+            { act: "walk", from: [32.6, 8.2], to: [32.6, 2.7], speed: 0.85 },
+          ],
+          initIdx: 6,
         },
         {
           index: 32,
-          path: [[5.8, 4.6], [5.8, 7.3], [3.4, 7.3], [3.4, 8.5], [1.8, 8.5], [3.4, 8.5], [3.4, 7.3], [5.8, 7.3]],
-          x: 5.8, z: 5.6, holdCup: false, speed: 0.68,
+          holdCup: false,
+          steps: [
+            { act: "wait", pos: [4.2, 4.35], yaw: 0, dur: 4.2, mode: "talk" },
+            { act: "walk", from: [4.2, 4.35], to: [5.8, 4.6], speed: 0.86 },
+            { act: "walk", from: [5.8, 4.6], to: [5.8, 7.0], speed: 0.86 },
+            { act: "walk", from: [5.8, 7.0], to: [3.8, 7.0], speed: 0.84 },
+            { act: "walk", from: [3.8, 7.0], to: [3.8, 8.6], speed: 0.84 },
+            { act: "walk", from: [3.8, 8.6], to: [2.2, 8.6], speed: 0.82 },
+            { act: "wait", pos: [2.2, 8.6], yaw: Math.PI / 2, dur: 3.4, mode: "idle" },
+            { act: "walk", from: [2.2, 8.6], to: [3.8, 8.6], speed: 0.82 },
+            { act: "walk", from: [3.8, 8.6], to: [3.8, 7.0], speed: 0.84 },
+            { act: "walk", from: [3.8, 7.0], to: [5.8, 7.0], speed: 0.84 },
+            { act: "walk", from: [5.8, 7.0], to: [5.8, 4.6], speed: 0.86 },
+            { act: "walk", from: [5.8, 4.6], to: [4.2, 4.35], speed: 0.86 },
+          ],
+          initIdx: 0,
         },
+      ];
+      for (const spec of scheduledIndoor) {
+        const rig = buildHDHuman(THREE, hdAssets, mats, {
+          index: spec.index,
+          mode: "idle",
+          femaleWalk: spec.index % 2 === 1,
+          topColor: OFFICE_SHIRTS[spec.index % OFFICE_SHIRTS.length],
+        }) || buildWalkerRig(THREE, humanAssets, mats, { index: spec.index, holdCup: spec.holdCup });
+        floorRoot.add(rig.root);
+        const npc = createScheduledNPC(rig, spec.steps, spec.initIdx, 0);
+        npc.isScheduled = true;
+        walkers.push(npc);
+      }
+
+      const ambientStaff = [
         // Nhân viên lễ tân đứng sau quầy hướng mặt về khách (+Z = rotY PI) & khách hướng về quầy (-Z = rotY 0)
         { index: 35, x: 3.7, z: 2.05, rotY: Math.PI, holdCup: false },
         { index: 36, x: 3.9, z: 4.35, rotY: 0, holdCup: false },
@@ -1667,7 +1716,7 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
       for (const spec of ambientStaff) {
         const w = buildHDHuman(THREE, hdAssets, mats, {
           ...spec,
-          mode: spec.path ? "walk" : "talk",
+          mode: "talk",
           femaleWalk: spec.index % 2 === 1,
           topColor: OFFICE_SHIRTS[spec.index % OFFICE_SHIRTS.length],
         }) || buildWalkerRig(THREE, humanAssets, mats, spec);
@@ -1686,7 +1735,9 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
         { index: 43, x: 21.5, z: 4.88, rotY: 0, state: "work" },
       ];
       for (const r of seatedRoles) {
-        const rig = buildHumanRig(THREE, humanAssets, mats, {
+        const rig = buildSeatedHDHuman(THREE, humanAssets, hdAssets, mats, {
+          index: r.index, theme: th, seat: { state: r.state }, season: opts.season, noChair: true,
+        }) || buildHumanRig(THREE, humanAssets, mats, {
           index: r.index, theme: th, seat: { state: r.state }, season: opts.season, noChair: true,
         });
         rig.root.position.set(r.x, 0, r.z);
@@ -1713,6 +1764,7 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
       variant: "rpm_a",
       height: 1.76,
       mode: "idle",
+      topColor: "#181b22",
     }) || buildWalkerRig(THREE, humanAssets, mats, {
       index: 99,
       hair: "#111827",
@@ -1808,9 +1860,13 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
     animate(t, motion) {
       const dt = scenePrevT ? Math.min(0.06, Math.max(0.001, t - scenePrevT)) : 0.016;
       scenePrevT = t;
-      for (const rig of rigs) animateHumanRig(rig, t, motion);
+      for (const rig of rigs) {
+        if (rig.isHDSeated) animateSeatedHDHuman(rig, t, motion);
+        else animateHumanRig(rig, t, motion);
+      }
       for (const w of walkers) {
-        if (w.isHD) animateHDHuman(w, t, dt, motion, w.curMode || "idle");
+        if (w.isScheduled) stepScheduledNPC(w, t, dt, motion);
+        else if (w.isHD) animateHDHuman(w, t, dt, motion, w.curMode || "idle");
         else animateWalkerRig(w, t, motion);
       }
       for (const st of agentStations) {

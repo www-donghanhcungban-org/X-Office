@@ -174,42 +174,21 @@ function tagPick(root, pick) {
   root.traverse((o) => { if (o.isMesh) o.userData.pick = pick; });
 }
 
-export function buildHumanRig(THREE, assets, mats, opts) {
-  const { index: i, theme, seat, season, pick } = opts;
-  const g = assets.geos;
+function buildErgonomicChair(THREE, g, mats, theme, noChair) {
   const root = new THREE.Group();
-  const skinCol = SKIN[i % SKIN.length];
-  const hairCol = HAIR[(i * 3) % HAIR.length];
-  const irisCol = IRIS[(i * 2) % IRIS.length];
-  const outfit = OUTFIT[i % OUTFIT.length];
-  const isAgent = Boolean(seat && seat.label);
-
-  const skinMat = mats.physical(skinCol, { roughness: 0.62, metalness: 0.0, sheen: 0.14, sheenRoughness: 0.8, sheenColor: "#d99272" });
-  const hairMat = mats.physical(hairCol, { roughness: 0.52, metalness: 0.05, clearcoat: 0.1, sheen: 0.12, tex: "hair", normal: 0.45 });
-  const topMat = mats.physical(outfit.top, { roughness: 0.86, metalness: 0.02, sheen: 0.12, sheenRoughness: 0.85 });
-  const innerMat = mats.physical(outfit.inner, { roughness: 0.84, metalness: 0.01, sheen: 0.08 });
-  const pantsMat = mats.physical(outfit.pants, { roughness: 0.86, metalness: 0.02, sheen: 0.12, sheenRoughness: 0.85 });
-  const chairMat = mats.physical(theme.chair, { roughness: 0.82, metalness: 0.04, sheen: 0.48, sheenRoughness: 0.75, tex: "fabric", normal: 0.35, roughMap: true });
-  const chairDark = mats.standard("#1e293b", { roughness: 0.38, metalness: 0.42 });
-  const chromeMat = mats.standard("#e2e8f0", { roughness: 0.14, metalness: 0.94 });
-  const shoeMat = mats.physical(i % 2 ? "#1e293b" : "#442c1e", { roughness: 0.34, metalness: 0.06, clearcoat: 0.48 });
-  const soleMat = mats.standard("#cbd5e1", { roughness: 0.68, metalness: 0.02 });
-  const whiteMat = mats.physical("#ffffff", { roughness: 0.06, metalness: 0.0, clearcoat: 1.0, clearcoatRoughness: 0.04 });
-  const darkMat = mats.standard("#0f172a", { roughness: 0.2, metalness: 0.15 });
-  const lipMat = mats.physical("#bd6960", { roughness: 0.38, clearcoat: 0.3 });
-
-  // Bóng tiếp xúc mềm dưới ghế (Ambient Occlusion tiếp đất)
   const sh = new THREE.Mesh(g.shadowDisc, mats.shadow());
   sh.rotation.x = -Math.PI / 2;
   sh.position.y = 0.016;
   root.add(sh);
 
-  // ---------------- 1. Ghế xoay công thái học 5 chân (bỏ qua khi nhân vật ngồi sẵn ghế phòng họp / giám đốc)
   const chairGroup = new THREE.Group();
   root.add(chairGroup);
   const swivel = new THREE.Group();
   chairGroup.add(swivel);
-  if (!opts.noChair) {
+  if (!noChair) {
+    const chairMat = mats.physical(theme.chair, { roughness: 0.82, metalness: 0.04, sheen: 0.48, sheenRoughness: 0.75, tex: "fabric", normal: 0.35, roughMap: true });
+    const chairDark = mats.standard("#1e293b", { roughness: 0.38, metalness: 0.42 });
+    const chromeMat = mats.standard("#e2e8f0", { roughness: 0.14, metalness: 0.94 });
     const stem = new THREE.Mesh(g.chairStem, chromeMat);
     stem.position.y = 0.25;
     stem.castShadow = true;
@@ -250,6 +229,73 @@ export function buildHumanRig(THREE, assets, mats, opts) {
     hrest.castShadow = true;
     swivel.add(hrest);
   }
+  return { root, chairGroup, swivel };
+}
+
+function attachHeadAccessories(THREE, g, mats, theme, isAgent, season, parent, darkMat, innerMat) {
+  let micLed = null;
+  if (isAgent) {
+    const hsMat = mats.standard("#1f2937", { roughness: 0.35, metalness: 0.45 });
+    const band = new THREE.Mesh(g.headband, hsMat);
+    band.position.y = 0.065;
+    parent.add(band);
+    for (const side of [-1, 1]) {
+      const cup = new THREE.Mesh(g.earcup, hsMat);
+      cup.position.set(side * 0.165, 0.25, 0.005);
+      cup.rotation.z = Math.PI / 2;
+      const pad = new THREE.Mesh(g.earpad, darkMat);
+      pad.position.set(side * 0.15, 0.25, 0.005);
+      pad.rotation.y = Math.PI / 2;
+      parent.add(cup, pad);
+    }
+    const boom = new THREE.Mesh(g.micBoom, hsMat);
+    boom.position.y = 0.065;
+    micLed = new THREE.Mesh(g.micTip, mats.standard(theme.glow, { roughness: 0.2, emissive: theme.glow, emissiveIntensity: 0.65 }));
+    micLed.position.set(0.065, 0.18, -0.175);
+    parent.add(boom, micLed);
+  }
+  if (season === "noel") {
+    const cuff = new THREE.Mesh(g.noelCuff, innerMat);
+    cuff.position.set(0, 0.405, 0.01);
+    cuff.rotation.x = Math.PI / 2;
+    const cone = new THREE.Mesh(g.noelCone, mats.standard("#dc2626", { roughness: 0.78, tex: "fabric" }));
+    cone.position.set(0, 0.56, 0.04);
+    cone.rotation.x = 0.18;
+    const pom = new THREE.Mesh(g.noelPom, innerMat);
+    pom.position.set(0, 0.72, 0.075);
+    parent.add(cuff, cone, pom);
+  } else if (season === "tet") {
+    const cap = new THREE.Mesh(g.tetCap, mats.standard("#dc2626", { roughness: 0.72, tex: "fabric" }));
+    cap.position.set(0, 0.415, 0.01);
+    const gold = new THREE.Mesh(g.noelPom, mats.standard("#facc15", { roughness: 0.28, metalness: 0.7 }));
+    gold.position.set(0, 0.425, -0.145);
+    gold.scale.setScalar(0.65);
+    parent.add(cap, gold);
+  }
+  return micLed;
+}
+
+export function buildHumanRig(THREE, assets, mats, opts) {
+  const { index: i, theme, seat, season, pick } = opts;
+  const g = assets.geos;
+  const { root, swivel } = buildErgonomicChair(THREE, g, mats, theme, opts.noChair);
+  const skinCol = SKIN[i % SKIN.length];
+  const hairCol = HAIR[(i * 3) % HAIR.length];
+  const irisCol = IRIS[(i * 2) % IRIS.length];
+  const outfit = OUTFIT[i % OUTFIT.length];
+  const isAgent = Boolean(seat && seat.label);
+
+  const skinMat = mats.physical(skinCol, { roughness: 0.62, metalness: 0.0, sheen: 0.14, sheenRoughness: 0.8, sheenColor: "#d99272" });
+  const hairMat = mats.physical(hairCol, { roughness: 0.52, metalness: 0.05, clearcoat: 0.1, sheen: 0.12, tex: "hair", normal: 0.45 });
+  const topMat = mats.physical(outfit.top, { roughness: 0.86, metalness: 0.02, sheen: 0.12, sheenRoughness: 0.85 });
+  const innerMat = mats.physical(outfit.inner, { roughness: 0.84, metalness: 0.01, sheen: 0.08 });
+  const pantsMat = mats.physical(outfit.pants, { roughness: 0.86, metalness: 0.02, sheen: 0.12, sheenRoughness: 0.85 });
+  const chromeMat = mats.standard("#e2e8f0", { roughness: 0.14, metalness: 0.94 });
+  const shoeMat = mats.physical(i % 2 ? "#1e293b" : "#442c1e", { roughness: 0.34, metalness: 0.06, clearcoat: 0.48 });
+  const soleMat = mats.standard("#cbd5e1", { roughness: 0.68, metalness: 0.02 });
+  const whiteMat = mats.physical("#ffffff", { roughness: 0.06, metalness: 0.0, clearcoat: 1.0, clearcoatRoughness: 0.04 });
+  const darkMat = mats.standard("#0f172a", { roughness: 0.2, metalness: 0.15 });
+  const lipMat = mats.physical("#bd6960", { roughness: 0.38, clearcoat: 0.3 });
 
   // ---------------- 2. Cơ thể người ngồi
   const body = new THREE.Group();
@@ -462,48 +508,7 @@ export function buildHumanRig(THREE, assets, mats, opts) {
     }
   }
 
-  // Tai nghe phòng thu + mic cho 5 AI agent
-  let micLed = null;
-  if (isAgent) {
-    const hsMat = mats.standard("#1f2937", { roughness: 0.35, metalness: 0.45 });
-    const band = new THREE.Mesh(g.headband, hsMat);
-    band.position.y = 0.065;
-    head.add(band);
-    for (const side of [-1, 1]) {
-      const cup = new THREE.Mesh(g.earcup, hsMat);
-      cup.position.set(side * 0.165, 0.25, 0.005);
-      cup.rotation.z = Math.PI / 2;
-      const pad = new THREE.Mesh(g.earpad, darkMat);
-      pad.position.set(side * 0.15, 0.25, 0.005);
-      pad.rotation.y = Math.PI / 2;
-      head.add(cup, pad);
-    }
-    const boom = new THREE.Mesh(g.micBoom, hsMat);
-    boom.position.y = 0.065;
-    micLed = new THREE.Mesh(g.micTip, mats.standard(theme.glow, { roughness: 0.2, emissive: theme.glow, emissiveIntensity: 0.65 }));
-    micLed.position.set(0.065, 0.18, -0.175);
-    head.add(boom, micLed);
-  }
-
-  // Mũ mùa lễ hội (Noel / Tết)
-  if (season === "noel") {
-    const cuff = new THREE.Mesh(g.noelCuff, innerMat);
-    cuff.position.set(0, 0.405, 0.01);
-    cuff.rotation.x = Math.PI / 2;
-    const cone = new THREE.Mesh(g.noelCone, mats.standard("#dc2626", { roughness: 0.78, tex: "fabric" }));
-    cone.position.set(0, 0.56, 0.04);
-    cone.rotation.x = 0.18;
-    const pom = new THREE.Mesh(g.noelPom, innerMat);
-    pom.position.set(0, 0.72, 0.075);
-    head.add(cuff, cone, pom);
-  } else if (season === "tet") {
-    const cap = new THREE.Mesh(g.tetCap, mats.standard("#dc2626", { roughness: 0.72, tex: "fabric" }));
-    cap.position.set(0, 0.415, 0.01);
-    const gold = new THREE.Mesh(g.noelPom, mats.standard("#facc15", { roughness: 0.28, metalness: 0.7 }));
-    gold.position.set(0, 0.425, -0.145);
-    gold.scale.setScalar(0.65);
-    head.add(cap, gold);
-  }
+  const micLed = attachHeadAccessories(THREE, g, mats, theme, isAgent, season, head, darkMat, innerMat);
 
   // ---------------- 4. Hai cánh tay khớp khuỷu (bờ vai tròn mượt → cánh tay trên → khuỷu → cẳng tay → bàn tay)
   function makeArm(side) {
@@ -811,6 +816,18 @@ export function buildWalkerRig(THREE, assets, mats, opts) {
   const leftArm = makeArm(-1);
   const rightArm = makeArm(1);
 
+  if (holdCup && !opts.parcel) {
+    /* Đã thêm cốc cà phê trên tay phải ở vòng makeArm */
+  } else if (opts.parcel) {
+    const box = new THREE.Mesh(
+      new THREE.BoxGeometry(0.32, 0.22, 0.28),
+      mats.standard("#c89d66", { roughness: 0.84 }),
+    );
+    box.position.set(0, 0.95, -0.26);
+    box.castShadow = true;
+    root.add(box);
+  }
+
   return { root, body, chest, head, eyelids, leftLeg, rightLeg, leftArm, rightArm, path: path || null, speed, holdCup, index: i };
 }
 
@@ -917,6 +934,21 @@ export function buildHDHuman(THREE, hdAssets, mats, opts = {}) {
   sh.position.y = 0.016;
   inst.group.add(sh);
 
+  if (opts.parcel) {
+    const box = new THREE.Mesh(
+      new THREE.BoxGeometry(0.32, 0.22, 0.28),
+      mats.standard("#c89d66", { roughness: 0.84 }),
+    );
+    box.position.set(0, 0.96, -0.27);
+    box.castShadow = true;
+    const tape = new THREE.Mesh(
+      new THREE.BoxGeometry(0.324, 0.025, 0.06),
+      mats.standard("#fef3c7", { roughness: 0.45 }),
+    );
+    tape.position.set(0, 1.072, -0.27);
+    inst.group.add(box, tape);
+  }
+
   const mixer = new THREE.AnimationMixer(inst.root);
   const actions = {};
   const clips = {
@@ -996,5 +1028,363 @@ export function animateHDHuman(h, t, dt, motion, modeOverride) {
   } else {
     setHDHumanMode(h, modeOverride || h.curMode || "idle");
     h.mixer.update(dt);
+  }
+}
+
+// ---------------------------------------------------------------- Nhân vật văn phòng Ready Player Me ngồi ghế công thái học / phòng họp / giám đốc
+const _qParent = { v: null };
+const _qDelta = { v: null };
+const _qInv = { v: null };
+const _axVec = { v: null };
+
+function rotateBoneWorld(THREE, bone, ax, ay, az, angle) {
+  if (!bone || !bone.parent) return;
+  if (!_qParent.v) {
+    _qParent.v = new THREE.Quaternion();
+    _qDelta.v = new THREE.Quaternion();
+    _qInv.v = new THREE.Quaternion();
+    _axVec.v = new THREE.Vector3();
+  }
+  bone.parent.getWorldQuaternion(_qParent.v);
+  _axVec.v.set(ax, ay, az).normalize();
+  _qDelta.v.setFromAxisAngle(_axVec.v, angle);
+  _qInv.v.copy(_qParent.v).invert();
+  bone.quaternion.premultiply(_qParent.v).premultiply(_qDelta.v).premultiply(_qInv.v);
+}
+
+function worldAxisToLocal(THREE, bone, ax, ay, az) {
+  const qW = new THREE.Quaternion();
+  bone.getWorldQuaternion(qW);
+  return new THREE.Vector3(ax, ay, az).normalize().applyQuaternion(qW.invert()).normalize();
+}
+
+export function buildSeatedHDHuman(THREE, assets, hdAssets, mats, opts = {}) {
+  const parsed = hdAssets && hdAssets.get("human_rpm_a");
+  if (!parsed) return null;
+
+  const { index: i = 0, theme, seat, season, pick } = opts;
+  const g = assets.geos;
+  const { root, swivel } = buildErgonomicChair(THREE, g, mats, theme, opts.noChair);
+  const outfit = OUTFIT[i % OUTFIT.length];
+  const hairCol = HAIR[(i * 3) % HAIR.length];
+  const isAgent = Boolean(seat && seat.label);
+
+  // Dựng ở rotY = 0 (mặt hướng +Z, trái +X, trên +Y) để căn khớp xương ngồi chuẩn xác trước khi xoay về -Z
+  const inst = instantiateGLB(THREE, parsed, { targetHeight: 1.72, rotY: 0, centerXZ: false, groundY: false });
+  inst.root.position.set(0, 0, 0);
+
+  const bones = {};
+  inst.root.traverse((o) => {
+    if (o.name) bones[o.name] = o;
+    if (o.isSkinnedMesh) o.frustumCulled = false;
+    if (!o.isMesh || !o.material) return;
+    const mn = o.material.name || "";
+    if (mn === "Wolf3D_Outfit_Top" || mn === "Wolf3D_Outfit_Bottom" || mn === "Wolf3D_Hair") {
+      const m = o.material.clone();
+      if (mn === "Wolf3D_Outfit_Top") {
+        m.color.set(outfit.top);
+        m.roughness = 0.84;
+      } else if (mn === "Wolf3D_Outfit_Bottom") {
+        m.color.set(outfit.pants);
+        m.roughness = 0.86;
+      } else {
+        m.color.set(hairCol);
+      }
+      m.map = null;
+      m.needsUpdate = true;
+      mats.own(m);
+      o.material = m;
+    }
+  });
+
+  if (bones.Hips) {
+    bones.Hips.position.y = 0.595;
+    bones.Hips.position.z = -0.02;
+  }
+  inst.root.updateMatrixWorld(true);
+
+  if (bones.LeftUpLeg) {
+    rotateBoneWorld(THREE, bones.LeftUpLeg, -1, 0, 0, 1.50);
+    rotateBoneWorld(THREE, bones.LeftUpLeg, 0, 1, 0, 0.06);
+  }
+  if (bones.RightUpLeg) {
+    rotateBoneWorld(THREE, bones.RightUpLeg, -1, 0, 0, 1.50);
+    rotateBoneWorld(THREE, bones.RightUpLeg, 0, 1, 0, -0.06);
+  }
+  inst.root.updateMatrixWorld(true);
+
+  if (bones.LeftLeg) rotateBoneWorld(THREE, bones.LeftLeg, 1, 0, 0, 1.46);
+  if (bones.RightLeg) rotateBoneWorld(THREE, bones.RightLeg, 1, 0, 0, 1.46);
+  if (bones.Spine) rotateBoneWorld(THREE, bones.Spine, 1, 0, 0, 0.06);
+  if (bones.Spine1) rotateBoneWorld(THREE, bones.Spine1, 1, 0, 0, 0.04);
+  inst.root.updateMatrixWorld(true);
+
+  if (bones.LeftArm) {
+    rotateBoneWorld(THREE, bones.LeftArm, 0, 0, -1, 0.58);
+    rotateBoneWorld(THREE, bones.LeftArm, -1, 0, 0, 0.42);
+  }
+  if (bones.RightArm) {
+    rotateBoneWorld(THREE, bones.RightArm, 0, 0, 1, 0.58);
+    rotateBoneWorld(THREE, bones.RightArm, -1, 0, 0, 0.42);
+  }
+  inst.root.updateMatrixWorld(true);
+
+  if (bones.LeftForeArm) {
+    rotateBoneWorld(THREE, bones.LeftForeArm, -1, 0, 0, 1.12);
+    rotateBoneWorld(THREE, bones.LeftForeArm, 0, -1, 0, 0.22);
+  }
+  if (bones.RightForeArm) {
+    rotateBoneWorld(THREE, bones.RightForeArm, -1, 0, 0, 1.12);
+    rotateBoneWorld(THREE, bones.RightForeArm, 0, 1, 0, 0.22);
+  }
+  inst.root.updateMatrixWorld(true);
+
+  const animBones = {};
+  for (const name of ["Spine1", "Head", "LeftArm", "RightArm", "LeftForeArm", "RightForeArm"]) {
+    const b = bones[name];
+    if (!b) continue;
+    animBones[name] = {
+      bone: b,
+      baseQ: b.quaternion.clone(),
+      pitchAxis: worldAxisToLocal(THREE, b, 1, 0, 0),
+      yawAxis: worldAxisToLocal(THREE, b, 0, 1, 0),
+      rollAxis: worldAxisToLocal(THREE, b, 0, 0, 1),
+    };
+  }
+
+  let micLed = null;
+  if (bones.Head && (isAgent || season === "noel" || season === "tet")) {
+    const qHeadW = new THREE.Quaternion();
+    bones.Head.getWorldQuaternion(qHeadW);
+    const qInvHead = qHeadW.clone().invert();
+    const headMount = new THREE.Group();
+    headMount.quaternion.copy(qInvHead).multiply(
+      new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI),
+    );
+    headMount.position.set(0, -0.055, 0.025).applyQuaternion(qInvHead);
+    headMount.scale.setScalar(0.58);
+    const darkMat = mats.standard("#0f172a", { roughness: 0.2, metalness: 0.15 });
+    const innerMat = mats.physical(outfit.inner, { roughness: 0.84, metalness: 0.01, sheen: 0.08 });
+    micLed = attachHeadAccessories(THREE, g, mats, theme, isAgent, season, headMount, darkMat, innerMat);
+    bones.Head.add(headMount);
+  }
+
+  // Xoay cả nhân vật ngồi quay mặt về hướng -Z (về phía màn hình & bàn phím)
+  inst.root.rotation.y = Math.PI;
+  inst.root.position.z = 0.04;
+  swivel.add(inst.group);
+
+  tagPick(root, pick);
+  return {
+    root,
+    swivel,
+    isHDSeated: true,
+    animBones,
+    micLed,
+    index: i,
+    state: seat ? seat.state : "idle",
+  };
+}
+
+function applyBoneOffsets(ab, pitch, yaw, roll) {
+  if (!ab) return;
+  ab.bone.quaternion.copy(ab.baseQ);
+  if (pitch) ab.bone.quaternion.multiply(_qDelta.v.setFromAxisAngle(ab.pitchAxis, pitch));
+  if (yaw) ab.bone.quaternion.multiply(_qInv.v.setFromAxisAngle(ab.yawAxis, yaw));
+  if (roll) ab.bone.quaternion.multiply(_qParent.v.setFromAxisAngle(ab.rollAxis, roll));
+}
+
+export function animateSeatedHDHuman(rig, t, motion, state) {
+  const i = rig.index;
+  const st = state || rig.state;
+  const busy = st === "work" || st === "npc";
+  const b = rig.animBones;
+  if (!motion) {
+    rig.swivel.rotation.y = 0;
+    for (const k of Object.keys(b)) applyBoneOffsets(b[k], 0, 0, 0);
+    if (st === "wait") {
+      applyBoneOffsets(b.RightArm, -0.75, 0, 0.25);
+      applyBoneOffsets(b.RightForeArm, -0.45, 0, 0);
+    } else if (st === "done") {
+      applyBoneOffsets(b.LeftArm, -0.8, 0, -0.22);
+      applyBoneOffsets(b.RightArm, -0.8, 0, 0.22);
+    }
+    return;
+  }
+
+  const breath = Math.sin(t * 2.1 + i * 1.3) * 0.022;
+  applyBoneOffsets(b.Spine1, breath, 0, 0);
+
+  if (st === "wait") {
+    rig.swivel.rotation.y = Math.sin(t * 1.2 + i) * 0.06;
+    applyBoneOffsets(b.Head, -0.05, Math.sin(t * 1.5) * 0.2, Math.sin(t * 2.0) * 0.05);
+    applyBoneOffsets(b.LeftArm, 0, 0, 0);
+    applyBoneOffsets(b.LeftForeArm, 0, 0, 0);
+    applyBoneOffsets(b.RightArm, -0.78, 0, 0.22 + Math.sin(t * 4.5) * 0.14);
+    applyBoneOffsets(b.RightForeArm, -0.42 + Math.sin(t * 4.5 + 0.5) * 0.18, 0, 0);
+  } else if (st === "done") {
+    rig.swivel.rotation.y = Math.sin(t * 2.1) * 0.09;
+    applyBoneOffsets(b.Spine1, breath - 0.05, 0, 0);
+    applyBoneOffsets(b.Head, -0.08, Math.sin(t * 2.3) * 0.16, 0);
+    const cheer = Math.sin(t * 6.5) * 0.14;
+    applyBoneOffsets(b.LeftArm, -0.85 - cheer, 0, -0.24);
+    applyBoneOffsets(b.LeftForeArm, -0.3, 0, 0);
+    applyBoneOffsets(b.RightArm, -0.85 + cheer, 0, 0.24);
+    applyBoneOffsets(b.RightForeArm, -0.3, 0, 0);
+  } else if (st === "fail") {
+    rig.swivel.rotation.y = 0;
+    applyBoneOffsets(b.Spine1, 0.07 + breath, 0, 0);
+    applyBoneOffsets(b.Head, 0.08, Math.sin(t * 6.0) * 0.14, Math.sin(t * 3.5) * 0.04);
+    const fast = Math.sin(t * 15 + i) * 0.1;
+    applyBoneOffsets(b.LeftArm, 0, 0, 0);
+    applyBoneOffsets(b.RightArm, 0, 0, 0);
+    applyBoneOffsets(b.LeftForeArm, fast, 0, 0);
+    applyBoneOffsets(b.RightForeArm, -fast, 0, 0);
+  } else if (busy) {
+    rig.swivel.rotation.y = Math.sin(t * 0.7 + i) * 0.035;
+    applyBoneOffsets(b.Head, 0.04 + Math.sin(t * 2.2 + i) * 0.04, Math.sin(t * 0.9 + i * 2.1) * 0.18, 0);
+    const tap = Math.sin(t * 11.5 + i * 1.7) * 0.085;
+    const useMouse = Math.sin(t * 0.45 + i) > 0.35;
+    applyBoneOffsets(b.LeftArm, 0, 0, 0);
+    applyBoneOffsets(b.LeftForeArm, tap, 0, 0);
+    applyBoneOffsets(b.RightArm, 0, useMouse ? -0.14 : 0, 0);
+    applyBoneOffsets(b.RightForeArm, useMouse ? Math.sin(t * 3.5 + i) * 0.03 : -tap, useMouse ? -0.18 + Math.sin(t * 2.8 + i) * 0.08 : 0, 0);
+  } else {
+    rig.swivel.rotation.y = Math.sin(t * 0.45 + i * 1.9) * 0.07;
+    applyBoneOffsets(b.Head, 0.02, Math.sin(t * 0.55 + i * 2.7) * 0.22, Math.sin(t * 0.4 + i) * 0.03);
+    applyBoneOffsets(b.LeftArm, 0, 0, 0);
+    applyBoneOffsets(b.RightArm, 0, 0, 0);
+    applyBoneOffsets(b.LeftForeArm, 0, 0, 0);
+    applyBoneOffsets(b.RightForeArm, 0, 0, 0);
+  }
+}
+
+// ---------------------------------------------------------------- Bộ điều khiển hành vi NPC có mục tiêu (dùng chung cho văn phòng & đường phố)
+function lerpAngle(cur, target, alpha) {
+  let diff = target - cur;
+  while (diff > Math.PI) diff -= Math.PI * 2;
+  while (diff < -Math.PI) diff += Math.PI * 2;
+  return cur + diff * alpha;
+}
+
+export function createScheduledNPC(rig, steps, initStepIdx = 0, initElapsed = 0) {
+  const s = steps[initStepIdx] || steps[0];
+  let initX = 0, initZ = 0, initYaw = 0;
+  if (s.act === "wait") {
+    [initX, initZ] = s.pos;
+    initYaw = s.yaw || 0;
+  } else {
+    const dx = s.to[0] - s.from[0], dz = s.to[1] - s.from[1];
+    const len = Math.hypot(dx, dz) || 1;
+    const u = Math.min(1, initElapsed / len);
+    initX = s.from[0] + dx * u;
+    initZ = s.from[1] + dz * u;
+    initYaw = Math.atan2(-dx, -dz);
+  }
+  rig.root.position.set(initX, 0, initZ);
+  rig.root.rotation.y = initYaw;
+  return {
+    rig,
+    steps,
+    initStepIdx,
+    initElapsed,
+    initX,
+    initZ,
+    initYaw,
+    stepIdx: initStepIdx,
+    elapsed: initElapsed,
+    committed: false,
+  };
+}
+
+export function stepScheduledNPC(npc, t, dt, motion, gateCheck) {
+  const w = npc.rig;
+  if (!motion) {
+    npc.stepIdx = npc.initStepIdx;
+    npc.elapsed = npc.initElapsed;
+    npc.committed = false;
+    w.root.position.set(npc.initX, 0, npc.initZ);
+    w.root.rotation.y = npc.initYaw;
+    if (w.isHD) animateHDHuman(w, 0, 0, false, "idle");
+    else animateWalkerRig(w, 0, false);
+    return;
+  }
+
+  const s = npc.steps[npc.stepIdx];
+  if (!s) return;
+
+  if (s.act === "wait") {
+    w.root.position.set(s.pos[0], 0, s.pos[1]);
+    w.root.rotation.y = lerpAngle(w.root.rotation.y, s.yaw || 0, Math.min(1, dt * 6.5));
+    npc.elapsed += dt;
+    const mode = s.mode || "idle";
+    if (w.isHD) {
+      animateHDHuman(w, t, dt, true, mode);
+    } else {
+      const i = w.index || 0;
+      w.body.position.y = 0.835;
+      w.leftLeg.rotation.x = w.rightLeg.rotation.x = 0;
+      w.head.rotation.set(Math.sin(t * 1.4 + i) * 0.05, Math.sin(t * 0.8 + i * 2) * 0.22, 0);
+      w.leftArm.rotation.x = mode === "talk" ? 0.14 + Math.sin(t * 2.2 + i) * 0.14 : 0.06;
+      w.rightArm.rotation.x = mode === "talk" ? 0.16 - Math.sin(t * 1.9 + i) * 0.12 : (w.holdCup ? 0.65 : 0.06);
+    }
+    if (npc.elapsed >= (s.dur || 3.5)) {
+      npc.stepIdx = (npc.stepIdx + 1) % npc.steps.length;
+      npc.elapsed = 0;
+      npc.committed = false;
+    }
+    return;
+  }
+
+  const dx = s.to[0] - s.from[0];
+  const dz = s.to[1] - s.from[1];
+  const len = Math.hypot(dx, dz);
+  const targetYaw = Math.atan2(-dx, -dz);
+
+  if (s.cross && !npc.committed) {
+    const allowed = gateCheck ? gateCheck(s.cross) : true;
+    if (!allowed) {
+      w.root.position.set(s.from[0], 0, s.from[1]);
+      w.root.rotation.y = lerpAngle(w.root.rotation.y, targetYaw, Math.min(1, dt * 8.0));
+      if (w.isHD) {
+        animateHDHuman(w, t, dt, true, "idle");
+      } else {
+        w.body.position.y = 0.835;
+        w.leftLeg.rotation.x = w.rightLeg.rotation.x = 0;
+        w.leftArm.rotation.x = w.rightArm.rotation.x = 0.06;
+        w.head.rotation.y = Math.sin(t * 1.1 + (w.index || 0)) * 0.24;
+      }
+      return;
+    }
+    npc.committed = true;
+  }
+
+  const spd = s.speed || 1.35;
+  w.root.rotation.y = lerpAngle(w.root.rotation.y, targetYaw, s.cross ? 1 : Math.min(1, dt * 7.5));
+  npc.elapsed += dt * spd;
+  const dist = Math.min(len, npc.elapsed);
+  const u = len > 1e-4 ? dist / len : 1;
+  w.root.position.set(s.from[0] + dx * u, 0, s.from[1] + dz * u);
+
+  if (w.isHD) {
+    w.speed = spd;
+    animateHDHuman(w, t, dt * (spd / 1.15), true, "walk");
+  } else {
+    const i = w.index || 0;
+    const stride = Math.sin(t * 5.6 + i);
+    w.body.position.y = 0.835 + Math.abs(Math.cos(t * 5.6 + i)) * 0.032;
+    w.leftLeg.rotation.x = stride * 0.44;
+    w.rightLeg.rotation.x = -stride * 0.44;
+    w.leftArm.rotation.x = -stride * 0.34;
+    w.rightArm.rotation.x = w.holdCup ? 0.65 + stride * 0.05 : stride * 0.34;
+    w.head.rotation.set(0, Math.sin(t * 0.9 + i) * 0.14, 0);
+  }
+
+  if (npc.elapsed >= len) {
+    const rem = npc.elapsed - len;
+    npc.stepIdx = (npc.stepIdx + 1) % npc.steps.length;
+    const nextStep = npc.steps[npc.stepIdx];
+    npc.elapsed = nextStep && nextStep.act === "walk" && !nextStep.cross ? rem : 0;
+    npc.committed = false;
   }
 }

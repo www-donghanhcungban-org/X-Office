@@ -340,6 +340,7 @@ export function buildTree(THREE, assets, mats, opts, anim) {
   }
 
   root.rotation.y = rnd(seed) * Math.PI * 2;
+  if (opts.scale) root.scale.setScalar(opts.scale);
   if (anim) anim.trees.push({ group: canopy, phase: seed, amp: palm ? 0.045 : 0.024 });
   return root;
 }
