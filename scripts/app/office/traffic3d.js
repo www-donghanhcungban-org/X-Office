@@ -1,11 +1,11 @@
-// Hệ thống giao thông đô thị 3D sống động phía trước văn phòng:
-// - Đèn tín hiệu giao thông thật (Đỏ / Vàng / Xanh + đèn người đi bộ) có quầng sáng HDR Bloom.
-// - Ô tô sơn bóng clearcoat (bánh xe quay thật, đèn phanh đỏ bừng khi dừng đèn đỏ/giữ khoảng cách).
-// - Xe máy / xe tay ga chi tiết kèm người lái đội mũ bảo hiểm kính râm, tay cầm lái.
-// - Người đi bộ dạo trên hai vỉa hè và đứng chờ vạch qua đường, chỉ băng qua khi đèn giao thông chuyển Đỏ.
+// Hệ thống giao thông đô thị 3D đa ngã tư bao quanh khu phố văn phòng:
+// - Đèn tín hiệu giao thông đồng bộ 2 pha tại nút qua đường chính & cả 4 ngã tư (Tây-Nam, Đông-Nam, Tây-Bắc, Đông-Bắc).
+// - Ô tô sơn bóng clearcoat & xe máy kèm người lái đội mũ bảo hiểm chạy dọc hết cả 4 tuyến đường (Đông-Tây & Bắc-Nam).
+// - Xe tự giữ khoảng cách an toàn, dừng đúng vạch trắng đèn đỏ ở mọi ngã tư và sáng đèn phanh HDR.
+// - Người đi bộ dạo trên vỉa hè cả 4 tuyến phố và qua đường đúng nhịp đèn đỏ tại nút chính + các ngã tư.
 import { buildWalkerRig, animateWalkerRig } from "./human3d.js";
 
-const CYCLE = 18.0; // chu kỳ đèn: 0–8.5s Xanh · 8.5–10.5s Vàng · 10.5–18.0s Đỏ (xe dừng, người qua đường 11–16.5s)
+const CYCLE = 18.0; // 0–8.5s ĐT Xanh/BN Đỏ · 8.5–10.5s ĐT Vàng/BN Đỏ · 10.5–16.5s ĐT Đỏ/BN Xanh · 16.5–18s ĐT Đỏ/BN Vàng
 
 export function createTrafficAssets(THREE) {
   const geos = {
@@ -14,7 +14,6 @@ export function createTrafficAssets(THREE) {
     arm: new THREE.CylinderGeometry(0.055, 0.068, 2.6, 10),
     lamp: new THREE.SphereGeometry(0.115, 12, 10),
     pedLamp: new THREE.BoxGeometry(0.16, 0.16, 0.06),
-    // Xe máy / tay ga
     motoWheel: new THREE.CylinderGeometry(0.24, 0.24, 0.12, 14),
     motoRim: new THREE.CylinderGeometry(0.14, 0.14, 0.135, 10),
     motoFork: new THREE.CylinderGeometry(0.025, 0.028, 0.68, 8),
@@ -43,11 +42,12 @@ function addShadow(THREE, group, natureAssets, mats, sx, sz) {
   group.add(m);
 }
 
-// ---------------------------------------------------------------- Cột đèn giao thông 3 màu + đèn tín hiệu người đi bộ
-function buildTrafficLight(THREE, tAssets, mats, x, z, dirZ) {
+// ---------------------------------------------------------------- Cột đèn giao thông 3 màu + đèn đi bộ (xoay được theo hướng đường)
+function buildTrafficLight(THREE, tAssets, mats, x, z, dirZ, rotY, sigAxis) {
   const g = tAssets.geos;
   const root = new THREE.Group();
   root.position.set(x, 0, z);
+  root.rotation.y = rotY;
   const metal = mats.standard("#1f2937", { roughness: 0.34, metalness: 0.8 });
   const hood = mats.standard("#111827", { roughness: 0.45, metalness: 0.5 });
 
@@ -56,7 +56,6 @@ function buildTrafficLight(THREE, tAssets, mats, x, z, dirZ) {
   pole.castShadow = true;
   root.add(pole);
 
-  // Tay vươn ngang ra lòng đường treo hộp đèn chính
   const arm = new THREE.Mesh(g.arm, metal);
   arm.rotation.x = Math.PI / 2;
   arm.position.set(0, 4.1, dirZ * 1.25);
@@ -70,19 +69,13 @@ function buildTrafficLight(THREE, tAssets, mats, x, z, dirZ) {
   const pedRedMat = mkLightMat("#ef4444");
   const pedGrnMat = mkLightMat("#22c55e");
 
-  // Hộp đèn 3 màu treo cao (nhìn rõ từ cả hai chiều đại lộ)
   const box = new THREE.Mesh(g.unitBox, hood);
   box.position.set(0, 3.62, dirZ * 2.15);
   box.scale.set(0.42, 1.02, 0.36);
   box.castShadow = true;
   root.add(box);
 
-  const cols = [
-    [3.92, redMat],
-    [3.62, yelMat],
-    [3.32, grnMat],
-  ];
-  for (const [ly, mat] of cols) {
+  for (const [ly, mat] of [[3.92, redMat], [3.62, yelMat], [3.32, grnMat]]) {
     for (const sx of [-0.18, 0.18]) {
       const lm = new THREE.Mesh(g.lamp, mat);
       lm.position.set(sx, ly, dirZ * 2.15);
@@ -91,7 +84,6 @@ function buildTrafficLight(THREE, tAssets, mats, x, z, dirZ) {
     }
   }
 
-  // Hộp đèn đi bộ gắn trên thân cột quay về vạch qua đường
   const pBox = new THREE.Mesh(g.unitBox, hood);
   pBox.position.set(-dirZ * 0.16, 2.35, 0);
   pBox.scale.set(0.26, 0.52, 0.24);
@@ -103,7 +95,7 @@ function buildTrafficLight(THREE, tAssets, mats, x, z, dirZ) {
   pGrn.position.set(-dirZ * 0.16, 2.22, dirZ * 0.11);
   root.add(pRed, pGrn);
 
-  return { root, redMat, yelMat, grnMat, pedRedMat, pedGrnMat };
+  return { root, sigAxis, redMat, yelMat, grnMat, pedRedMat, pedGrnMat };
 }
 
 // ---------------------------------------------------------------- Ô tô chạy đường bộ (bánh xoay + đèn phanh HDR)
@@ -166,7 +158,6 @@ function buildMotorbike(THREE, tAssets, natureAssets, mats, bodyColor, jacketCol
   const chromeMat = mats.standard("#e2e8f0", { roughness: 0.14, metalness: 0.94 });
   const seatMat = mats.physical("#1e293b", { roughness: 0.58, clearcoat: 0.2 });
 
-  // Bánh trước & bánh sau (xoay thật khi lăn bánh)
   const wheels = [];
   for (const wx of [0.62, -0.6]) {
     const wg = new THREE.Group();
@@ -181,7 +172,6 @@ function buildMotorbike(THREE, tAssets, natureAssets, mats, bodyColor, jacketCol
     wheels.push(wg);
   }
 
-  // Khung sườn, yếm trước khí động học, yên da, ống xả inox, ghi-đông & đèn pha/hậu
   const deck = new THREE.Mesh(g.unitBox, darkMat);
   deck.position.set(0.02, 0.32, 0);
   deck.scale.set(0.86, 0.12, 0.36);
@@ -215,7 +205,6 @@ function buildMotorbike(THREE, tAssets, natureAssets, mats, bodyColor, jacketCol
   tailLamp.scale.set(0.05, 0.09, 0.2);
   root.add(deck, body, shield, seat, fork, handle, exhaust, headLamp, tailLamp);
 
-  // Người lái xe máy ngồi tự nhiên (áo khoác, quần tối, hai tay nắm ghi-đông, mũ bảo hiểm bóng có kính râm)
   const rider = new THREE.Group();
   root.add(rider);
   const jacketMat = mats.physical(jacketColor, { roughness: 0.78, sheen: 0.45, tex: "fabric" });
@@ -251,77 +240,155 @@ function buildMotorbike(THREE, tAssets, natureAssets, mats, bodyColor, jacketCol
   return { root, wheels, tailMat, halfLen: 1.05, wheelR: 0.24 };
 }
 
-// ---------------------------------------------------------------- Hệ thống giao thông hoàn chỉnh ngoài đại lộ
+// ---------------------------------------------------------------- Hệ thống giao thông hoàn chỉnh toàn khu phố
 export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, mats, plan, streetZ) {
   const root = new THREE.Group();
   const pad = plan.levels ? 6 : 4;
-  const xMin = -18.0;
-  const xMax = plan.W + pad + 18.0;
-  const span = xMax - xMin;
-  const laneWestZ = streetZ + 4.15; // làn trên: đi sang trái (-X)
-  const laneEastZ = streetZ + 7.65; // làn dưới: đi sang phải (+X)
+  const W = plan.W;
+  const westRoadX = -6.6;
+  const eastRoadX = W + pad + 5.2;
+  const northRoadZ = -6.4;
+  const mainRoadZ = streetZ + 5.9;
 
-  // Hai trụ đèn tín hiệu giao thông kẹp hai bên vạch qua đường (x = 3.2..6.8)
-  const lightNorth = buildTrafficLight(THREE, tAssets, mats, 8.2, streetZ + 2.12, 1);
-  const lightSouth = buildTrafficLight(THREE, tAssets, mats, 1.9, streetZ + 9.68, -1);
-  const lights = [lightNorth, lightSouth];
-  root.add(lightNorth.root, lightSouth.root);
+  // Toàn tuyến chạy dọc hết đường phố hiển thị
+  const ewMin = -64.0, ewMax = eastRoadX + 58.0, ewSpan = ewMax - ewMin;
+  const nsMin = -52.0, nsMax = streetZ + 50.0, nsSpan = nsMax - nsMin;
 
-  // Đội xe thực tế trên hai làn (ô tô + xe máy xen kẽ, tự giữ khoảng cách & dừng đúng vạch khi đèn đỏ)
+  // 1. Hệ thống cột đèn tín hiệu đồng bộ 2 pha tại nút chính & cả 4 ngã tư
+  const lightSpecs = [
+    // Nút qua đường chính trước sảnh X-Office (Đông-Tây)
+    [8.2, streetZ + 2.12, 1, 0, "ew"],
+    [1.9, streetZ + 9.68, -1, 0, "ew"],
+    // Ngã tư Tây-Nam (westRoadX, mainRoadZ)
+    [westRoadX + 3.7, mainRoadZ - 3.7, 1, 0, "ew"],
+    [westRoadX - 3.7, mainRoadZ + 3.7, -1, Math.PI / 2, "ns"],
+    // Ngã tư Đông-Nam (eastRoadX, mainRoadZ)
+    [eastRoadX - 3.7, mainRoadZ + 3.7, -1, 0, "ew"],
+    [eastRoadX + 3.7, mainRoadZ - 3.7, 1, Math.PI / 2, "ns"],
+    // Ngã tư Tây-Bắc (westRoadX, northRoadZ)
+    [westRoadX + 3.7, northRoadZ - 3.5, 1, 0, "ew"],
+    [westRoadX - 3.7, northRoadZ + 3.5, -1, Math.PI / 2, "ns"],
+    // Ngã tư Đông-Bắc (eastRoadX, northRoadZ)
+    [eastRoadX - 3.7, northRoadZ + 3.5, -1, 0, "ew"],
+    [eastRoadX + 3.7, northRoadZ - 3.5, 1, Math.PI / 2, "ns"],
+  ];
+  const lights = lightSpecs.map(([lx, lz, dirZ, rotY, sigAxis]) => {
+    const l = buildTrafficLight(THREE, tAssets, mats, lx, lz, dirZ, rotY, sigAxis);
+    root.add(l.root);
+    return l;
+  });
+
+  // 2. Đội xe chạy dọc hết cả 4 tuyến đường (Đông-Tây & Bắc-Nam)
+  const mainEastStop = [westRoadX - 5.9, 1.85, eastRoadX - 5.9];
+  const mainWestStop = [eastRoadX + 5.9, 8.25, westRoadX + 5.9];
+  const northEastStop = [westRoadX - 5.9, eastRoadX - 5.9];
+  const northWestStop = [eastRoadX + 5.9, westRoadX + 5.9];
+  const nsSouthStop = [northRoadZ - 6.0, mainRoadZ - 6.0];
+  const nsNorthStop = [mainRoadZ + 6.0, northRoadZ + 6.0];
+
   const vehicleSpecs = [
-    // Làn đi sang phải (+X, z = laneEastZ, vạch dừng x <= 1.85)
-    { kind: "car", dir: 1, z: laneEastZ, x: 12.0, maxV: 4.8, col: "#f1f5f9" },
-    { kind: "moto", dir: 1, z: laneEastZ - 0.55, x: 22.0, maxV: 4.2, col: "#dc2626", j: "#1d4ed8", h: "#f8fafc" },
-    { kind: "car", dir: 1, z: laneEastZ, x: 31.5, maxV: 4.6, col: "#0284c7" },
-    { kind: "moto", dir: 1, z: laneEastZ + 0.52, x: 43.0, maxV: 4.4, col: "#0f766e", j: "#334155", h: "#111827" },
-    { kind: "car", dir: 1, z: laneEastZ, x: -2.0, maxV: 4.5, col: "#b91c1c" },
-    // Làn đi sang trái (-X, z = laneWestZ, vạch dừng x >= 8.2)
-    { kind: "car", dir: -1, z: laneWestZ, x: 18.0, maxV: 4.7, col: "#94a3b8" },
-    { kind: "moto", dir: -1, z: laneWestZ - 0.52, x: 26.5, maxV: 4.3, col: "#f8fafc", j: "#15803d", h: "#dc2626" },
-    { kind: "moto", dir: -1, z: laneWestZ + 0.5, x: 35.5, maxV: 4.1, col: "#1e3a8a", j: "#c2410c", h: "#facc15" },
-    { kind: "car", dir: -1, z: laneWestZ, x: 45.0, maxV: 4.6, col: "#0f766e" },
-    { kind: "moto", dir: -1, z: laneWestZ - 0.42, x: 1.0, maxV: 4.5, col: "#18181b", j: "#6d28d9", h: "#e2e8f0" },
+    // Đại lộ chính Nam (Eastbound +X)
+    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.75, pos: -38.0, maxV: 5.2, kind: "car", col: "#f1f5f9", stopLines: mainEastStop },
+    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.2, pos: -16.0, maxV: 4.5, kind: "moto", col: "#dc2626", j: "#1d4ed8", h: "#f8fafc", stopLines: mainEastStop },
+    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.75, pos: 12.0, maxV: 5.0, kind: "car", col: "#0284c7", stopLines: mainEastStop },
+    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 2.25, pos: 26.0, maxV: 4.6, kind: "moto", col: "#0f766e", j: "#334155", h: "#111827", stopLines: mainEastStop },
+    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.75, pos: 42.0, maxV: 4.8, kind: "car", col: "#b91c1c", stopLines: mainEastStop },
+    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.2, pos: eastRoadX + 26.0, maxV: 4.7, kind: "moto", col: "#ea580c", j: "#1e293b", h: "#f8fafc", stopLines: mainEastStop },
+    // Đại lộ chính Nam (Westbound -X)
+    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.75, pos: eastRoadX + 34.0, maxV: 5.1, kind: "car", col: "#94a3b8", stopLines: mainWestStop },
+    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 2.25, pos: 35.0, maxV: 4.4, kind: "moto", col: "#f8fafc", j: "#15803d", h: "#dc2626", stopLines: mainWestStop },
+    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.75, pos: 18.0, maxV: 4.9, kind: "car", col: "#0f766e", stopLines: mainWestStop },
+    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.25, pos: 1.5, maxV: 4.6, kind: "moto", col: "#1e3a8a", j: "#c2410c", h: "#facc15", stopLines: mainWestStop },
+    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.75, pos: -24.0, maxV: 5.0, kind: "car", col: "#334155", stopLines: mainWestStop },
+    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.25, pos: -48.0, maxV: 4.5, kind: "moto", col: "#18181b", j: "#6d28d9", h: "#e2e8f0", stopLines: mainWestStop },
+    // Đại lộ phía Bắc (sau lưng văn phòng, chạy suốt tuyến)
+    { axis: "x", sigAxis: "ew", dir: 1, lane: northRoadZ + 1.55, pos: -32.0, maxV: 4.8, kind: "car", col: "#e2e8f0", stopLines: northEastStop },
+    { axis: "x", sigAxis: "ew", dir: 1, lane: northRoadZ + 1.55, pos: 14.0, maxV: 4.7, kind: "moto", col: "#0284c7", j: "#0f172a", h: "#f8fafc", stopLines: northEastStop },
+    { axis: "x", sigAxis: "ew", dir: 1, lane: northRoadZ + 1.55, pos: eastRoadX + 18.0, maxV: 4.9, kind: "car", col: "#1d4ed8", stopLines: northEastStop },
+    { axis: "x", sigAxis: "ew", dir: -1, lane: northRoadZ - 1.55, pos: eastRoadX + 24.0, maxV: 4.9, kind: "car", col: "#0f766e", stopLines: northWestStop },
+    { axis: "x", sigAxis: "ew", dir: -1, lane: northRoadZ - 1.55, pos: 22.0, maxV: 4.6, kind: "moto", col: "#b91c1c", j: "#1e293b", h: "#facc15", stopLines: northWestStop },
+    { axis: "x", sigAxis: "ew", dir: -1, lane: northRoadZ - 1.55, pos: -26.0, maxV: 4.8, kind: "car", col: "#64748b", stopLines: northWestStop },
+    // Đại lộ nhánh Tây (Bắc-Nam, qua ngã tư Tây-Bắc & Tây-Nam)
+    { axis: "z", sigAxis: "ns", dir: 1, lane: westRoadX - 1.65, pos: -34.0, maxV: 4.8, kind: "car", col: "#f8fafc", stopLines: nsSouthStop },
+    { axis: "z", sigAxis: "ns", dir: 1, lane: westRoadX - 1.2, pos: 6.0, maxV: 4.5, kind: "moto", col: "#dc2626", j: "#1d4ed8", h: "#f8fafc", stopLines: nsSouthStop },
+    { axis: "z", sigAxis: "ns", dir: 1, lane: westRoadX - 1.65, pos: mainRoadZ + 18.0, maxV: 4.9, kind: "car", col: "#0284c7", stopLines: nsSouthStop },
+    { axis: "z", sigAxis: "ns", dir: -1, lane: westRoadX + 1.65, pos: mainRoadZ + 28.0, maxV: 4.8, kind: "car", col: "#334155", stopLines: nsNorthStop },
+    { axis: "z", sigAxis: "ns", dir: -1, lane: westRoadX + 1.2, pos: 14.0, maxV: 4.4, kind: "moto", col: "#0f766e", j: "#c2410c", h: "#f8fafc", stopLines: nsNorthStop },
+    { axis: "z", sigAxis: "ns", dir: -1, lane: westRoadX + 1.65, pos: -24.0, maxV: 4.7, kind: "car", col: "#b91c1c", stopLines: nsNorthStop },
+    // Đại lộ nhánh Đông (Bắc-Nam, qua ngã tư Đông-Bắc & Đông-Nam)
+    { axis: "z", sigAxis: "ns", dir: 1, lane: eastRoadX - 1.65, pos: -28.0, maxV: 4.9, kind: "car", col: "#94a3b8", stopLines: nsSouthStop },
+    { axis: "z", sigAxis: "ns", dir: 1, lane: eastRoadX - 1.2, pos: 9.0, maxV: 4.5, kind: "moto", col: "#1e3a8a", j: "#334155", h: "#facc15", stopLines: nsSouthStop },
+    { axis: "z", sigAxis: "ns", dir: 1, lane: eastRoadX - 1.65, pos: mainRoadZ + 20.0, maxV: 4.7, kind: "car", col: "#15803d", stopLines: nsSouthStop },
+    { axis: "z", sigAxis: "ns", dir: -1, lane: eastRoadX + 1.65, pos: mainRoadZ + 32.0, maxV: 4.8, kind: "car", col: "#f1f5f9", stopLines: nsNorthStop },
+    { axis: "z", sigAxis: "ns", dir: -1, lane: eastRoadX + 1.2, pos: 17.0, maxV: 4.4, kind: "moto", col: "#ea580c", j: "#1d4ed8", h: "#f8fafc", stopLines: nsNorthStop },
+    { axis: "z", sigAxis: "ns", dir: -1, lane: eastRoadX + 1.65, pos: -22.0, maxV: 4.8, kind: "car", col: "#0284c7", stopLines: nsNorthStop },
   ];
 
   const vehicles = vehicleSpecs.map((s) => {
     const v = s.kind === "car"
       ? buildTrafficCar(THREE, natureAssets, mats, s.col)
       : buildMotorbike(THREE, tAssets, natureAssets, mats, s.col, s.j, s.h);
-    v.root.position.set(s.x, 0, s.z);
-    v.root.rotation.y = s.dir > 0 ? 0 : Math.PI;
+    if (s.axis === "x") {
+      v.root.position.set(s.pos, 0, s.lane);
+      v.root.rotation.y = s.dir > 0 ? 0 : Math.PI;
+    } else {
+      v.root.position.set(s.lane, 0, s.pos);
+      v.root.rotation.y = s.dir > 0 ? -Math.PI / 2 : Math.PI / 2;
+    }
     root.add(v.root);
+    const min = s.axis === "x" ? ewMin : nsMin;
+    const max = s.axis === "x" ? ewMax : nsMax;
     return {
       ...v,
+      axis: s.axis,
+      sigAxis: s.sigAxis,
       dir: s.dir,
-      x: s.x,
-      initX: s.x,
-      z: s.z,
-      speed: s.maxV * 0.7,
+      pos: s.pos,
+      initPos: s.pos,
+      lane: s.lane,
+      min,
+      max,
+      span: max - min,
+      speed: s.maxV * 0.72,
       maxV: s.maxV,
-      stopLine: s.dir > 0 ? 1.85 : 8.25,
+      stopLines: s.stopLines,
     };
   });
 
-  // 4 người đi bộ dạo trên hai vỉa hè (vỉa hè Bắc & vỉa hè Nam) — không bao giờ chạm lòng đường hay cây/đèn
+  // 3. Người đi bộ dạo trên vỉa hè cả 4 tuyến đường bao quanh khu phố
   const sidewalkWalkers = [
-    { index: 41, path: [[9.5, streetZ + 1.15], [38.0, streetZ + 1.15]], x: 16.0, z: streetZ + 1.15, holdCup: true, speed: 0.78 },
-    { index: 42, path: [[36.0, streetZ + 1.55], [10.0, streetZ + 1.55]], x: 28.0, z: streetZ + 1.55, holdCup: false, speed: 0.72 },
-    { index: 43, path: [[8.5, streetZ + 10.4], [39.0, streetZ + 10.4]], x: 14.0, z: streetZ + 10.4, holdCup: false, speed: 0.75 },
-    { index: 44, path: [[38.0, streetZ + 10.85], [8.5, streetZ + 10.85]], x: 30.0, z: streetZ + 10.85, holdCup: true, speed: 0.7 },
+    { index: 41, path: [[9.5, streetZ + 1.15], [W + 1.5, streetZ + 1.15]], x: 16.0, z: streetZ + 1.15, holdCup: true, speed: 0.78 },
+    { index: 42, path: [[W + 0.5, streetZ + 1.55], [10.0, streetZ + 1.55]], x: 28.0, z: streetZ + 1.55, holdCup: false, speed: 0.72 },
+    { index: 43, path: [[8.5, streetZ + 10.4], [W + 2.0, streetZ + 10.4]], x: 14.0, z: streetZ + 10.4, holdCup: false, speed: 0.75 },
+    { index: 44, path: [[W + 1.0, streetZ + 10.85], [8.5, streetZ + 10.85]], x: 30.0, z: streetZ + 10.85, holdCup: true, speed: 0.7 },
+    { index: 47, path: [[0.5, -10.8], [W + 2.0, -10.8]], x: 12.0, z: -10.8, holdCup: false, speed: 0.74 },
+    { index: 48, path: [[-11.3, 1.0], [-11.3, streetZ - 1.5]], x: -11.3, z: 10.0, holdCup: true, speed: 0.76 },
+    { index: 49, path: [[eastRoadX + 4.5, streetZ - 1.5], [eastRoadX + 4.5, 1.0]], x: eastRoadX + 4.5, z: 14.0, holdCup: false, speed: 0.73 },
   ].map((spec) => {
     const w = buildWalkerRig(THREE, humanAssets, mats, spec);
     root.add(w.root);
     return w;
   });
 
-  // 2 người đi bộ băng qua vạch qua đường (x = 4.3 & 5.7): chờ đúng lề khi đèn xe Xanh/Vàng, qua đường khi đèn Đỏ!
+  // 4. Người đi bộ băng qua vạch trắng tại nút chính & các ngã tư (tuân thủ đèn đỏ từng hướng!)
   const crossers = [
-    { index: 45, x: 4.3, zNorth: streetZ + 1.65, zSouth: streetZ + 10.25, fromNorth: true },
-    { index: 46, x: 5.75, zNorth: streetZ + 1.65, zSouth: streetZ + 10.25, fromNorth: false },
+    // Nút chính trước X-Office (băng qua đại lộ theo chiều Bắc-Nam)
+    { index: 45, axis: "z", pedGroup: "ns", fixed: 4.3, p0: streetZ + 1.65, p1: streetZ + 10.25, from0: true },
+    { index: 46, axis: "z", pedGroup: "ns", fixed: 5.75, p0: streetZ + 1.65, p1: streetZ + 10.25, from0: false },
+    // Ngã tư Tây-Nam (1 người băng đại lộ Nam, 1 người băng đường nhánh Tây)
+    { index: 50, axis: "z", pedGroup: "ns", fixed: westRoadX - 4.4, p0: mainRoadZ - 4.4, p1: mainRoadZ + 4.4, from0: true },
+    { index: 51, axis: "x", pedGroup: "ew", fixed: mainRoadZ + 4.6, p0: westRoadX - 4.2, p1: westRoadX + 4.2, from0: false },
+    // Ngã tư Đông-Nam (1 người băng đại lộ Nam, 1 người băng đường nhánh Đông)
+    { index: 52, axis: "z", pedGroup: "ns", fixed: eastRoadX + 4.4, p0: mainRoadZ - 4.4, p1: mainRoadZ + 4.4, from0: false },
+    { index: 53, axis: "x", pedGroup: "ew", fixed: mainRoadZ + 4.6, p0: eastRoadX - 4.2, p1: eastRoadX + 4.2, from0: true },
   ].map((c) => {
-    const w = buildWalkerRig(THREE, humanAssets, mats, { index: c.index, x: c.x, z: c.fromNorth ? c.zNorth : c.zSouth, rotY: c.fromNorth ? Math.PI : 0 });
+    const startP = c.from0 ? c.p0 : c.p1;
+    const x = c.axis === "z" ? c.fixed : startP;
+    const z = c.axis === "z" ? startP : c.fixed;
+    const rotY = c.axis === "z" ? (c.from0 ? 0 : Math.PI) : (c.from0 ? Math.PI / 2 : -Math.PI / 2);
+    const w = buildWalkerRig(THREE, humanAssets, mats, { index: c.index, x, z, rotY });
     root.add(w.root);
-    return { rig: w, ...c, progress: 0, dir: c.fromNorth ? 1 : -1 };
+    return { rig: w, ...c, progress: 0, dir: c.from0 ? 1 : -1 };
   });
 
   let prevT = 0;
@@ -330,27 +397,33 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
     root,
     animate(t, motion) {
       const phase = (motion ? t : 3.0) % CYCLE;
-      const sig = phase < 8.5 ? "green" : phase < 10.5 ? "yellow" : "red";
-      const pedGo = phase >= 11.1 && phase <= 16.4;
+      const ewSig = phase < 8.5 ? "green" : phase < 10.5 ? "yellow" : "red";
+      const nsSig = phase < 10.5 ? "red" : phase < 16.5 ? "green" : "yellow";
+      const pedGoNS = phase >= 11.0 && phase <= 16.5;
+      const pedGoEW = phase >= 0.6 && phase <= 8.0;
 
-      // 1. Cập nhật đèn tín hiệu (HDR emissive intensity cao tạo quầng Bloom thật)
       for (const l of lights) {
+        const sig = l.sigAxis === "ew" ? ewSig : nsSig;
+        const pGo = l.sigAxis === "ew" ? pedGoNS : pedGoEW;
         l.redMat.emissiveIntensity = sig === "red" ? 2.4 : 0.04;
         l.yelMat.emissiveIntensity = sig === "yellow" ? 2.3 : 0.04;
         l.grnMat.emissiveIntensity = sig === "green" ? 2.2 : 0.04;
-        l.pedGrnMat.emissiveIntensity = pedGo ? 2.1 : 0.04;
-        l.pedRedMat.emissiveIntensity = pedGo ? 0.04 : 2.0;
+        l.pedGrnMat.emissiveIntensity = pGo ? 2.1 : 0.04;
+        l.pedRedMat.emissiveIntensity = pGo ? 0.04 : 2.0;
       }
 
       if (!motion) {
         for (const v of vehicles) {
-          v.x = v.initX;
-          v.root.position.x = v.x;
+          v.pos = v.initPos;
+          if (v.axis === "x") v.root.position.x = v.pos;
+          else v.root.position.z = v.pos;
           v.tailMat.emissiveIntensity = 0.75;
         }
         for (const sw of sidewalkWalkers) animateWalkerRig(sw, 0, false);
         for (const cr of crossers) {
-          cr.rig.root.position.z = cr.fromNorth ? cr.zNorth : cr.zSouth;
+          const p = cr.from0 ? cr.p0 : cr.p1;
+          if (cr.axis === "z") cr.rig.root.position.z = p;
+          else cr.rig.root.position.x = p;
           animateWalkerRig(cr.rig, 0, false);
         }
         prevT = t;
@@ -360,61 +433,66 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
       const dt = prevT ? Math.min(0.06, Math.max(0.001, t - prevT)) : 0.016;
       prevT = t;
 
-      // 2. Mô phỏng động học xe cộ trên 2 làn: dừng trước vạch khi đèn Đỏ/Vàng + tự giữ khoảng cách xe phía trước
+      // Động học xe cộ trên cả 4 tuyến đường
       for (const v of vehicles) {
         let desired = v.maxV;
+        const sig = v.sigAxis === "ew" ? ewSig : nsSig;
 
-        // Kiểm tra vạch dừng đèn đỏ / vàng phía trước mũi xe
         if (sig !== "green") {
-          const distToLine = (v.stopLine - v.x) * v.dir - v.halfLen;
-          if (distToLine > -0.35 && distToLine < 8.5) {
-            if (distToLine <= 0.35) desired = 0;
-            else desired = Math.min(desired, (distToLine / 5.5) * v.maxV);
+          for (const sl of v.stopLines) {
+            const distToLine = (sl - v.pos) * v.dir - v.halfLen;
+            if (distToLine > -0.35 && distToLine < 8.5) {
+              if (distToLine <= 0.35) desired = 0;
+              else desired = Math.min(desired, (distToLine / 5.5) * v.maxV);
+            }
           }
         }
 
-        // Kiểm tra xe cùng làn phía trước để không bao giờ đâm/xuyên qua nhau
         for (const o of vehicles) {
-          if (o === v || o.dir !== v.dir || Math.abs(o.z - v.z) > 0.95) continue;
-          let gap = (o.x - v.x) * v.dir;
-          if (gap < 0) gap += span;
+          if (o === v || o.axis !== v.axis || o.dir !== v.dir || Math.abs(o.lane - v.lane) > 0.95) continue;
+          let gap = (o.pos - v.pos) * v.dir;
+          if (gap < 0) gap += v.span;
           const clear = gap - v.halfLen - o.halfLen;
           if (clear < 5.5) {
-            if (clear <= 1.15) desired = 0;
-            else desired = Math.min(desired, ((clear - 1.15) / 4.35) * v.maxV);
+            if (clear <= 1.2) desired = 0;
+            else desired = Math.min(desired, ((clear - 1.2) / 4.3) * v.maxV);
           }
         }
 
         const braking = desired < v.speed - 0.15 || desired < 0.25;
-        const accel = braking ? 7.8 : 3.2;
+        const accel = braking ? 7.8 : 3.4;
         v.speed += Math.sign(desired - v.speed) * Math.min(Math.abs(desired - v.speed), accel * dt);
         v.speed = Math.max(0, v.speed);
-        v.x += v.dir * v.speed * dt;
-        if (v.dir > 0 && v.x > xMax) v.x = xMin;
-        else if (v.dir < 0 && v.x < xMin) v.x = xMax;
+        v.pos += v.dir * v.speed * dt;
+        if (v.dir > 0 && v.pos > v.max) v.pos = v.min;
+        else if (v.dir < 0 && v.pos < v.min) v.pos = v.max;
 
-        v.root.position.x = v.x;
+        if (v.axis === "x") v.root.position.x = v.pos;
+        else v.root.position.z = v.pos;
         const dSpin = (v.speed * dt) / v.wheelR;
         for (const w of v.wheels) w.rotation.z -= dSpin;
         v.tailMat.emissiveIntensity = braking ? 2.8 : 0.75;
       }
 
-      // 3. Người đi bộ trên hai vỉa hè
       for (const sw of sidewalkWalkers) animateWalkerRig(sw, t, true);
 
-      // 4. Người qua đường đúng nhịp đèn đỏ (băng qua vạch trắng khi xe đã dừng hẳn)
+      // Người qua đường tại các vạch kẻ ngã tư & nút chính
       for (const cr of crossers) {
         const w = cr.rig;
-        if (cr.progress >= 1 && !pedGo) {
+        const pGo = cr.pedGroup === "ns" ? pedGoNS : pedGoEW;
+        if (cr.progress >= 1 && !pGo) {
           cr.dir *= -1;
           cr.progress = 0;
         }
-        const movingCross = (pedGo && cr.progress < 1) || (cr.progress > 0.02 && cr.progress < 1);
+        const movingCross = (pGo && cr.progress < 1) || (cr.progress > 0.02 && cr.progress < 1);
+        const yaw = cr.axis === "z" ? (cr.dir > 0 ? 0 : Math.PI) : (cr.dir > 0 ? Math.PI / 2 : -Math.PI / 2);
+        w.root.rotation.y = yaw;
         if (movingCross) {
           cr.progress = Math.min(1, cr.progress + dt * 0.22);
           const u = cr.dir > 0 ? cr.progress : 1 - cr.progress;
-          w.root.position.z = cr.zNorth + (cr.zSouth - cr.zNorth) * u;
-          w.root.rotation.y = cr.dir > 0 ? Math.PI : 0;
+          const p = cr.p0 + (cr.p1 - cr.p0) * u;
+          if (cr.axis === "z") w.root.position.z = p;
+          else w.root.position.x = p;
           const stride = Math.sin(t * 5.8 + cr.index);
           w.body.position.y = 0.835 + Math.abs(Math.cos(t * 5.8 + cr.index)) * 0.032;
           w.leftLeg.rotation.x = stride * 0.44;
@@ -422,8 +500,6 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
           w.leftArm.rotation.x = -stride * 0.36;
           w.rightArm.rotation.x = stride * 0.36;
         } else {
-          // Đứng chờ lịch sự ngay mép vỉa hè nhìn đèn & dòng xe
-          w.root.rotation.y = cr.dir > 0 ? Math.PI : 0;
           w.body.position.y = 0.835;
           w.leftLeg.rotation.x = w.rightLeg.rotation.x = 0;
           w.leftArm.rotation.x = w.rightArm.rotation.x = 0.06;

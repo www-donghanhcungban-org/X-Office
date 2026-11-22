@@ -203,50 +203,52 @@ export function buildHumanRig(THREE, assets, mats, opts) {
   sh.position.y = 0.016;
   root.add(sh);
 
-  // ---------------- 1. Ghế xoay công thái học 5 chân
+  // ---------------- 1. Ghế xoay công thái học 5 chân (bỏ qua khi nhân vật ngồi sẵn ghế phòng họp / giám đốc)
   const chairGroup = new THREE.Group();
   root.add(chairGroup);
-  const stem = new THREE.Mesh(g.chairStem, chromeMat);
-  stem.position.y = 0.25;
-  stem.castShadow = true;
-  chairGroup.add(stem);
-  for (let k = 0; k < 5; k++) {
-    const a = (k * Math.PI * 2) / 5;
-    const arm = new THREE.Mesh(g.starArm, chromeMat);
-    arm.position.set(Math.sin(a) * 0.15, 0.065, Math.cos(a) * 0.15);
-    arm.rotation.set(Math.cos(a) * 1.42, 0, -Math.sin(a) * 1.42);
-    chairGroup.add(arm);
-    const wheel = new THREE.Mesh(g.wheel, chairDark);
-    wheel.position.set(Math.sin(a) * 0.29, 0.028, Math.cos(a) * 0.29);
-    wheel.rotation.z = Math.PI / 2;
-    chairGroup.add(wheel);
-  }
-
   const swivel = new THREE.Group();
   chairGroup.add(swivel);
-  const seatMesh = new THREE.Mesh(g.seat, chairMat);
-  seatMesh.position.set(0, 0.49, 0.02);
-  seatMesh.castShadow = seatMesh.receiveShadow = true;
-  swivel.add(seatMesh);
+  if (!opts.noChair) {
+    const stem = new THREE.Mesh(g.chairStem, chromeMat);
+    stem.position.y = 0.25;
+    stem.castShadow = true;
+    chairGroup.add(stem);
+    for (let k = 0; k < 5; k++) {
+      const a = (k * Math.PI * 2) / 5;
+      const arm = new THREE.Mesh(g.starArm, chromeMat);
+      arm.position.set(Math.sin(a) * 0.15, 0.065, Math.cos(a) * 0.15);
+      arm.rotation.set(Math.cos(a) * 1.42, 0, -Math.sin(a) * 1.42);
+      chairGroup.add(arm);
+      const wheel = new THREE.Mesh(g.wheel, chairDark);
+      wheel.position.set(Math.sin(a) * 0.29, 0.028, Math.cos(a) * 0.29);
+      wheel.rotation.z = Math.PI / 2;
+      chairGroup.add(wheel);
+    }
 
-  for (const side of [-1, 1]) {
-    const post = new THREE.Mesh(g.armPost, chairDark);
-    post.position.set(side * 0.31, 0.57, 0.03);
-    const pad = new THREE.Mesh(g.armPad, chairDark);
-    pad.position.set(side * 0.31, 0.68, -0.02);
-    pad.rotation.x = Math.PI / 2;
-    swivel.add(post, pad);
+    const seatMesh = new THREE.Mesh(g.seat, chairMat);
+    seatMesh.position.set(0, 0.49, 0.02);
+    seatMesh.castShadow = seatMesh.receiveShadow = true;
+    swivel.add(seatMesh);
+
+    for (const side of [-1, 1]) {
+      const post = new THREE.Mesh(g.armPost, chairDark);
+      post.position.set(side * 0.31, 0.57, 0.03);
+      const pad = new THREE.Mesh(g.armPad, chairDark);
+      pad.position.set(side * 0.31, 0.68, -0.02);
+      pad.rotation.x = Math.PI / 2;
+      swivel.add(post, pad);
+    }
+    const back = new THREE.Mesh(g.chairBack, chairMat);
+    back.position.set(0, 0.84, 0.28);
+    back.rotation.x = -0.1;
+    back.castShadow = back.receiveShadow = true;
+    swivel.add(back);
+    const hrest = new THREE.Mesh(g.headrest, chairMat);
+    hrest.position.set(0, 1.24, 0.31);
+    hrest.rotation.z = Math.PI / 2;
+    hrest.castShadow = true;
+    swivel.add(hrest);
   }
-  const back = new THREE.Mesh(g.chairBack, chairMat);
-  back.position.set(0, 0.84, 0.28);
-  back.rotation.x = -0.1;
-  back.castShadow = back.receiveShadow = true;
-  swivel.add(back);
-  const hrest = new THREE.Mesh(g.headrest, chairMat);
-  hrest.position.set(0, 1.24, 0.31);
-  hrest.rotation.z = Math.PI / 2;
-  hrest.castShadow = true;
-  swivel.add(hrest);
 
   // ---------------- 2. Cơ thể người ngồi
   const body = new THREE.Group();

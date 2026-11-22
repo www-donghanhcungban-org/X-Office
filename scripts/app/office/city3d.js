@@ -1,7 +1,7 @@
 // Khu phố đô thị 3D hoàn chỉnh bao quanh văn phòng X-Office (nhà phố, shophouse quán cà phê, chung cư ban công,
 // cao ốc văn phòng kính, ngã tư đường nhánh, công viên nhỏ có đài phun nước, trạm xe buýt & đường chân trời thành phố).
 // Mọi cao độ mặt trước (Nam & Đông) được tính hình học chuẩn để KHÔNG che phòng văn phòng hay làn xe ở góc nhìn mặc định.
-import { buildTree, buildCar, buildFlowerbed } from "./nature3d.js";
+import { buildTree, buildFlowerbed } from "./nature3d.js";
 
 function rnd(s) {
   const x = Math.sin(s * 127.1 + 311.7) * 43758.5453;
@@ -104,6 +104,7 @@ export function buildSurroundingCity(THREE, cityAssets, natureAssets, mats, plan
     root.add(ln);
   };
   for (let x = -72; x < -12; x += 4.6) {
+    if (Math.abs(x - westRoadX) < 6.0) continue;
     addDash(x, mainRoadZ, 2.2, 0.16);
     addDash(x, northRoadZ, 2.0, 0.15);
   }
@@ -116,6 +117,29 @@ export function buildSurroundingCity(THREE, cityAssets, natureAssets, mats, plan
     if (Math.abs(z - mainRoadZ) < 6.5 || Math.abs(z - northRoadZ) < 6.0) continue;
     addDash(westRoadX, z, 0.16, 2.2);
     addDash(eastRoadX, z, 0.16, 2.2);
+  }
+
+  // Vạch qua đường & vạch dừng đèn đỏ tại cả 4 ngã tư (Tây-Nam, Đông-Nam, Tây-Bắc, Đông-Bắc)
+  for (const [ix, iz] of [
+    [westRoadX, mainRoadZ],
+    [eastRoadX, mainRoadZ],
+    [westRoadX, northRoadZ],
+    [eastRoadX, northRoadZ],
+  ]) {
+    const rw = iz === mainRoadZ ? 6.2 : 5.4;
+    // Vạch qua đường hai đầu Đông-Tây của ngã tư
+    for (const dx of [-4.4, 4.4]) {
+      for (let k = -2; k <= 2; k++) addDash(ix + dx, iz + k * (rw / 5.2), 1.35, 0.42);
+    }
+    // Vạch qua đường hai đầu Bắc-Nam của ngã tư
+    for (const dz of [-4.6, 4.6]) {
+      for (let k = -2; k <= 2; k++) addDash(ix + k * 1.15, iz + dz, 0.42, 1.35);
+    }
+    // Vạch trắng dừng đèn đỏ 4 hướng trước ngã tư
+    addDash(ix - 5.8, iz + (iz === mainRoadZ ? 1.75 : 1.55), 0.28, 2.9);
+    addDash(ix + 5.8, iz - (iz === mainRoadZ ? 1.75 : 1.55), 0.28, 2.9);
+    addDash(ix - 1.65, iz - 5.9, 2.8, 0.28);
+    addDash(ix + 1.65, iz + 5.9, 2.8, 0.28);
   }
 
   // Vỉa hè các ô phố xung quanh (Bắc, Tây, Đông, Nam và 4 ô góc — mép khớp chuẩn với vỉa hè đại lộ, không đội người đi bộ)
@@ -528,17 +552,6 @@ export function buildSurroundingCity(THREE, cityAssets, natureAssets, mats, plan
     root.add(buildTree(THREE, natureAssets, mats, { x: eastRoadX + 4.4, y: z, color: "#2f855a", scale: 0.88 }, anim));
     addCityLamp(-10.8, z + 4.2);
     addCityLamp(eastRoadX + 4.2, z + 4.2);
-  }
-  // Ô tô đỗ gọn bên lề đường nhánh Tây & Đông (tránh hoàn toàn đại lộ chính có xe đang chạy!)
-  for (const [cx, cz, rot, col] of [
-    [-8.5, 6.0, Math.PI / 2, "#f1f5f9"],
-    [-8.5, 16.5, Math.PI / 2, "#0284c7"],
-    [eastRoadX + 1.8, 13.5, -Math.PI / 2, "#dc2626"],
-    [eastRoadX + 1.8, 21.5, -Math.PI / 2, "#334155"],
-  ]) {
-    const car = buildCar(THREE, natureAssets, mats, cx, cz, col);
-    car.rotation.y = rot;
-    root.add(car);
   }
 
   // ---------------------------------------------------------------- 7. Đường chân trời thành phố xa (Skyline silhouette hòa sương mờ tự nhiên)
