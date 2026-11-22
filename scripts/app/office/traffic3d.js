@@ -133,6 +133,7 @@ export function upgradeVehicleGLB(THREE, natureAssets, mats, hdAssets, key, opts
     tailMat,
     policeLightMat,
     halfLen,
+    halfW: opts.halfW || 1.04,
     wheelR: opts.wheelR || 0.34,
   };
 }
@@ -244,7 +245,7 @@ function buildFallbackCar(THREE, natureAssets, mats, color) {
     root.add(wg);
     wheels.push(wg);
   }
-  return { root, wheels, mixer: null, tailMat, policeLightMat: null, halfLen: 2.35, wheelR: 0.32 };
+  return { root, wheels, mixer: null, tailMat, policeLightMat: null, halfLen: 2.35, halfW: 1.04, wheelR: 0.32 };
 }
 
 // ---------------------------------------------------------------- Xe buýt đô thị Sài Gòn (8.2m, kính toàn cảnh, bảng LED tuyến & 4 bánh quay)
@@ -303,7 +304,7 @@ function buildCityBus(THREE, natureAssets, mats, color) {
     root.add(wg);
     wheels.push(wg);
   }
-  return { root, wheels, mixer: null, tailMat, policeLightMat: null, halfLen: 4.25, wheelR: 0.42 };
+  return { root, wheels, mixer: null, tailMat, policeLightMat: null, halfLen: 4.25, halfW: 1.18, wheelR: 0.42 };
 }
 
 // ---------------------------------------------------------------- Xe máy / tay ga kèm người lái đội mũ bảo hiểm
@@ -410,22 +411,22 @@ function buildMotorbike(THREE, tAssets, natureAssets, mats, bodyColor, jacketCol
   visor.rotation.y = Math.PI / 2;
   rider.add(helm, visor);
 
-  return { root, wheels, mixer: null, tailMat, policeLightMat: null, halfLen: 1.05, wheelR: 0.24 };
+  return { root, wheels, mixer: null, tailMat, policeLightMat: null, halfLen: 1.05, halfW: 0.42, wheelR: 0.24 };
 }
 
 const VEHICLE_GLB_TABLE = {
-  suv: ["veh_suv", 4.75, 2.48, -Math.PI / 2, false, 0.36],
-  sedan: ["veh_sedan", 4.55, 2.38, -Math.PI / 2, false, 0.33],
-  sedan_classic: ["veh_sedan_classic", 4.45, 2.34, -Math.PI / 2, false, 0.32],
-  hatchback: ["veh_hatchback", 4.05, 2.12, -Math.PI / 2, false, 0.31],
-  taxi: ["veh_taxi", 4.45, 2.32, -Math.PI / 2, false, 0.32],
-  van: ["veh_van", 4.95, 2.58, -Math.PI / 2, false, 0.35],
-  delivery: ["veh_delivery", 5.15, 2.68, -Math.PI / 2, true, 0.36],
-  pickup: ["veh_pickup", 4.85, 2.54, -Math.PI / 2, false, 0.37],
-  police: ["veh_police", 4.55, 2.38, -Math.PI / 2, true, 0.33],
-  ferrari: ["veh_ferrari", 4.52, 2.36, -Math.PI / 2, false, 0.33],
-  car: ["car", 4.55, 2.35, Math.PI / 2, false, 0.32],
-  truck: ["truck", 5.2, 2.75, Math.PI / 2, false, 0.4],
+  suv: ["veh_suv", 4.75, 2.48, -Math.PI / 2, false, 0.36, 1.08],
+  sedan: ["veh_sedan", 4.55, 2.38, -Math.PI / 2, false, 0.33, 1.04],
+  sedan_classic: ["veh_sedan_classic", 4.45, 2.34, -Math.PI / 2, false, 0.32, 1.02],
+  hatchback: ["veh_hatchback", 4.05, 2.12, -Math.PI / 2, false, 0.31, 0.98],
+  taxi: ["veh_taxi", 4.45, 2.32, -Math.PI / 2, false, 0.32, 1.02],
+  van: ["veh_van", 4.95, 2.58, -Math.PI / 2, false, 0.35, 1.12],
+  delivery: ["veh_delivery", 5.15, 2.68, -Math.PI / 2, true, 0.36, 1.12],
+  pickup: ["veh_pickup", 4.85, 2.54, -Math.PI / 2, false, 0.37, 1.08],
+  police: ["veh_police", 4.55, 2.38, -Math.PI / 2, true, 0.33, 1.04],
+  ferrari: ["veh_ferrari", 4.52, 2.36, -Math.PI / 2, false, 0.33, 1.04],
+  car: ["car", 4.55, 2.35, Math.PI / 2, false, 0.32, 1.04],
+  truck: ["truck", 5.2, 2.75, Math.PI / 2, false, 0.4, 1.14],
 };
 
 function buildTrafficVehicle(THREE, tAssets, natureAssets, mats, s, hdAssets) {
@@ -434,7 +435,7 @@ function buildTrafficVehicle(THREE, tAssets, natureAssets, mats, s, hdAssets) {
 
   const cfg = VEHICLE_GLB_TABLE[s.kind];
   if (cfg) {
-    const [key, targetLength, halfLen, rotY, keepWhitePaint, wheelR] = cfg;
+    const [key, targetLength, halfLen, rotY, keepWhitePaint, wheelR, halfW] = cfg;
     const col = s.kind === "taxi" ? (s.col || "#eab308") : (s.kind === "police" ? "#1e3a8a" : s.col);
     const v = upgradeVehicleGLB(THREE, natureAssets, mats, hdAssets, key, {
       targetLength,
@@ -443,6 +444,7 @@ function buildTrafficVehicle(THREE, tAssets, natureAssets, mats, s, hdAssets) {
       color: col,
       keepWhitePaint,
       wheelR,
+      halfW,
     });
     if (v) return v;
   }
@@ -454,8 +456,8 @@ function buildTrafficVehicle(THREE, tAssets, natureAssets, mats, s, hdAssets) {
   }) || buildFallbackCar(THREE, natureAssets, mats, s.col);
 }
 
-// ---------------------------------------------------------------- Hệ thống giao thông & công dân đô thị hoàn chỉnh
-export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, mats, plan, streetZ, hdAssets) {
+// ---------------------------------------------------------------- Hệ thống giao thông & công dân đô thị hoàn chỉnh (va chạm cứng + né xe)
+export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, mats, plan, streetZ, hdAssets, physics) {
   const root = new THREE.Group();
   const pad = plan.levels ? 6 : 4;
   const W = plan.W;
@@ -488,6 +490,7 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
     );
   }
   const lights = lightSpecs.map(([lx, lz, dirZ, rotY, sigAxis]) => {
+    if (physics) physics.addCircle("outdoor", lx, lz, 0.28, "traffic_pole");
     const l = buildTrafficLight(THREE, tAssets, mats, lx, lz, dirZ, rotY, sigAxis);
     root.add(l.root);
     return l;
@@ -506,7 +509,7 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
     { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.75, pos: -48.0, maxV: 4.4, kind: "truck", col: "#f1f5f9", stopLines: mainEastStop },
     { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.75, pos: -32.0, maxV: 4.8, kind: "pickup", col: "#991b1b", stopLines: mainEastStop },
     { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.2, pos: -18.0, maxV: 4.6, kind: "moto", col: "#dc2626", j: "#1d4ed8", h: "#f8fafc", stopLines: mainEastStop },
-    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.75, pos: -2.5, maxV: 4.3, kind: "bus", col: "#059669", busStopX: 19.5, stopLines: mainEastStop },
+    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.75, pos: -2.5, maxV: 4.3, kind: "bus", col: "#059669", busStopX: 16.8, stopLines: mainEastStop },
     { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 2.25, pos: 13.0, maxV: 4.7, kind: "moto", col: "#0f766e", j: "#334155", h: "#111827", stopLines: mainEastStop },
     { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.75, pos: 29.0, maxV: 5.0, kind: "ferrari", col: "#dc2626", stopLines: mainEastStop },
     { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.75, pos: 46.0, maxV: 4.9, kind: "suv", col: "#e2e8f0", stopLines: mainEastStop },
@@ -622,26 +625,27 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
       ],
       initIdx: 3,
     },
-    // Hành khách trạm xe buýt → đợi xe tại nhà chờ → sang đường tới sảnh văn phòng / tiếp tục qua ngã tư Đông
+    // Hành khách trạm xe buýt → đợi xe tại nhà chờ (x = 15.8..17.8) → sang đường qua lối đá tới sảnh văn phòng / tiếp tục qua ngã tư Đông
     {
       index: 42,
       steps: [
-        { act: "wait", pos: [18.7, streetZ + 10.9], yaw: 0, dur: 5.0, mode: "idle" },
-        { act: "walk", from: [18.7, zS], to: [xMainR, zS], speed: 1.36 },
+        { act: "wait", pos: [15.8, streetZ + 10.95], yaw: 0, dur: 5.0, mode: "idle" },
+        { act: "walk", from: [15.8, zS], to: [xMainR, zS], speed: 1.36 },
         { act: "walk", from: [xMainR, zS], to: [xMainR, zN], cross: "ns", speed: 2.35 },
         { act: "walk", from: [xMainR, zN], to: [5.2, streetZ - 0.6], speed: 1.28 },
         { act: "wait", pos: [5.2, streetZ - 0.6], yaw: 0, dur: 3.4, mode: "talk" },
-        { act: "walk", from: [5.2, streetZ - 0.6], to: [xEW, zN], speed: 1.38 },
+        { act: "walk", from: [5.2, streetZ - 0.6], to: [xMainR, zN], speed: 1.3 },
+        { act: "walk", from: [xMainR, zN], to: [xEW, zN], speed: 1.38 },
         { act: "walk", from: [xEW, zN], to: [xEW, zS], cross: "ns", speed: 2.35 },
-        { act: "walk", from: [xEW, zS], to: [18.7, zS], speed: 1.35 },
+        { act: "walk", from: [xEW, zS], to: [15.8, zS], speed: 1.35 },
       ],
       initIdx: 0,
     },
     {
       index: 43,
       steps: [
-        { act: "wait", pos: [20.1, streetZ + 10.9], yaw: 0.4, dur: 4.5, mode: "talk" },
-        { act: "walk", from: [20.1, zS], to: [xEW, zS], speed: 1.34 },
+        { act: "wait", pos: [16.9, streetZ + 10.95], yaw: 0.4, dur: 4.5, mode: "talk" },
+        { act: "walk", from: [16.9, zS], to: [xEW, zS], speed: 1.34 },
         { act: "walk", from: [xEW, zS], to: [xEE, zS], cross: "ew", speed: 2.35 },
         { act: "walk", from: [xEE, zS], to: [xEE, zN], cross: "ns", speed: 2.35 },
         { act: "walk", from: [xEE, zN], to: [xEE, 17.0], speed: 1.3 },
@@ -649,41 +653,42 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
         { act: "walk", from: [xEE, 17.0], to: [xEE, zN], speed: 1.32 },
         { act: "walk", from: [xEE, zN], to: [xEW, zN], cross: "ew", speed: 2.35 },
         { act: "walk", from: [xEW, zN], to: [xEW, zS], cross: "ns", speed: 2.35 },
-        { act: "walk", from: [xEW, zS], to: [20.1, zS], speed: 1.34 },
+        { act: "walk", from: [xEW, zS], to: [16.9, zS], speed: 1.34 },
       ],
       initIdx: 2,
     },
     {
       index: 44,
       steps: [
-        { act: "wait", pos: [21.0, streetZ + 11.1], yaw: -0.35, dur: 5.2, mode: "talk" },
-        { act: "walk", from: [21.0, zS], to: [xWE, zS], speed: 1.38 },
+        { act: "wait", pos: [17.9, streetZ + 11.05], yaw: -0.35, dur: 5.2, mode: "talk" },
+        { act: "walk", from: [17.9, zS], to: [xWE, zS], speed: 1.38 },
         { act: "walk", from: [xWE, zS], to: [xWW, zS], cross: "ew", speed: 2.35 },
         { act: "walk", from: [xWW, zS], to: [xWW, zN], cross: "ns", speed: 2.35 },
         { act: "walk", from: [xWW, zN], to: [xWE, zN], cross: "ew", speed: 2.35 },
         { act: "walk", from: [xWE, zN], to: [xMainL, zN], speed: 1.36 },
         { act: "walk", from: [xMainL, zN], to: [xMainL, zS], cross: "ns", speed: 2.35 },
-        { act: "walk", from: [xMainL, zS], to: [21.0, zS], speed: 1.35 },
+        { act: "walk", from: [xMainL, zS], to: [17.9, zS], speed: 1.35 },
       ],
       initIdx: 5,
     },
-    // Khách cà phê vỉa hè Tây: gọi đồ trước hiên → ngồi/đứng bàn dù → sang vạch đèn đỏ → dạo tiếp sang Đông
+    // Khách cà phê vỉa hè Tây: gọi đồ trước hiên → ngồi/đứng bàn dù → vòng ra vỉa hè → sang vạch đèn đỏ → dạo tiếp sang Đông
     {
       index: 45,
       steps: [
-        { act: "wait", pos: [3.4, streetZ + 12.1], yaw: Math.PI, dur: 3.8, mode: "talk" },
-        { act: "walk", from: [3.4, streetZ + 12.1], to: [1.9, streetZ + 12.4], speed: 1.15 },
-        { act: "wait", pos: [1.9, streetZ + 12.4], yaw: Math.PI / 2, dur: 4.8, mode: "idle" },
-        { act: "walk", from: [1.9, streetZ + 12.4], to: [xMainL, zS], speed: 1.25 },
+        { act: "wait", pos: [3.2, streetZ + 12.1], yaw: Math.PI, dur: 3.8, mode: "talk" },
+        { act: "walk", from: [3.2, streetZ + 12.1], to: [2.2, streetZ + 12.2], speed: 1.15 },
+        { act: "wait", pos: [2.2, streetZ + 12.2], yaw: Math.PI / 2, dur: 4.8, mode: "idle" },
+        { act: "walk", from: [2.2, streetZ + 12.2], to: [2.2, zS], speed: 1.25 },
+        { act: "walk", from: [2.2, zS], to: [xMainL, zS], speed: 1.25 },
         { act: "walk", from: [xMainL, zS], to: [xMainL, zN], cross: "ns", speed: 2.35 },
         { act: "walk", from: [xMainL, zN], to: [xEW, zN], speed: 1.38 },
         { act: "walk", from: [xEW, zN], to: [xEE, zN], cross: "ew", speed: 2.35 },
         { act: "walk", from: [xEE, zN], to: [xEE, zS], cross: "ns", speed: 2.35 },
         { act: "walk", from: [xEE, zS], to: [xEW, zS], cross: "ew", speed: 2.35 },
-        { act: "walk", from: [xEW, zS], to: [3.4, zS], speed: 1.38 },
-        { act: "walk", from: [3.4, zS], to: [3.4, streetZ + 12.1], speed: 1.15 },
+        { act: "walk", from: [xEW, zS], to: [3.2, zS], speed: 1.38 },
+        { act: "walk", from: [3.2, zS], to: [3.2, streetZ + 12.1], speed: 1.15 },
       ],
-      initIdx: 3,
+      initIdx: 4,
     },
     // Khách cà phê vỉa hè Đông → dạo tới vạch chính → sang đường tiếp tục hành trình
     {
@@ -810,7 +815,27 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
       spec.steps,
       spec.initIdx || 0,
       0,
+      `cit_${spec.index}`,
     ));
+
+  const intersections = [
+    [westRoadX, mainRoadZ],
+    [eastRoadX, mainRoadZ],
+    [westRoadX, northRoadZ],
+    [eastRoadX, northRoadZ],
+  ];
+
+  const syncVehiclePhysics = (v, idx) => {
+    if (!physics) return;
+    const vx = v.axis === "x" ? v.pos : v.lane;
+    const vz = v.axis === "x" ? v.lane : v.pos;
+    const halfX = v.axis === "x" ? v.halfLen : v.halfW;
+    const halfZ = v.axis === "x" ? v.halfW : v.halfLen;
+    const dirX = v.axis === "x" ? v.dir : 0;
+    const dirZ = v.axis === "x" ? 0 : v.dir;
+    physics.setVehicle(`veh_${idx}`, vx, vz, halfX, halfZ, dirX, dirZ, v.speed, v.halfLen, v.halfW);
+  };
+  vehicles.forEach((v, idx) => syncVehiclePhysics(v, idx));
 
   let prevT = 0;
 
@@ -841,7 +866,7 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
       }
 
       if (!motion) {
-        for (const v of vehicles) {
+        vehicles.forEach((v, idx) => {
           v.pos = v.initPos;
           v.stopTimer = 0;
           v.stopCooldown = 0;
@@ -849,8 +874,9 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
           else v.root.position.z = v.pos;
           v.tailMat.emissiveIntensity = 0.75;
           if (v.policeLightMat) v.policeLightMat.emissiveIntensity = 0.9;
-        }
-        for (const npc of urbanNPCs) stepScheduledNPC(npc, 0, 0, false);
+          syncVehiclePhysics(v, idx);
+        });
+        for (const npc of urbanNPCs) stepScheduledNPC(npc, 0, 0, false, { physics, layer: "outdoor" });
         prevT = t;
         return;
       }
@@ -858,8 +884,8 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
       const dt = prevT ? Math.min(0.06, Math.max(0.001, t - prevT)) : 0.016;
       prevT = t;
 
-      // Động học phương tiện (dừng vạch đèn đỏ, giữ khoảng cách an toàn, xe buýt tự ghé trạm đón khách)
-      for (const v of vehicles) {
+      // Động học phương tiện (dừng đèn đỏ, giữ khoảng cách, nhường giao lộ chéo, phanh khẩn cấp tránh người & Hero)
+      vehicles.forEach((v, idx) => {
         let desired = v.maxV;
         const sig = v.sigAxis === "ew" ? ewSig : nsSig;
         let redHold = false;
@@ -897,36 +923,99 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
           }
         }
 
+        // Tránh đâm xe cùng chiều (tính theo bề rộng hai xe nên xe máy song song ô tô không chạm sườn!)
         for (const o of vehicles) {
-          if (o === v || o.axis !== v.axis || o.dir !== v.dir || Math.abs(o.lane - v.lane) > 0.95) continue;
+          if (o === v || o.axis !== v.axis || o.dir !== v.dir || Math.abs(o.lane - v.lane) >= v.halfW + o.halfW + 0.18) continue;
           let gap = (o.pos - v.pos) * v.dir;
           if (gap < 0) gap += v.span;
           const clear = gap - v.halfLen - o.halfLen;
-          if (clear < 5.5) {
-            if (clear <= 1.2) desired = 0;
-            else desired = Math.min(desired, ((clear - 1.2) / 4.3) * v.maxV);
+          if (clear < 5.8) {
+            if (clear <= 1.25) {
+              desired = 0;
+              if (clear <= 0.85) redHold = true;
+            } else {
+              desired = Math.min(desired, ((clear - 1.25) / 4.55) * v.maxV);
+            }
+          }
+        }
+
+        // Nhường giao lộ nếu còn xe trục vuông góc chưa thoát khỏi nút giao
+        for (const [ix, iz] of intersections) {
+          const ic = v.axis === "x" ? ix : iz;
+          const enterEdge = ic - v.dir * 4.3;
+          const edgeDist = (enterEdge - v.pos) * v.dir - v.halfLen;
+          if (edgeDist > -0.35 && edgeDist < 6.5) {
+            const blocked = vehicles.some((o) => {
+              if (o.axis === v.axis) return false;
+              const oOnCrossingLine = Math.abs(o.lane - ic) < 4.5 + o.halfW;
+              const oCrossCoord = o.axis === "x" ? ix : iz;
+              return oOnCrossingLine && Math.abs(o.pos - oCrossCoord) < 4.4 + o.halfLen;
+            });
+            if (blocked) {
+              if (edgeDist <= 0.65) {
+                desired = 0;
+                redHold = true;
+              } else {
+                desired = Math.min(desired, (edgeDist / 6.5) * v.maxV);
+              }
+            }
+          }
+        }
+
+        // Phanh gấp nhường người đi bộ & Hero trên đường
+        if (physics) {
+          const vx = v.axis === "x" ? v.pos : v.lane;
+          const vz = v.axis === "x" ? v.lane : v.pos;
+          const fdx = v.axis === "x" ? v.dir : 0;
+          const fdz = v.axis === "x" ? 0 : v.dir;
+          for (const h of physics.getHumans("outdoor")) {
+            const dx = h.x - vx;
+            const dz = h.z - vz;
+            const fwd = dx * fdx + dz * fdz;
+            const lat = Math.abs(-dx * fdz + dz * fdx);
+            if (lat < v.halfW + h.r + 0.48 && fwd > -v.halfLen * 0.25 && fwd < v.halfLen + 9.0) {
+              const clear = fwd - v.halfLen - h.r;
+              if (clear <= 1.85) {
+                desired = 0;
+                redHold = true;
+              } else {
+                desired = Math.min(desired, ((clear - 1.85) / 7.15) * v.maxV);
+              }
+            }
           }
         }
 
         const braking = desired < v.speed - 0.15 || desired < 0.25;
-        const accel = braking ? 11.5 : 3.6;
+        const accel = braking ? 12.5 : 3.6;
         v.speed += Math.sign(desired - v.speed) * Math.min(Math.abs(desired - v.speed), accel * dt);
         v.speed = redHold ? 0 : Math.max(0, v.speed);
-        v.pos += v.dir * v.speed * dt;
-        if (v.dir > 0 && v.pos > v.max) v.pos = v.min;
-        else if (v.dir < 0 && v.pos < v.min) v.pos = v.max;
+        let nextPos = v.pos + v.dir * v.speed * dt;
+        if ((v.dir > 0 && nextPos > v.max) || (v.dir < 0 && nextPos < v.min)) {
+          const wrapPos = v.dir > 0 ? v.min : v.max;
+          const spawnBusy = vehicles.some((o) =>
+            o !== v && o.axis === v.axis && Math.abs(o.lane - v.lane) < v.halfW + o.halfW + 0.2 &&
+            Math.abs(o.pos - wrapPos) < v.halfLen + o.halfLen + 2.5);
+          if (spawnBusy) {
+            nextPos = v.pos;
+            v.speed = 0;
+          } else {
+            nextPos = wrapPos;
+          }
+        }
+        v.pos = nextPos;
 
         if (v.axis === "x") v.root.position.x = v.pos;
         else v.root.position.z = v.pos;
+        syncVehiclePhysics(v, idx);
         const dSpin = (v.speed * dt) / v.wheelR;
         for (const w of v.wheels) w.rotation.z -= dSpin;
         if (v.mixer && v.speed > 0.05) v.mixer.update(dt * (v.speed / 3.8));
         v.tailMat.emissiveIntensity = braking ? 2.8 : 0.75;
         if (v.policeLightMat) v.policeLightMat.emissiveIntensity = Math.sin(t * 14) > 0 ? 3.2 : 0.25;
-      }
+      });
 
       const gateCheck = (crossAxis) => (crossAxis === "ns" ? pedStartNS : pedStartEW);
-      for (const npc of urbanNPCs) stepScheduledNPC(npc, t, dt, true, gateCheck);
+      for (const npc of urbanNPCs) stepScheduledNPC(npc, t, dt, true, { gateCheck, physics, layer: "outdoor" });
     },
   };
 }

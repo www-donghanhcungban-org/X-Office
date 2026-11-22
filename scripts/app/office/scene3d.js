@@ -15,6 +15,7 @@ import {
 import { buildStreetTraffic } from "./traffic3d.js";
 import { buildSurroundingCity } from "./city3d.js";
 import { instantiateGLB } from "./glb.js";
+import { createWorldPhysics } from "./physics3d.js";
 import {
   buildBench, buildBollard, buildFence, buildFlowerbed, buildInstancedLawn, buildPlant,
   buildPool, buildRock, buildSeasonTree, buildStreetlamp, buildTree, buildUmbrella,
@@ -312,10 +313,17 @@ function putHD(THREE, hdAssets, key, instOpts, x, y, z, rotY = 0) {
 }
 
 // ---------------------------------------------------------------- Ngoại cảnh: sân cỏ, lối vào, cây cối, bồn hoa, đèn đường
-function buildOutdoor(THREE, sceneAssets, natureAssets, humanAssets, trafficAssets, cityAssets, sgAssets, hdAssets, mats, plan, anim) {
+function buildOutdoor(THREE, sceneAssets, natureAssets, humanAssets, trafficAssets, cityAssets, sgAssets, hdAssets, mats, plan, anim, physics) {
   const group = new THREE.Group();
   const g = sceneAssets.geos;
   const pad = plan.levels ? 6 : 4;
+  if (physics) {
+    // Khối toà nhà X-Office tầng trệt + hàng rào cây xanh bao quanh (chừa mở lối đi đá sảnh x = 3..7)
+    physics.addBox("outdoor", -0.2, -0.2, plan.W + 0.2, plan.D + 0.2, "xoffice_bldg");
+    physics.addBox("outdoor", 7.35, plan.D + pad - 1.35, plan.W + pad - 0.65, plan.D + pad - 0.65, "yard_fence");
+    physics.addBox("outdoor", plan.W + pad - 1.35, -1.0, plan.W + pad - 0.65, plan.D + pad - 0.65, "yard_fence");
+    physics.addBox("outdoor", -1.0, plan.D + pad - 1.35, 2.85, plan.D + pad - 0.65, "yard_fence");
+  }
   const grassA = mats.standard("#78ab62", { roughness: 0.94, tex: "grass", bump: 0.03 });
   const grassB = mats.standard("#8cc074", { roughness: 0.92, tex: "grass", bump: 0.025, polygonOffset: true, offsetUnits: -1 });
   const curbMat = mats.standard("#a8a29e", { roughness: 0.85, tex: "stone", bump: 0.03, polygonOffset: true, offsetUnits: -2 });
@@ -358,18 +366,23 @@ function buildOutdoor(THREE, sceneAssets, natureAssets, humanAssets, trafficAsse
     group.add(buildTree(THREE, natureAssets, mats, {
       x, y: plan.D + 1.0, color: x % 2 ? "#2f855a" : "#3b8f4f", pine: x % 14 === 9, palm: x >= 30,
     }, anim));
+    if (physics) physics.addCircle("outdoor", x + 1.0, plan.D + 2.0, 0.48, "yard_tree");
   }
   for (let y = 2; y < plan.D; y += 7) {
     group.add(buildTree(THREE, natureAssets, mats, {
       x: plan.W + 1.0, y, color: y % 2 ? "#2f855a" : "#40916c",
     }, anim));
+    if (physics) physics.addCircle("outdoor", plan.W + 2.0, y + 1.0, 0.48, "yard_tree");
   }
 
   // Lối đá bước dạo & đèn trụ sân vườn
   const stepMat = mats.standard("#d6d3d1", { roughness: 0.82, tex: "stone", bump: 0.03 });
   for (let sx = 8.4; sx < 31.5; sx += 2.2) {
     addBox(THREE, group, g.unitBox, stepMat, sx + 0.55, 0.025, plan.D + 0.72, 1.1, 0.05, 0.75, false, true);
-    if (Math.round(sx) % 4 === 0) group.add(buildBollard(THREE, natureAssets, mats, sx + 0.5, plan.D + 1.25));
+    if (Math.round(sx) % 4 === 0) {
+      group.add(buildBollard(THREE, natureAssets, mats, sx + 0.5, plan.D + 1.25));
+      if (physics) physics.addCircle("outdoor", sx + 0.5, plan.D + 1.25, 0.22, "bollard");
+    }
   }
 
   group.add(buildFlowerbed(THREE, natureAssets, mats, 1.5, plan.D + 0.35, "#f43f5e"));
@@ -377,12 +390,14 @@ function buildOutdoor(THREE, sceneAssets, natureAssets, humanAssets, trafficAsse
   for (const px of [1.4, 7.5]) {
     const pb = putHD(THREE, hdAssets, "planter_box", { targetLength: 1.35 }, px, 0, plan.D + 0.55);
     if (pb) group.add(pb);
+    if (physics) physics.addBox("outdoor", px - 0.7, plan.D + 0.15, px + 0.7, plan.D + 0.95, "planter");
   }
   group.add(buildRock(THREE, natureAssets, mats, 31.2, 20.4, 0.85));
   group.add(buildRock(THREE, natureAssets, mats, 42.2, 18.8, 0.75));
   for (const lx of [2.5, 7.4]) {
     const sl = putHD(THREE, hdAssets, "streetlamp", { targetHeight: 3.8 }, lx, 0, plan.D + 1.4);
     group.add(sl || buildStreetlamp(THREE, natureAssets, mats, { x: lx, y: plan.D + 1.4 }));
+    if (physics) physics.addCircle("outdoor", lx, plan.D + 1.4, 0.26, "lamp");
   }
 
   // Cỏ 3D & hoa dại thật quanh khuôn viên sân vườn (InstancedMesh)
@@ -449,16 +464,16 @@ function buildOutdoor(THREE, sceneAssets, natureAssets, humanAssets, trafficAsse
     group.add(stopLn);
   }
 
-  // Hệ thống giao thông chạy thật: đèn tín hiệu Đỏ/Vàng/Xanh, ô tô, xe máy kèm người lái và người đi bộ
+  // Hệ thống giao thông chạy thật: đèn tín hiệu Đỏ/Vàng/Xanh, ô tô, xe máy kèm người lái và người đi bộ (có va chạm vật lý)
   if (trafficAssets) {
-    const traffic = buildStreetTraffic(THREE, trafficAssets, natureAssets, humanAssets, mats, plan, streetZ, hdAssets);
+    const traffic = buildStreetTraffic(THREE, trafficAssets, natureAssets, humanAssets, mats, plan, streetZ, hdAssets, physics);
     group.add(traffic.root);
     anim.traffics.push(traffic);
   }
 
   // Khu phố đô thị hoàn chỉnh bao quanh 4 phía (nhà phố, quán cà phê, cao ốc kính, công viên, trạm buýt, skyline)
   if (cityAssets) {
-    const city = buildSurroundingCity(THREE, cityAssets, natureAssets, sgAssets, hdAssets, mats, plan, streetZ, anim);
+    const city = buildSurroundingCity(THREE, cityAssets, natureAssets, sgAssets, hdAssets, mats, plan, streetZ, anim, physics);
     group.add(city.root);
     anim.cities.push(city);
   }
@@ -1569,6 +1584,28 @@ function buildWorkstation(THREE, sceneAssets, humanAssets, hdAssets, mats, textu
   };
 }
 
+function registerIndoorProp(physics, p) {
+  if (!physics || !p) return;
+  if (p.kind === "pool") physics.addBox("indoor", p.x - 0.3, p.y - 0.3, p.x + p.w + 0.3, p.y + p.d + 0.3, "pool");
+  else if (p.kind === "sofa") physics.addBox("indoor", p.x - 0.1, p.y, p.x + 3.25, p.y + 1.85, "sofa");
+  else if (p.kind === "counter") physics.addBox("indoor", p.x, p.y, p.x + (p.x > 20 ? 4.65 : 3.45), p.y + 1.05, "counter");
+  else if (p.kind === "cafetable") physics.addCircle("indoor", p.x + 0.4, p.y + 0.4, 1.02, "cafetable");
+  else if (p.kind === "rack") physics.addBox("indoor", p.x, p.y, p.x + 1.0, p.y + 1.0, "rack");
+  else if (p.kind === "bed") physics.addBox("indoor", p.x, p.y, p.x + 2.4, p.y + 1.0, "bed");
+  else if (p.kind === "bigdesk") {
+    physics.addBox("indoor", p.x, p.y, p.x + 3.2, p.y + 1.35, "bigdesk");
+    physics.addBox("indoor", p.x + 2.35, p.y + 1.3, p.x + 3.2, p.y + 2.55, "bigdesk");
+    physics.addBox("indoor", p.x + 1.0, p.y + 1.65, p.x + 2.0, p.y + 2.65, "dir_chair");
+  } else if (p.kind === "meeting") physics.addBox("indoor", p.x, p.y - 0.65, p.x + 6.8, p.y + 2.45, "meeting");
+  else if (p.kind === "tree") physics.addCircle("indoor", p.x + 1.0, p.y + 1.0, 0.52, "in_tree");
+  else if (p.kind === "bench") physics.addBox("indoor", p.x, p.y, p.x + 1.7, p.y + 0.72, "in_bench");
+  else if (p.kind === "umbrella") physics.addCircle("indoor", p.x, p.y, 1.02, "in_umb");
+  else if (p.kind === "plant" || p.kind === "cooler") physics.addCircle("indoor", p.x + 0.3, p.y + 0.3, 0.4, p.kind);
+  else if (p.kind === "shelf") physics.addBox("indoor", p.x, p.y, p.x + (p.side === "left" ? 0.65 : 1.45), p.y + (p.side === "left" ? 1.45 : 0.65), "shelf");
+  else if (p.kind === "console") physics.addBox("indoor", p.x, p.y, p.x + 1.6, p.y + 0.9, "console");
+  else if (p.kind === "holo") physics.addCircle("indoor", p.x + 0.7, p.y + 0.7, 0.72, "holo");
+}
+
 // ---------------------------------------------------------------- Dựng trọn cảnh 3D bền vững
 export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natureAssets, trafficAssets, cityAssets, sgAssets, hdAssets, opts) {
   const th = opts.theme;
@@ -1576,6 +1613,7 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
   const plan = planFor(opts.scale || "team", opts.layout || "open");
   const zb = plan.levels ? plan.levels * plan.levelH : 0;
   const mats = createMaterialBank(THREE, textures, glowOn);
+  const physics = createWorldPhysics();
 
   const dark = Boolean(th.edge || th.id === "night" || th.id === "library");
   const root = new THREE.Group();
@@ -1584,7 +1622,7 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
   const rigs = [];
   const agentStations = [];
 
-  if (plan.outdoor) root.add(buildOutdoor(THREE, sceneAssets, natureAssets, humanAssets, trafficAssets, cityAssets, sgAssets, hdAssets, mats, plan, anim));
+  if (plan.outdoor) root.add(buildOutdoor(THREE, sceneAssets, natureAssets, humanAssets, trafficAssets, cityAssets, sgAssets, hdAssets, mats, plan, anim, physics));
   if (plan.levels) root.add(buildBuilding(THREE, sceneAssets, mats, plan, th));
 
   const floorRoot = new THREE.Group();
@@ -1593,8 +1631,23 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
   floorRoot.add(cutaway.left, cutaway.back, cutaway.ceiling);
   floorRoot.add(buildArchitecture(THREE, sceneAssets, mats, hdAssets, plan, th, cutaway, anim));
 
+  // Đăng ký tường ngoài & tường vách nội thất vào vật lý trong phòng (tự chừa đúng khoảng cửa đi!)
+  physics.addBox("indoor", -0.5, -0.5, plan.W + 0.5, 0.2, "wall_n");
+  physics.addBox("indoor", -0.5, plan.D - 0.2, plan.W + 0.5, plan.D + 0.5, "wall_s");
+  physics.addBox("indoor", -0.5, -0.5, 0.2, plan.D + 0.5, "wall_w");
+  physics.addBox("indoor", plan.W - 0.2, -0.5, plan.W + 0.5, plan.D + 0.5, "wall_e");
+  if (plan.walls && plan.walls.length) {
+    for (const [axis, at, from, to, doors] of plan.walls) {
+      for (const [u, v] of mergeSegments(wallSegments(from, to, doors))) {
+        if (axis === "x") physics.addBox("indoor", u, at - 0.12, v, at + 0.12, "in_wall");
+        else physics.addBox("indoor", at - 0.12, u, at + 0.12, v, "in_wall");
+      }
+    }
+  }
+
   const props = plan.props || th.props;
   for (const p of props) {
+    registerIndoorProp(physics, p);
     const obj = buildProp(THREE, sceneAssets, natureAssets, hdAssets, mats, {
       ...p, dark, glowOn, iv: p.kind === "bed" && plan.props ? false : p.iv,
     }, th, plan, cutaway, anim);
@@ -1607,6 +1660,8 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
     floorRoot.add(buildFlowerbed(THREE, natureAssets, mats, 40.4, 18.8, "#a855f7"));
     floorRoot.add(buildBollard(THREE, natureAssets, mats, 32.1, 14.4));
     floorRoot.add(buildBollard(THREE, natureAssets, mats, 41.2, 14.4));
+    physics.addCircle("indoor", 32.1, 14.4, 0.22, "bollard");
+    physics.addCircle("indoor", 41.2, 14.4, 0.22, "bollard");
     for (const [key, opt, gx, gz, ry] of [
       ["shrub", { targetHeight: 0.95 }, 30.8, 10.6, 0.3],
       ["shrub", { targetHeight: 0.9 }, 42.8, 13.8, -0.5],
@@ -1617,6 +1672,8 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
     ]) {
       const gh = putHD(THREE, hdAssets, key, opt, gx, 0, gz, ry);
       if (gh) floorRoot.add(gh);
+      if (key === "picnic_table") physics.addBox("indoor", gx - 0.92, gz - 0.68, gx + 0.92, gz + 0.68, "picnic");
+      else physics.addCircle("indoor", gx, gz, 0.38, key);
     }
     floorRoot.add(buildInstancedLawn(THREE, natureAssets, mats, {
       x0: 30.4, x1: 43.6, y0: 8.4, y1: 21.6, count: 360, flowers: 44,
@@ -1629,6 +1686,7 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
   // 5 bàn agent thật
   const seats = opts.seats || [];
   plan.desks.forEach(([x, y], i) => {
+    physics.addBox("indoor", x, y, x + 2.8, y + 1.55, "desk");
     const seat = seats[i] || { label: "", state: "idle" };
     const st = buildWorkstation(THREE, sceneAssets, humanAssets, hdAssets, mats, textures, {
       x, y, index: i, seat, theme: th, season: opts.season, isAgent: Boolean(seat.label),
@@ -1642,6 +1700,7 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
   const walkers = [];
   if (opts.npc !== false) {
     plan.extraDesks.forEach(([x, y], k) => {
+      physics.addBox("indoor", x, y, x + 2.8, y + 1.55, "desk");
       const seated = npcAt(k);
       const st = buildWorkstation(THREE, sceneAssets, humanAssets, hdAssets, mats, textures, {
         x, y, index: k + 5, seat: { state: seated ? "npc" : "idle", label: "" }, theme: th, season: opts.season, isAgent: false,
@@ -1650,35 +1709,33 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
       if (st.rig) rigs.push(st.rig);
     });
     if (plan.rooms && plan.rooms.length) {
-      // Nhân viên nội bộ hành động có mục tiêu rõ ràng (pha cà phê → trò chuyện → sân vườn hồ bơi; check-in lễ tân → khu làm việc → trở lại quầy)
+      // Nhân viên nội bộ hành động có mục tiêu rõ ràng, giữ khoảng cách vật lý với đồng nghiệp & đồ đạc
       const OFFICE_SHIRTS = ["#2563eb", "#0f766e", "#6d28d9", "#be123c", "#15803d", "#0369a1"];
       const scheduledIndoor = [
         {
           index: 31,
           holdCup: true,
           steps: [
-            { act: "wait", pos: [32.6, 2.7], yaw: Math.PI, dur: 3.6, mode: "talk" },
-            { act: "walk", from: [32.6, 2.7], to: [32.6, 8.2], speed: 0.85 },
-            { act: "walk", from: [32.6, 8.2], to: [31.4, 8.8], speed: 0.85 },
-            { act: "walk", from: [31.4, 8.8], to: [31.4, 14.9], speed: 0.85 },
-            { act: "walk", from: [31.4, 14.9], to: [35.6, 14.9], speed: 0.82 },
-            { act: "walk", from: [35.6, 14.9], to: [36.0, 16.0], speed: 0.78 },
-            { act: "wait", pos: [36.0, 16.0], yaw: 0.25, dur: 4.5, mode: "idle" },
-            { act: "walk", from: [36.0, 16.0], to: [35.6, 14.9], speed: 0.78 },
-            { act: "walk", from: [35.6, 14.9], to: [31.4, 14.9], speed: 0.82 },
-            { act: "walk", from: [31.4, 14.9], to: [31.4, 8.8], speed: 0.85 },
-            { act: "walk", from: [31.4, 8.8], to: [32.6, 8.2], speed: 0.85 },
-            { act: "walk", from: [32.6, 8.2], to: [32.6, 2.7], speed: 0.85 },
+            { act: "wait", pos: [32.0, 3.6], yaw: 0, dur: 3.6, mode: "talk" },
+            { act: "walk", from: [32.0, 3.6], to: [32.6, 8.2], speed: 0.85 },
+            { act: "walk", from: [32.6, 8.2], to: [31.5, 8.9], speed: 0.85 },
+            { act: "walk", from: [31.5, 8.9], to: [31.5, 14.9], speed: 0.85 },
+            { act: "walk", from: [31.5, 14.9], to: [35.8, 15.1], speed: 0.82 },
+            { act: "wait", pos: [35.8, 15.1], yaw: 0.25, dur: 4.5, mode: "idle" },
+            { act: "walk", from: [35.8, 15.1], to: [31.5, 14.9], speed: 0.82 },
+            { act: "walk", from: [31.5, 14.9], to: [31.5, 8.9], speed: 0.85 },
+            { act: "walk", from: [31.5, 8.9], to: [32.6, 8.2], speed: 0.85 },
+            { act: "walk", from: [32.6, 8.2], to: [32.0, 3.6], speed: 0.85 },
           ],
-          initIdx: 6,
+          initIdx: 5,
         },
         {
           index: 32,
           holdCup: false,
           steps: [
-            { act: "wait", pos: [4.2, 4.35], yaw: 0, dur: 4.2, mode: "talk" },
-            { act: "walk", from: [4.2, 4.35], to: [5.8, 4.6], speed: 0.86 },
-            { act: "walk", from: [5.8, 4.6], to: [5.8, 7.0], speed: 0.86 },
+            { act: "wait", pos: [5.1, 4.35], yaw: 0.45, dur: 4.2, mode: "talk" },
+            { act: "walk", from: [5.1, 4.35], to: [5.8, 4.8], speed: 0.86 },
+            { act: "walk", from: [5.8, 4.8], to: [5.8, 7.0], speed: 0.86 },
             { act: "walk", from: [5.8, 7.0], to: [3.8, 7.0], speed: 0.84 },
             { act: "walk", from: [3.8, 7.0], to: [3.8, 8.6], speed: 0.84 },
             { act: "walk", from: [3.8, 8.6], to: [2.2, 8.6], speed: 0.82 },
@@ -1686,8 +1743,8 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
             { act: "walk", from: [2.2, 8.6], to: [3.8, 8.6], speed: 0.82 },
             { act: "walk", from: [3.8, 8.6], to: [3.8, 7.0], speed: 0.84 },
             { act: "walk", from: [3.8, 7.0], to: [5.8, 7.0], speed: 0.84 },
-            { act: "walk", from: [5.8, 7.0], to: [5.8, 4.6], speed: 0.86 },
-            { act: "walk", from: [5.8, 4.6], to: [4.2, 4.35], speed: 0.86 },
+            { act: "walk", from: [5.8, 7.0], to: [5.8, 4.8], speed: 0.86 },
+            { act: "walk", from: [5.8, 4.8], to: [5.1, 4.35], speed: 0.86 },
           ],
           initIdx: 0,
         },
@@ -1700,7 +1757,7 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
           topColor: OFFICE_SHIRTS[spec.index % OFFICE_SHIRTS.length],
         }) || buildWalkerRig(THREE, humanAssets, mats, { index: spec.index, holdCup: spec.holdCup });
         floorRoot.add(rig.root);
-        const npc = createScheduledNPC(rig, spec.steps, spec.initIdx, 0);
+        const npc = createScheduledNPC(rig, spec.steps, spec.initIdx, 0, `in_${spec.index}`);
         npc.isScheduled = true;
         walkers.push(npc);
       }
@@ -1714,6 +1771,7 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
         { index: 34, x: 32.6, z: 2.65, rotY: 1.55, holdCup: false },
       ];
       for (const spec of ambientStaff) {
+        physics.setHuman("indoor", `static_${spec.index}`, spec.x, spec.z, 0.38);
         const w = buildHDHuman(THREE, hdAssets, mats, {
           ...spec,
           mode: "talk",
@@ -1779,6 +1837,7 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
     plan,
     zb,
     cutaway,
+    physics,
     setHero(visible, x, z, rotY, walkPhase, moving, t) {
       if (!hero) return;
       hero.root.visible = Boolean(visible);
@@ -1865,7 +1924,7 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
         else animateHumanRig(rig, t, motion);
       }
       for (const w of walkers) {
-        if (w.isScheduled) stepScheduledNPC(w, t, dt, motion);
+        if (w.isScheduled) stepScheduledNPC(w, t, dt, motion, { physics, layer: "indoor" });
         else if (w.isHD) animateHDHuman(w, t, dt, motion, w.curMode || "idle");
         else animateWalkerRig(w, t, motion);
       }

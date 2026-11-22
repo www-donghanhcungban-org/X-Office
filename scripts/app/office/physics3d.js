@@ -1,0 +1,303 @@
+// Động cơ vật lý va chạm 2D & né tránh phương tiện dự báo cho Văn phòng & Đường phố 3D (thuần JS, không DOM).
+
+function pushOutAABB(cx, cz, r, b, seed) {
+  const qx = Math.max(b.minX, Math.min(b.maxX, cx));
+  const qz = Math.max(b.minZ, Math.min(b.maxZ, cz));
+  let dx = cx - qx;
+  let dz = cz - qz;
+  const d2 = dx * dx + dz * dz;
+  if (d2 >= r * r) return null;
+  if (d2 > 1e-10) {
+    const d = Math.sqrt(d2);
+    const k = (r - d) / d;
+    return [cx + dx * k, cz + dz * k];
+  }
+  const left = cx - b.minX;
+  const right = b.maxX - cx;
+  const top = cz - b.minZ;
+  const bot = b.maxZ - cz;
+  const m = Math.min(left, right, top, bot);
+  if (m === left) return [b.minX - r - 1e-3, cz];
+  if (m === right) return [b.maxX + r + 1e-3, cz];
+  if (m === top) return [cx, b.minZ - r - 1e-3];
+  void seed;
+  return [cx, b.maxZ + r + 1e-3];
+}
+
+function pushOutOBB(cx, cz, r, o) {
+  const vx = cx - o.cx;
+  const vz = cz - o.cz;
+  const lx = vx * o.c - vz * o.s;
+  const lz = vx * o.s + vz * o.c;
+  const qlx = Math.max(-o.hl, Math.min(o.hl, lx));
+  const qlz = Math.max(-o.hw, Math.min(o.hw, lz));
+  let dlx = lx - qlx;
+  let dlz = lz - qlz;
+  const d2 = dlx * dlx + dlz * dlz;
+  if (d2 >= r * r) return null;
+  let pushLx = 0;
+  let pushLz = 0;
+  if (d2 > 1e-10) {
+    const d = Math.sqrt(d2);
+    const k = (r - d) / d;
+    pushLx = dlx * k;
+    pushLz = dlz * k;
+  } else {
+    const ox = o.hl - Math.abs(lx);
+    const oz = o.hw - Math.abs(lz);
+    if (ox < oz) pushLx = (lx >= 0 ? ox + r : -(ox + r));
+    else pushLz = (lz >= 0 ? oz + r : -(oz + r));
+  }
+  const wx = pushLx * o.c + pushLz * o.s;
+  const wz = -pushLx * o.s + pushLz * o.c;
+  return [cx + wx, cz + wz];
+}
+
+function pushOutCircle(cx, cz, r, tx, tz, tr, fallbackAngle) {
+  let dx = cx - tx;
+  let dz = cz - tz;
+  const minD = r + tr;
+  const d2 = dx * dx + dz * dz;
+  if (d2 >= minD * minD) return null;
+  if (d2 > 1e-10) {
+    const d = Math.sqrt(d2);
+    const k = (minD - d) / d;
+    return [cx + dx * k, cz + dz * k];
+  }
+  return [cx + Math.cos(fallbackAngle) * minD, cz + Math.sin(fallbackAngle) * minD];
+}
+
+export function createWorldPhysics() {
+  const layers = {
+    outdoor: { boxes: [], obbs: [], circles: [], humans: new Map() },
+    indoor: { boxes: [], obbs: [], circles: [], humans: new Map() },
+  };
+  const vehicles = new Map();
+
+  function layerOf(name) {
+    return layers[name] || layers.outdoor;
+  }
+
+  return {
+    addBox(layer, minX, minZ, maxX, maxZ, tag = "") {
+      const x0 = Math.min(minX, maxX);
+      const x1 = Math.max(minX, maxX);
+      const z0 = Math.min(minZ, maxZ);
+      const z1 = Math.max(minZ, maxZ);
+      if (x1 - x0 < 1e-4 || z1 - z0 < 1e-4) return;
+      layerOf(layer).boxes.push({ minX: x0, minZ: z0, maxX: x1, maxZ: z1, tag });
+    },
+
+    addOrientedBox(layer, cx, cz, halfL, halfW, rotY = 0, tag = "") {
+      layerOf(layer).obbs.push({
+        cx,
+        cz,
+        hl: halfL,
+        hw: halfW,
+        c: Math.cos(rotY),
+        s: Math.sin(rotY),
+        tag,
+      });
+    },
+
+    addCircle(layer, x, z, r, tag = "") {
+      if (r <= 1e-4) return;
+      layerOf(layer).circles.push({ x, z, r, tag });
+    },
+
+    setHuman(layer, id, x, z, r = 0.36) {
+      layerOf(layer).humans.set(id, { id, x, z, r });
+    },
+
+    removeHuman(layer, id) {
+      layerOf(layer).humans.delete(id);
+    },
+
+    getHumans(layer) {
+      return layerOf(layer).humans.values();
+    },
+
+    setVehicle(id, x, z, halfX, halfZ, dirX, dirZ, speed, halfLen, halfW) {
+      vehicles.set(id, { id, x, z, halfX, halfZ, dirX, dirZ, speed, halfLen, halfW });
+    },
+
+    getVehicles() {
+      return vehicles.values();
+    },
+
+    resolveCircle(layer, x, z, r = 0.36, ignoreId = null, opts = {}) {
+      const L = layerOf(layer);
+      let px = x;
+      let pz = z;
+      let collided = false;
+      const checkVeh = layer === "outdoor" && !opts.ignoreVehicles;
+
+      for (let pass = 0; pass < 3; pass++) {
+        for (let i = 0; i < L.boxes.length; i++) {
+          const hit = pushOutAABB(px, pz, r, L.boxes[i], pass + i);
+          if (hit) {
+            px = hit[0];
+            pz = hit[1];
+            collided = true;
+          }
+        }
+        for (let i = 0; i < L.obbs.length; i++) {
+          const hit = pushOutOBB(px, pz, r, L.obbs[i]);
+          if (hit) {
+            px = hit[0];
+            pz = hit[1];
+            collided = true;
+          }
+        }
+        for (let i = 0; i < L.circles.length; i++) {
+          const c = L.circles[i];
+          const hit = pushOutCircle(px, pz, r, c.x, c.z, c.r, (i + pass) * 1.1);
+          if (hit) {
+            px = hit[0];
+            pz = hit[1];
+            collided = true;
+          }
+        }
+        for (const h of L.humans.values()) {
+          if (h.id === ignoreId) continue;
+          const hit = pushOutCircle(px, pz, r, h.x, h.z, h.r, pass * 0.9 + 0.4);
+          if (hit) {
+            px = hit[0];
+            pz = hit[1];
+            collided = true;
+          }
+        }
+        if (checkVeh) {
+          for (const v of vehicles.values()) {
+            const vb = {
+              minX: v.x - v.halfX - 0.12,
+              minZ: v.z - v.halfZ - 0.12,
+              maxX: v.x + v.halfX + 0.12,
+              maxZ: v.z + v.halfZ + 0.12,
+            };
+            const hit = pushOutAABB(px, pz, r, vb, pass);
+            if (hit) {
+              px = hit[0];
+              pz = hit[1];
+              collided = true;
+            }
+          }
+        }
+      }
+      return { x: px, z: pz, collided };
+    },
+
+    steerAround(layer, x, z, dirX, dirZ, r = 0.36, ignoreId = null) {
+      const len = Math.hypot(dirX, dirZ);
+      if (len < 1e-5) return { dx: 0, dz: 0 };
+      const fx = dirX / len;
+      const fz = dirZ / len;
+      const rx = -fz;
+      const rz = fx;
+      let sx = fx;
+      let sz = fz;
+      const L = layerOf(layer);
+
+      const avoidPoint = (ox, oz, orad, reach, strength, preferRight) => {
+        const vx = ox - x;
+        const vz = oz - z;
+        const fwd = vx * fx + vz * fz;
+        const side = vx * rx + vz * rz;
+        const margin = r + orad + 0.48;
+        if (fwd > -0.15 && fwd < reach && Math.abs(side) < margin) {
+          const sign = Math.abs(side) <= 0.08 ? (preferRight ? 1 : -1) : (side > 0 ? -1 : 1);
+          const w = ((reach - Math.max(0, fwd)) / reach) * ((margin - Math.abs(side)) / margin) * strength;
+          sx += rx * sign * w;
+          sz += rz * sign * w;
+        }
+      };
+
+      for (const c of L.circles) avoidPoint(c.x, c.z, c.r, 1.9, 1.8, false);
+      for (const h of L.humans.values()) {
+        if (h.id === ignoreId) continue;
+        // Hai người gặp nhau đối diện đều ưu tiên né sang phải để lướt qua mượt mà
+        avoidPoint(h.x, h.z, h.r, 2.25, 2.1, true);
+      }
+      if (layer === "outdoor") {
+        for (const o of L.obbs) avoidPoint(o.cx, o.cz, Math.max(o.hl, o.hw) * 0.72, 2.3, 1.6, false);
+        for (const v of vehicles.values()) avoidPoint(v.x, v.z, Math.max(v.halfX, v.halfZ) * 0.75, 2.6, 2.2, false);
+      }
+
+      // Kiểm tra điểm dò phía trước trước khối hộp tĩnh (tường, bàn, bồn hoa)
+      for (const probeDist of [0.85, 1.55]) {
+        const qx = x + fx * probeDist;
+        const qz = z + fz * probeDist;
+        for (const b of L.boxes) {
+          const hit = pushOutAABB(qx, qz, r + 0.14, b, 1);
+          if (hit) {
+            const pushX = hit[0] - qx;
+            const pushZ = hit[1] - qz;
+            const sideProj = pushX * rx + pushZ * rz;
+            const nudge = Math.abs(sideProj) > 0.02 ? Math.sign(sideProj) : 1;
+            sx += rx * nudge * 1.45;
+            sz += rz * nudge * 1.45;
+            break;
+          }
+        }
+      }
+
+      const outLen = Math.hypot(sx, sz);
+      if (outLen < 1e-5) return { dx: fx, dz: fz };
+      return { dx: sx / outLen, dz: sz / outLen };
+    },
+
+    isCrossingSafe(fromX, fromZ, toX, toZ) {
+      const minX = Math.min(fromX, toX);
+      const maxX = Math.max(fromX, toX);
+      const minZ = Math.min(fromZ, toZ);
+      const maxZ = Math.max(fromZ, toZ);
+      const midX = (fromX + toX) * 0.5;
+      const midZ = (fromZ + toZ) * 0.5;
+
+      for (const v of vehicles.values()) {
+        if (Math.abs(v.dirX) > 0.5) {
+          if (v.z + v.halfW + 1.1 < minZ || v.z - v.halfW - 1.1 > maxZ) continue;
+          const ahead = (midX - v.x) * v.dirX;
+          const stopDist = v.halfLen + 2.2 + Math.max(9.0, v.speed * 2.8);
+          if (ahead > -(v.halfLen + 2.2) && ahead < stopDist) return false;
+        } else {
+          if (v.x + v.halfW + 1.1 < minX || v.x - v.halfW - 1.1 > maxX) continue;
+          const ahead = (midZ - v.z) * v.dirZ;
+          const stopDist = v.halfLen + 2.2 + Math.max(9.0, v.speed * 2.8);
+          if (ahead > -(v.halfLen + 2.2) && ahead < stopDist) return false;
+        }
+      }
+      return true;
+    },
+
+    getVehicleThreat(x, z, r = 0.38) {
+      let best = null;
+      for (const v of vehicles.values()) {
+        if (v.speed <= 0.35) continue;
+        const perpX = -v.dirZ;
+        const perpZ = v.dirX;
+        const vx = x - v.x;
+        const vz = z - v.z;
+        const fwd = vx * v.dirX + vz * v.dirZ;
+        const lat = vx * perpX + vz * perpZ;
+        const maxFwd = v.halfLen + Math.max(7.0, v.speed * 2.2);
+        const maxLat = v.halfW + 1.15 + r;
+        if (fwd >= -v.halfLen * 0.4 && fwd <= maxFwd && Math.abs(lat) <= maxLat) {
+          if (!best || fwd < best.fwd) {
+            const sideSign = lat >= 0 ? 1 : -1;
+            best = {
+              vehicle: v,
+              fwd,
+              lat,
+              sideSign,
+              escapeX: perpX * sideSign,
+              escapeZ: perpZ * sideSign,
+              dist: Math.max(0, fwd - v.halfLen),
+            };
+          }
+        }
+      }
+      return best;
+    },
+  };
+}
