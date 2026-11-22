@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import unittest.mock as mock
 from urllib.parse import urlsplit
 
-from playwright.sync_api import Browser, BrowserContext, Page, Playwright, sync_playwright
+from playwright.sync_api import Browser, BrowserContext, Error as PlaywrightError, Page, Playwright, sync_playwright
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -877,24 +877,31 @@ class OfficeTest(AppCase):
         page, watch = self.open_app(ctx)
 
         def busy(route: Any) -> None:
-            res = route.fetch()
-            body = res.json()
+            try:
+                res = route.fetch()
+                body = res.json()
+            except PlaywrightError:
+                return
             for seat in body["seats"]:
                 seat["state"], seat["task"] = "work", {"id": "T-1234", "title": "x"}
             route.fulfill(response=res, json=body)
 
         page.route("**/api/office*", busy)
-        go(page, "office", "Văn phòng")
-        page.locator("canvas.office-3d").wait_for()
-        page.wait_for_function(
-            "() => document.querySelectorAll('.office-labels .office-tag[data-kind=state]:not([hidden])').length >= 3"
-        )
-        for _ in range(3):
-            page.click("button[aria-label='Phóng to']")
-        page.click(".office-rooms button[data-room='work']")
-        page.evaluate("() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))")
-        self.assertIn("▸ Khu làm việc", [b[0] for b in page.evaluate(self.ROOM_BOXES)])
-        self.assertEqual(watch.take(), [])
+        try:
+            go(page, "office", "Văn phòng")
+            page.locator("canvas.office-3d").wait_for()
+            page.wait_for_function(
+                "() => document.querySelectorAll("
+                "'.office-labels .office-tag[data-kind=state]:not([hidden])').length >= 3"
+            )
+            for _ in range(3):
+                page.click("button[aria-label='Phóng to']")
+            page.click(".office-rooms button[data-room='work']")
+            page.evaluate("() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))")
+            self.assertIn("▸ Khu làm việc", [b[0] for b in page.evaluate(self.ROOM_BOXES)])
+            self.assertEqual(watch.take(), [])
+        finally:
+            page.unroute("**/api/office*")
 
     def assert_labels_apart(self, boxes: List[Any]) -> None:
         """Mọi nhãn nằm trọn trong khung và không hai nhãn nào chồng nhau."""
