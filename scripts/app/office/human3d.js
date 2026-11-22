@@ -1387,6 +1387,11 @@ export function createScheduledNPC(rig, steps, initStepIdx = 0, initElapsed = 0,
     initYaw,
     x: initX,
     z: initZ,
+    vx: 0,
+    vz: 0,
+    detourSide: 0,
+    detourHold: 0,
+    bestRem: Infinity,
     stepIdx: initStepIdx,
     elapsed: initElapsed,
     committed: false,
@@ -1430,6 +1435,11 @@ export function stepScheduledNPC(npc, t, dt, motion, opts = {}) {
     npc.elapsed = npc.initElapsed;
     npc.committed = false;
     npc.stallTime = 0;
+    npc.detourSide = 0;
+    npc.detourHold = 0;
+    npc.vx = 0;
+    npc.vz = 0;
+    npc.bestRem = Infinity;
     npc.x = npc.initX;
     npc.z = npc.initZ;
     w.root.position.set(npc.initX, 0, npc.initZ);
@@ -1448,31 +1458,52 @@ export function stepScheduledNPC(npc, t, dt, motion, opts = {}) {
     npc.elapsed = 0;
     npc.committed = false;
     npc.stallTime = 0;
+    npc.detourSide = 0;
+    npc.detourHold = 0;
+    npc.bestRem = Infinity;
   };
+
+  if (npc.detourHold > 0) npc.detourHold = Math.max(0, npc.detourHold - dt);
 
   if (s.act === "wait") {
     const dx = s.pos[0] - npc.x;
     const dz = s.pos[1] - npc.z;
     const d = Math.hypot(dx, dz);
-    if (d > 0.38) {
-      const steer = physics ? physics.steerAround(layer, npc.x, npc.z, dx, dz, 0.36, npc.id) : { dx: dx / d, dz: dz / d };
+    if (d > 0.48 && npc.stallTime < 1.2) {
+      const steer = physics
+        ? physics.steerAround(layer, npc.x, npc.z, dx, dz, 0.36, npc.id, npc.detourSide)
+        : { dx: dx / d, dz: dz / d, side: 0, clear: true };
+      if (!steer.clear && steer.side !== 0) {
+        npc.detourSide = steer.side;
+        npc.detourHold = 0.6;
+      }
       const stepD = Math.min(d, 1.2 * dt);
-      const res = physics ? physics.resolveCircle(layer, npc.x + steer.dx * stepD, npc.z + steer.dz * stepD, 0.36, npc.id) : { x: npc.x + steer.dx * stepD, z: npc.z + steer.dz * stepD };
+      const res = physics
+        ? physics.resolveCircle(layer, npc.x + steer.dx * stepD, npc.z + steer.dz * stepD, 0.36, npc.id)
+        : { x: npc.x + steer.dx * stepD, z: npc.z + steer.dz * stepD, collided: false };
       const mvX = res.x - npc.x;
       const mvZ = res.z - npc.z;
+      const mv = Math.hypot(mvX, mvZ);
       npc.x = res.x;
       npc.z = res.z;
       w.root.position.set(npc.x, 0, npc.z);
-      if (Math.hypot(mvX, mvZ) > 0.002) {
-        w.root.rotation.y = lerpAngle(w.root.rotation.y, Math.atan2(-mvX, -mvZ), Math.min(1, dt * 7.5));
+      // Nếu điểm chờ sát mép bị Hero hoặc NPC khác chiếm chỗ, đứng yên tự nhiên thay vì cố chen gây rung giật
+      if (d <= 0.95 && res.collided) {
+        npc.stallTime = 2.0;
+      } else if (mv > 0.008) {
+        w.root.rotation.y = lerpAngle(w.root.rotation.y, Math.atan2(-mvX, -mvZ), Math.min(1, dt * 7.0));
         playNPCPose(w, t, dt, 1.2, "walk", true);
         if (physics) physics.setHuman(layer, npc.id, npc.x, npc.z, 0.36);
         return;
+      } else {
+        npc.stallTime += dt;
       }
     }
     const res = physics ? physics.resolveCircle(layer, npc.x, npc.z, 0.36, npc.id) : { x: npc.x, z: npc.z };
     npc.x = res.x;
     npc.z = res.z;
+    npc.vx = 0;
+    npc.vz = 0;
     w.root.position.set(npc.x, 0, npc.z);
     w.root.rotation.y = lerpAngle(w.root.rotation.y, s.yaw || 0, Math.min(1, dt * 6.5));
     if (physics) physics.setHuman(layer, npc.id, npc.x, npc.z, 0.36);
@@ -1488,10 +1519,12 @@ export function stepScheduledNPC(npc, t, dt, motion, opts = {}) {
     const sigOk = gateCheck ? gateCheck(s.cross) : true;
     const roadClear = !physics || physics.isCrossingSafe(npc.x, npc.z, s.to[0], s.to[1]);
     if (!sigOk || !roadClear) {
-      if (df > 0.45) {
-        const fx = (s.from[0] - npc.x) / df;
-        const fz = (s.from[1] - npc.z) / df;
-        const res = physics ? physics.resolveCircle(layer, npc.x + fx * Math.min(df, 1.25 * dt), npc.z + fz * Math.min(df, 1.25 * dt), 0.36, npc.id) : { x: npc.x + fx * dt, z: npc.z + fz * dt };
+      if (df > 0.52) {
+        const st = physics
+          ? physics.steerAround(layer, npc.x, npc.z, s.from[0] - npc.x, s.from[1] - npc.z, 0.36, npc.id, npc.detourSide)
+          : { dx: (s.from[0] - npc.x) / df, dz: (s.from[1] - npc.z) / df };
+        const step = Math.min(df, 1.25 * dt);
+        const res = physics ? physics.resolveCircle(layer, npc.x + st.dx * step, npc.z + st.dz * step, 0.36, npc.id) : { x: npc.x + st.dx * step, z: npc.z + st.dz * step };
         npc.x = res.x;
         npc.z = res.z;
       } else if (physics) {
@@ -1499,8 +1532,10 @@ export function stepScheduledNPC(npc, t, dt, motion, opts = {}) {
         npc.x = res.x;
         npc.z = res.z;
       }
+      npc.vx = 0;
+      npc.vz = 0;
       w.root.position.set(npc.x, 0, npc.z);
-      w.root.rotation.y = lerpAngle(w.root.rotation.y, Math.atan2(-(s.to[0] - npc.x), -(s.to[1] - npc.z)), Math.min(1, dt * 8.0));
+      w.root.rotation.y = lerpAngle(w.root.rotation.y, Math.atan2(-(s.to[0] - npc.x), -(s.to[1] - npc.z)), Math.min(1, dt * 7.5));
       if (physics) physics.setHuman(layer, npc.id, npc.x, npc.z, 0.36);
       playNPCPose(w, t, dt, 0, "idle", false);
       return;
@@ -1519,7 +1554,6 @@ export function stepScheduledNPC(npc, t, dt, motion, opts = {}) {
   if (threat) {
     const distFromEntry = Math.hypot(npc.x - s.from[0], npc.z - s.from[1]);
     if (s.cross && distFromEntry < 2.2) {
-      // Còn gần mép vỉa hè: lùi lại an toàn lên vỉa hè cho xe qua trước
       tgtX = s.from[0];
       tgtZ = s.from[1];
       dirX = tgtX - npc.x;
@@ -1527,16 +1561,21 @@ export function stepScheduledNPC(npc, t, dt, motion, opts = {}) {
       rem = Math.hypot(dirX, dirZ) || 1;
       npc.committed = false;
     } else {
-      // Chủ động né ngang dứt khoát ra khỏi làn xe đang tới
       dirX = threat.escapeX;
       dirZ = threat.escapeZ;
       rem = 1;
     }
     spd = 3.15;
   } else if (physics) {
-    const st = physics.steerAround(layer, npc.x, npc.z, dirX, dirZ, 0.36, npc.id);
+    const st = physics.steerAround(layer, npc.x, npc.z, dirX, dirZ, 0.36, npc.id, npc.detourSide);
     dirX = st.dx;
     dirZ = st.dz;
+    if (st.clear && npc.detourHold <= 0) {
+      npc.detourSide = 0;
+    } else if (!st.clear && st.side !== 0) {
+      npc.detourSide = st.side;
+      npc.detourHold = Math.max(npc.detourHold, 0.65);
+    }
   } else if (rem > 1e-4) {
     dirX /= rem;
     dirZ /= rem;
@@ -1545,6 +1584,16 @@ export function stepScheduledNPC(npc, t, dt, motion, opts = {}) {
   const dLen = Math.hypot(dirX, dirZ) || 1;
   dirX /= dLen;
   dirZ /= dLen;
+
+  // Lọc mượt vector hướng đi giúp NPC bo cua quanh vật cản uyển chuyển, tuyệt đối không giật lắc
+  const blend = threat ? 1 : Math.min(1, dt * 11.5);
+  npc.vx = npc.vx + (dirX - npc.vx) * blend;
+  npc.vz = npc.vz + (dirZ - npc.vz) * blend;
+  const vLen = Math.hypot(npc.vx, npc.vz);
+  if (vLen > 1e-4) {
+    dirX = npc.vx / vLen;
+    dirZ = npc.vz / vLen;
+  }
 
   const stepD = threat ? spd * dt : Math.min(Math.max(rem, 0.25), spd * dt);
   const propX = npc.x + dirX * stepD;
@@ -1558,18 +1607,30 @@ export function stepScheduledNPC(npc, t, dt, motion, opts = {}) {
   w.root.position.set(npc.x, 0, npc.z);
   if (physics) physics.setHuman(layer, npc.id, npc.x, npc.z, 0.36);
 
-  if (moved > 0.002) {
-    npc.stallTime = 0;
+  const newRem = Math.hypot(s.to[0] - npc.x, s.to[1] - npc.z);
+  if (!threat) {
+    if (newRem < npc.bestRem - 0.08) {
+      npc.bestRem = newRem;
+      npc.stallTime = 0;
+    } else {
+      npc.stallTime += dt;
+      if (npc.stallTime > 1.35 && npc.detourHold <= 0) {
+        npc.detourSide = npc.detourSide ? -npc.detourSide : 1;
+        npc.detourHold = 1.1;
+      }
+    }
+  }
+
+  if (moved > 0.008) {
     const faceYaw = Math.atan2(-mvX, -mvZ);
-    w.root.rotation.y = lerpAngle(w.root.rotation.y, faceYaw, threat || s.cross ? 1 : Math.min(1, dt * 8.5));
+    w.root.rotation.y = lerpAngle(w.root.rotation.y, faceYaw, threat ? 0.85 : Math.min(1, dt * 7.5));
     playNPCPose(w, t, dt, spd, "walk", true);
   } else {
-    npc.stallTime += dt;
-    w.root.rotation.y = lerpAngle(w.root.rotation.y, Math.atan2(-dirX, -dirZ), Math.min(1, dt * 6.0));
+    w.root.rotation.y = lerpAngle(w.root.rotation.y, Math.atan2(-dirX, -dirZ), Math.min(1, dt * 5.0));
     playNPCPose(w, t, dt, 0, "idle", false);
   }
 
-  if (!threat && (Math.hypot(s.to[0] - npc.x, s.to[1] - npc.z) <= 0.42 || npc.stallTime > 6.5)) {
+  if (!threat && (newRem <= 0.48 || npc.stallTime > 4.5)) {
     advanceStep();
   }
 }

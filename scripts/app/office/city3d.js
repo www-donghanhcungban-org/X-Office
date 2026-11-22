@@ -658,11 +658,11 @@ export function buildSurroundingCity(THREE, cityAssets, natureAssets, sgAssets, 
     false,
   );
 
-  // Xe ô tô & xe bán tải HD đa sắc màu đỗ tự nhiên dọc lề đường & trước sân nhà phố
+  // Xe ô tô & xe bán tải HD đa sắc màu đỗ tự nhiên dọc lề đường & trước sân nhà phố (1–2 draw call mỗi xe)
   const parkedSpecs = [
     ["veh_delivery", "#f8fafc", 10.8, streetZ + 12.6, 0, 5.85, true],
     ["veh_pickup", "#dc2626", -14.8, streetZ + 12.8, 0.04, 4.95, false],
-    ["veh_rancher", "#1d4ed8", -22.4, streetZ + 12.7, Math.PI, 4.8, false],
+    ["veh_suv", "#1d4ed8", -22.4, streetZ + 12.7, Math.PI, 4.78, false],
     ["veh_suv", "#059669", 41.2, streetZ + 12.6, Math.PI, 4.75, false],
     ["veh_sedan", "#d97706", -13.0, 14.0, Math.PI / 2, 4.65, false],
     ["veh_sedan", "#7c3aed", eastRoadX + 6.4, 13.8, -Math.PI / 2, 4.65, false],
@@ -724,12 +724,12 @@ export function buildSurroundingCity(THREE, cityAssets, natureAssets, sgAssets, 
     addCityLamp(x, streetZ + 11.68);
   }
   for (const z of [-1.0, 8.5, 18.5]) {
-    root.add(buildTree(THREE, natureAssets, mats, { x: -12.0, y: z, color: "#3b8f4f", scale: 0.96 }, anim));
-    regCircle(-11.0, z + 1.0, 0.45, "tree");
-    root.add(buildTree(THREE, natureAssets, mats, { x: eastRoadX + 4.2, y: z, color: "#2f855a", scale: 0.96 }, anim));
-    regCircle(eastRoadX + 5.2, z + 1.0, 0.45, "tree");
-    addCityLamp(-10.6, z + 4.2);
-    addCityLamp(eastRoadX + 4.2, z + 4.2);
+    root.add(buildTree(THREE, natureAssets, mats, { x: -14.2, y: z, color: "#3b8f4f", scale: 0.96 }, anim));
+    regCircle(-13.2, z + 1.0, 0.45, "tree");
+    root.add(buildTree(THREE, natureAssets, mats, { x: eastRoadX + 6.0, y: z, color: "#2f855a", scale: 0.96 }, anim));
+    regCircle(eastRoadX + 7.0, z + 1.0, 0.45, "tree");
+    addCityLamp(-10.1, z + 4.2);
+    addCityLamp(eastRoadX + 4.05, z + 4.2);
   }
 
   // Nội thất đường phố HD: bảng menu quán cà phê, thùng rác, trụ cứu hoả, tủ điện, cọc tiêu & cục nóng điều hoà
@@ -745,13 +745,13 @@ export function buildSurroundingCity(THREE, cityAssets, natureAssets, sgAssets, 
   for (const [cx, cz, ry] of [[5.6, streetZ + 12.2, 0.25], [26.0, streetZ + 12.2, -0.25]]) {
     placeCityHD("chalkboard", { targetHeight: 1.05 }, cx, 0, cz, ry, 0.38);
   }
-  for (const [tx, tz] of [[22.2, streetZ + 11.6], [-9.6, streetZ + 1.4], [eastRoadX + 3.6, streetZ + 1.4]]) {
+  for (const [tx, tz] of [[22.2, streetZ + 11.6], [-9.6, streetZ + 2.05], [eastRoadX + 3.6, streetZ + 2.05]]) {
     placeCityHD("trash_can", { targetHeight: 0.88 }, tx, 0, tz, 0, 0.34);
   }
-  for (const [fx, fz] of [[-1.8, streetZ + 1.9], [eastRoadX - 4.2, streetZ + 1.9], [25.8, streetZ + 9.75]]) {
+  for (const [fx, fz] of [[-1.8, streetZ + 2.05], [eastRoadX - 4.2, streetZ + 2.05], [25.8, streetZ + 9.75]]) {
     placeCityHD("fire_hydrant", { targetHeight: 0.78 }, fx, 0, fz, 0, 0.28);
   }
-  for (const [ux, uz] of [[-10.8, -5.0], [eastRoadX + 4.8, streetZ + 12.0]]) {
+  for (const [ux, uz] of [[-13.0, -5.0], [eastRoadX + 6.8, streetZ + 12.0]]) {
     placeCityHD("utility_box", { targetHeight: 1.35 }, ux, 0, uz, 0, 0.48);
   }
   for (const [kx, kz] of [[eastRoadX - 4.8, streetZ + 9.6], [eastRoadX - 4.0, streetZ + 9.6]]) {
