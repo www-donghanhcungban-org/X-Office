@@ -1267,7 +1267,7 @@ function lerpAngle(cur, target, alpha) {
   return cur + diff * alpha;
 }
 
-export function createScheduledNPC(rig, steps, initStepIdx = 0, initElapsed = 0) {
+export function createScheduledNPC(rig, steps, initStepIdx = 0, initElapsed = 0, id = null) {
   const s = steps[initStepIdx] || steps[0];
   let initX = 0, initZ = 0, initYaw = 0;
   if (s.act === "wait") {
@@ -1281,9 +1281,11 @@ export function createScheduledNPC(rig, steps, initStepIdx = 0, initElapsed = 0)
     initZ = s.from[1] + dz * u;
     initYaw = Math.atan2(-dx, -dz);
   }
+  rig.path = null;
   rig.root.position.set(initX, 0, initZ);
   rig.root.rotation.y = initYaw;
   return {
+    id: id || `npc_${rig.index !== undefined ? rig.index : Math.round(initX * 31 + initZ * 17)}`,
     rig,
     steps,
     initStepIdx,
@@ -1291,20 +1293,56 @@ export function createScheduledNPC(rig, steps, initStepIdx = 0, initElapsed = 0)
     initX,
     initZ,
     initYaw,
+    x: initX,
+    z: initZ,
     stepIdx: initStepIdx,
     elapsed: initElapsed,
     committed: false,
+    stallTime: 0,
   };
 }
 
-export function stepScheduledNPC(npc, t, dt, motion, gateCheck) {
+function playNPCPose(w, t, dt, spd, mode, walking) {
+  if (w.isHD) {
+    if (walking) {
+      w.speed = spd;
+      animateHDHuman(w, t, dt * (spd / 1.15), true, "walk");
+    } else {
+      animateHDHuman(w, t, dt, true, mode || "idle");
+    }
+    return;
+  }
+  const i = w.index || 0;
+  if (walking) {
+    const stride = Math.sin(t * 5.6 + i);
+    w.body.position.y = 0.835 + Math.abs(Math.cos(t * 5.6 + i)) * 0.032;
+    w.leftLeg.rotation.x = stride * 0.44;
+    w.rightLeg.rotation.x = -stride * 0.44;
+    w.leftArm.rotation.x = -stride * 0.34;
+    w.rightArm.rotation.x = w.holdCup ? 0.65 + stride * 0.05 : stride * 0.34;
+    w.head.rotation.set(0, Math.sin(t * 0.9 + i) * 0.14, 0);
+  } else {
+    w.body.position.y = 0.835;
+    w.leftLeg.rotation.x = w.rightLeg.rotation.x = 0;
+    w.head.rotation.set(Math.sin(t * 1.4 + i) * 0.05, Math.sin(t * 0.8 + i * 2) * 0.22, 0);
+    w.leftArm.rotation.x = mode === "talk" ? 0.14 + Math.sin(t * 2.2 + i) * 0.14 : 0.06;
+    w.rightArm.rotation.x = mode === "talk" ? 0.16 - Math.sin(t * 1.9 + i) * 0.12 : (w.holdCup ? 0.65 : 0.06);
+  }
+}
+
+export function stepScheduledNPC(npc, t, dt, motion, opts = {}) {
+  const { gateCheck = null, physics = null, layer = "outdoor" } = typeof opts === "function" ? { gateCheck: opts } : opts;
   const w = npc.rig;
   if (!motion) {
     npc.stepIdx = npc.initStepIdx;
     npc.elapsed = npc.initElapsed;
     npc.committed = false;
+    npc.stallTime = 0;
+    npc.x = npc.initX;
+    npc.z = npc.initZ;
     w.root.position.set(npc.initX, 0, npc.initZ);
     w.root.rotation.y = npc.initYaw;
+    if (physics) physics.setHuman(layer, npc.id, npc.x, npc.z, 0.36);
     if (w.isHD) animateHDHuman(w, 0, 0, false, "idle");
     else animateWalkerRig(w, 0, false);
     return;
@@ -1313,78 +1351,133 @@ export function stepScheduledNPC(npc, t, dt, motion, gateCheck) {
   const s = npc.steps[npc.stepIdx];
   if (!s) return;
 
+  const advanceStep = () => {
+    npc.stepIdx = (npc.stepIdx + 1) % npc.steps.length;
+    npc.elapsed = 0;
+    npc.committed = false;
+    npc.stallTime = 0;
+  };
+
   if (s.act === "wait") {
-    w.root.position.set(s.pos[0], 0, s.pos[1]);
+    const dx = s.pos[0] - npc.x;
+    const dz = s.pos[1] - npc.z;
+    const d = Math.hypot(dx, dz);
+    if (d > 0.38) {
+      const steer = physics ? physics.steerAround(layer, npc.x, npc.z, dx, dz, 0.36, npc.id) : { dx: dx / d, dz: dz / d };
+      const stepD = Math.min(d, 1.2 * dt);
+      const res = physics ? physics.resolveCircle(layer, npc.x + steer.dx * stepD, npc.z + steer.dz * stepD, 0.36, npc.id) : { x: npc.x + steer.dx * stepD, z: npc.z + steer.dz * stepD };
+      const mvX = res.x - npc.x;
+      const mvZ = res.z - npc.z;
+      npc.x = res.x;
+      npc.z = res.z;
+      w.root.position.set(npc.x, 0, npc.z);
+      if (Math.hypot(mvX, mvZ) > 0.002) {
+        w.root.rotation.y = lerpAngle(w.root.rotation.y, Math.atan2(-mvX, -mvZ), Math.min(1, dt * 7.5));
+        playNPCPose(w, t, dt, 1.2, "walk", true);
+        if (physics) physics.setHuman(layer, npc.id, npc.x, npc.z, 0.36);
+        return;
+      }
+    }
+    const res = physics ? physics.resolveCircle(layer, npc.x, npc.z, 0.36, npc.id) : { x: npc.x, z: npc.z };
+    npc.x = res.x;
+    npc.z = res.z;
+    w.root.position.set(npc.x, 0, npc.z);
     w.root.rotation.y = lerpAngle(w.root.rotation.y, s.yaw || 0, Math.min(1, dt * 6.5));
+    if (physics) physics.setHuman(layer, npc.id, npc.x, npc.z, 0.36);
     npc.elapsed += dt;
-    const mode = s.mode || "idle";
-    if (w.isHD) {
-      animateHDHuman(w, t, dt, true, mode);
-    } else {
-      const i = w.index || 0;
-      w.body.position.y = 0.835;
-      w.leftLeg.rotation.x = w.rightLeg.rotation.x = 0;
-      w.head.rotation.set(Math.sin(t * 1.4 + i) * 0.05, Math.sin(t * 0.8 + i * 2) * 0.22, 0);
-      w.leftArm.rotation.x = mode === "talk" ? 0.14 + Math.sin(t * 2.2 + i) * 0.14 : 0.06;
-      w.rightArm.rotation.x = mode === "talk" ? 0.16 - Math.sin(t * 1.9 + i) * 0.12 : (w.holdCup ? 0.65 : 0.06);
-    }
-    if (npc.elapsed >= (s.dur || 3.5)) {
-      npc.stepIdx = (npc.stepIdx + 1) % npc.steps.length;
-      npc.elapsed = 0;
-      npc.committed = false;
-    }
+    playNPCPose(w, t, dt, 0, s.mode || "idle", false);
+    if (npc.elapsed >= (s.dur || 3.5)) advanceStep();
     return;
   }
 
-  const dx = s.to[0] - s.from[0];
-  const dz = s.to[1] - s.from[1];
-  const len = Math.hypot(dx, dz);
-  const targetYaw = Math.atan2(-dx, -dz);
-
+  // Hỗ trợ kiểm tra đèn tín hiệu + dự báo xe đang lao tới trước khi bước xuống vạch qua đường
   if (s.cross && !npc.committed) {
-    const allowed = gateCheck ? gateCheck(s.cross) : true;
-    if (!allowed) {
-      w.root.position.set(s.from[0], 0, s.from[1]);
-      w.root.rotation.y = lerpAngle(w.root.rotation.y, targetYaw, Math.min(1, dt * 8.0));
-      if (w.isHD) {
-        animateHDHuman(w, t, dt, true, "idle");
-      } else {
-        w.body.position.y = 0.835;
-        w.leftLeg.rotation.x = w.rightLeg.rotation.x = 0;
-        w.leftArm.rotation.x = w.rightArm.rotation.x = 0.06;
-        w.head.rotation.y = Math.sin(t * 1.1 + (w.index || 0)) * 0.24;
+    const df = Math.hypot(s.from[0] - npc.x, s.from[1] - npc.z);
+    const sigOk = gateCheck ? gateCheck(s.cross) : true;
+    const roadClear = !physics || physics.isCrossingSafe(npc.x, npc.z, s.to[0], s.to[1]);
+    if (!sigOk || !roadClear) {
+      if (df > 0.45) {
+        const fx = (s.from[0] - npc.x) / df;
+        const fz = (s.from[1] - npc.z) / df;
+        const res = physics ? physics.resolveCircle(layer, npc.x + fx * Math.min(df, 1.25 * dt), npc.z + fz * Math.min(df, 1.25 * dt), 0.36, npc.id) : { x: npc.x + fx * dt, z: npc.z + fz * dt };
+        npc.x = res.x;
+        npc.z = res.z;
+      } else if (physics) {
+        const res = physics.resolveCircle(layer, npc.x, npc.z, 0.36, npc.id);
+        npc.x = res.x;
+        npc.z = res.z;
       }
+      w.root.position.set(npc.x, 0, npc.z);
+      w.root.rotation.y = lerpAngle(w.root.rotation.y, Math.atan2(-(s.to[0] - npc.x), -(s.to[1] - npc.z)), Math.min(1, dt * 8.0));
+      if (physics) physics.setHuman(layer, npc.id, npc.x, npc.z, 0.36);
+      playNPCPose(w, t, dt, 0, "idle", false);
       return;
     }
     npc.committed = true;
   }
 
-  const spd = s.speed || 1.35;
-  w.root.rotation.y = lerpAngle(w.root.rotation.y, targetYaw, s.cross ? 1 : Math.min(1, dt * 7.5));
-  npc.elapsed += dt * spd;
-  const dist = Math.min(len, npc.elapsed);
-  const u = len > 1e-4 ? dist / len : 1;
-  w.root.position.set(s.from[0] + dx * u, 0, s.from[1] + dz * u);
+  const threat = (physics && layer === "outdoor") ? physics.getVehicleThreat(npc.x, npc.z, 0.38) : null;
+  let tgtX = s.to[0];
+  let tgtZ = s.to[1];
+  let spd = s.speed || 1.35;
+  let dirX = tgtX - npc.x;
+  let dirZ = tgtZ - npc.z;
+  let rem = Math.hypot(dirX, dirZ);
 
-  if (w.isHD) {
-    w.speed = spd;
-    animateHDHuman(w, t, dt * (spd / 1.15), true, "walk");
-  } else {
-    const i = w.index || 0;
-    const stride = Math.sin(t * 5.6 + i);
-    w.body.position.y = 0.835 + Math.abs(Math.cos(t * 5.6 + i)) * 0.032;
-    w.leftLeg.rotation.x = stride * 0.44;
-    w.rightLeg.rotation.x = -stride * 0.44;
-    w.leftArm.rotation.x = -stride * 0.34;
-    w.rightArm.rotation.x = w.holdCup ? 0.65 + stride * 0.05 : stride * 0.34;
-    w.head.rotation.set(0, Math.sin(t * 0.9 + i) * 0.14, 0);
+  if (threat) {
+    const distFromEntry = Math.hypot(npc.x - s.from[0], npc.z - s.from[1]);
+    if (s.cross && distFromEntry < 2.2) {
+      // Còn gần mép vỉa hè: lùi lại an toàn lên vỉa hè cho xe qua trước
+      tgtX = s.from[0];
+      tgtZ = s.from[1];
+      dirX = tgtX - npc.x;
+      dirZ = tgtZ - npc.z;
+      rem = Math.hypot(dirX, dirZ) || 1;
+      npc.committed = false;
+    } else {
+      // Chủ động né ngang dứt khoát ra khỏi làn xe đang tới
+      dirX = threat.escapeX;
+      dirZ = threat.escapeZ;
+      rem = 1;
+    }
+    spd = 3.15;
+  } else if (physics) {
+    const st = physics.steerAround(layer, npc.x, npc.z, dirX, dirZ, 0.36, npc.id);
+    dirX = st.dx;
+    dirZ = st.dz;
+  } else if (rem > 1e-4) {
+    dirX /= rem;
+    dirZ /= rem;
   }
 
-  if (npc.elapsed >= len) {
-    const rem = npc.elapsed - len;
-    npc.stepIdx = (npc.stepIdx + 1) % npc.steps.length;
-    const nextStep = npc.steps[npc.stepIdx];
-    npc.elapsed = nextStep && nextStep.act === "walk" && !nextStep.cross ? rem : 0;
-    npc.committed = false;
+  const dLen = Math.hypot(dirX, dirZ) || 1;
+  dirX /= dLen;
+  dirZ /= dLen;
+
+  const stepD = threat ? spd * dt : Math.min(Math.max(rem, 0.25), spd * dt);
+  const propX = npc.x + dirX * stepD;
+  const propZ = npc.z + dirZ * stepD;
+  const res = physics ? physics.resolveCircle(layer, propX, propZ, 0.36, npc.id) : { x: propX, z: propZ };
+  const mvX = res.x - npc.x;
+  const mvZ = res.z - npc.z;
+  const moved = Math.hypot(mvX, mvZ);
+  npc.x = res.x;
+  npc.z = res.z;
+  w.root.position.set(npc.x, 0, npc.z);
+  if (physics) physics.setHuman(layer, npc.id, npc.x, npc.z, 0.36);
+
+  if (moved > 0.002) {
+    npc.stallTime = 0;
+    const faceYaw = Math.atan2(-mvX, -mvZ);
+    w.root.rotation.y = lerpAngle(w.root.rotation.y, faceYaw, threat || s.cross ? 1 : Math.min(1, dt * 8.5));
+    playNPCPose(w, t, dt, spd, "walk", true);
+  } else {
+    npc.stallTime += dt;
+    w.root.rotation.y = lerpAngle(w.root.rotation.y, Math.atan2(-dirX, -dirZ), Math.min(1, dt * 6.0));
+    playNPCPose(w, t, dt, 0, "idle", false);
+  }
+
+  if (!threat && (Math.hypot(s.to[0] - npc.x, s.to[1] - npc.z) <= 0.42 || npc.stallTime > 6.5)) {
+    advanceStep();
   }
 }

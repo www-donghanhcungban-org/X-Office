@@ -615,6 +615,11 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
         const pad = plan.levels ? 6 : 4;
         walk.x = Math.min(plan.W - 6, Math.max(10, 14.2));
         walk.z = plan.D + pad + 10.15;
+        if (officeObj.physics) {
+          const sp = officeObj.physics.resolveCircle("outdoor", walk.x, walk.z, 0.38, "hero", { ignoreVehicles: true });
+          walk.x = sp.x;
+          walk.z = sp.z;
+        }
         walk.yaw = Math.atan2(-26 - walk.x, -17 - walk.z);
         walk.pitch = 0.14;
         walk.dist = 2.85;
@@ -627,20 +632,30 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
         if (walk.keys.has("KeyS") || walk.keys.has("ArrowDown")) fwdMove -= 1;
         if (walk.keys.has("KeyA") || walk.keys.has("ArrowLeft")) strMove -= 1;
         if (walk.keys.has("KeyD") || walk.keys.has("ArrowRight")) strMove += 1;
+        const fx = Math.sin(walk.yaw), fz = Math.cos(walk.yaw);
+        const rx = -fz, rz = fx;
+        let nextX = walk.x, nextZ = walk.z;
         if (fwdMove || strMove) {
           walkMoving = true;
           const speed = 4.6 * dtFrame;
-          const fx = Math.sin(walk.yaw), fz = Math.cos(walk.yaw);
-          const rx = -fz, rz = fx;
-          walk.x = Math.max(-42, Math.min(plan.W + 32, walk.x + (fx * fwdMove + rx * strMove) * speed));
-          walk.z = Math.max(-22, Math.min(plan.D + 38, walk.z + (fz * fwdMove + rz * strMove) * speed));
+          nextX = Math.max(-42, Math.min(plan.W + 32, walk.x + (fx * fwdMove + rx * strMove) * speed));
+          nextZ = Math.max(-22, Math.min(plan.D + 38, walk.z + (fz * fwdMove + rz * strMove) * speed));
           walk.phase += dtFrame * 7.2;
         }
+        if (officeObj.physics) {
+          const res = officeObj.physics.resolveCircle("outdoor", nextX, nextZ, 0.38, "hero");
+          nextX = res.x;
+          nextZ = res.z;
+          officeObj.physics.setHuman("outdoor", "hero", nextX, nextZ, 0.38);
+        }
+        walk.x = nextX;
+        walk.z = nextZ;
         if (officeObj.setHero) {
           officeObj.setHero(true, walk.x, walk.z, walk.yaw + Math.PI, walk.phase, walkMoving, tNow);
         }
-      } else if (officeObj.setHero) {
-        officeObj.setHero(false, 0, 0, 0, 0, false, tNow);
+      } else {
+        if (officeObj.physics) officeObj.physics.removeHuman("outdoor", "hero");
+        if (officeObj.setHero) officeObj.setHero(false, 0, 0, 0, 0, false, tNow);
       }
 
       // Hệ hạt 3D (tuyết / mưa neon / sao / bụi nắng)
