@@ -1801,14 +1801,14 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
     floorRoot.add(buildFlowerbed(THREE, natureAssets, mats, 30.8, 9.2, "#f43f5e"));
     floorRoot.add(buildFlowerbed(THREE, natureAssets, mats, 31.2, 13.0, "#facc15"));
     floorRoot.add(buildFlowerbed(THREE, natureAssets, mats, 40.4, 18.8, "#a855f7"));
-    floorRoot.add(buildBollard(THREE, natureAssets, mats, 32.1, 14.4));
+    floorRoot.add(buildBollard(THREE, natureAssets, mats, 32.85, 14.5));
     floorRoot.add(buildBollard(THREE, natureAssets, mats, 41.2, 14.4));
-    physics.addCircle("indoor", 32.1, 14.4, 0.22, "bollard");
+    physics.addCircle("indoor", 32.85, 14.5, 0.22, "bollard");
     physics.addCircle("indoor", 41.2, 14.4, 0.22, "bollard");
     for (const [key, opt, gx, gz, ry] of [
       ["shrub", { targetHeight: 0.95 }, 30.8, 10.6, 0.3],
       ["shrub", { targetHeight: 0.9 }, 42.8, 13.8, -0.5],
-      ["fern", { targetHeight: 0.65 }, 31.2, 14.2, 0.8],
+      ["fern", { targetHeight: 0.65 }, 30.75, 14.2, 0.8],
       ["fern", { targetHeight: 0.6 }, 41.6, 15.2, -0.4],
       ["calathea", { targetHeight: 0.78 }, 34.5, 20.2, 0],
       ["picnic_table", { targetLength: 1.75 }, 35.6, 16.6, 0],
@@ -1859,16 +1859,17 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
           index: 31,
           holdCup: true,
           steps: [
-            { act: "wait", pos: [32.0, 3.6], yaw: 0, dur: 3.6, mode: "talk" },
-            { act: "walk", from: [32.0, 3.6], to: [32.6, 8.2], speed: 0.85 },
-            { act: "walk", from: [32.6, 8.2], to: [31.5, 8.9], speed: 0.85 },
-            { act: "walk", from: [31.5, 8.9], to: [31.5, 14.9], speed: 0.85 },
-            { act: "walk", from: [31.5, 14.9], to: [35.8, 15.1], speed: 0.82 },
-            { act: "wait", pos: [35.8, 15.1], yaw: 0.25, dur: 4.5, mode: "idle" },
-            { act: "walk", from: [35.8, 15.1], to: [31.5, 14.9], speed: 0.82 },
-            { act: "walk", from: [31.5, 14.9], to: [31.5, 8.9], speed: 0.85 },
-            { act: "walk", from: [31.5, 8.9], to: [32.6, 8.2], speed: 0.85 },
-            { act: "walk", from: [32.6, 8.2], to: [32.0, 3.6], speed: 0.85 },
+            // Pha cà phê tại quầy Pantry (chưa cầm cốc) → cầm cốc nóng dạo ra khu Vườn & hồ bơi thưởng thức → quay lại Pantry
+            { act: "wait", pos: [32.0, 3.6], yaw: 0, dur: 3.6, mode: "talk", cup: false },
+            { act: "walk", from: [32.0, 3.6], to: [32.4, 8.2], speed: 0.92, cup: true },
+            { act: "walk", from: [32.4, 8.2], to: [31.85, 8.9], speed: 0.92, cup: true },
+            { act: "walk", from: [31.85, 8.9], to: [31.85, 14.9], speed: 0.92, cup: true },
+            { act: "walk", from: [31.85, 14.9], to: [35.8, 15.1], speed: 0.88, cup: true },
+            { act: "wait", pos: [35.8, 15.1], yaw: 0.25, dur: 4.8, mode: "idle", cup: true, look: true },
+            { act: "walk", from: [35.8, 15.1], to: [31.85, 14.9], speed: 0.88, cup: true },
+            { act: "walk", from: [31.85, 14.9], to: [31.85, 8.9], speed: 0.92, cup: true },
+            { act: "walk", from: [31.85, 8.9], to: [32.4, 8.2], speed: 0.92, cup: true },
+            { act: "walk", from: [32.4, 8.2], to: [32.0, 3.6], speed: 0.92, cup: true },
           ],
           initIdx: 5,
         },
@@ -1877,17 +1878,17 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
           holdCup: false,
           steps: [
             { act: "wait", pos: [5.1, 4.35], yaw: 0.45, dur: 4.2, mode: "talk" },
-            { act: "walk", from: [5.1, 4.35], to: [5.8, 4.8], speed: 0.86 },
-            { act: "walk", from: [5.8, 4.8], to: [5.8, 7.0], speed: 0.86 },
-            { act: "walk", from: [5.8, 7.0], to: [3.8, 7.0], speed: 0.84 },
-            { act: "walk", from: [3.8, 7.0], to: [3.8, 8.6], speed: 0.84 },
-            { act: "walk", from: [3.8, 8.6], to: [2.2, 8.6], speed: 0.82 },
-            { act: "wait", pos: [2.2, 8.6], yaw: Math.PI / 2, dur: 3.4, mode: "idle" },
-            { act: "walk", from: [2.2, 8.6], to: [3.8, 8.6], speed: 0.82 },
-            { act: "walk", from: [3.8, 8.6], to: [3.8, 7.0], speed: 0.84 },
-            { act: "walk", from: [3.8, 7.0], to: [5.8, 7.0], speed: 0.84 },
-            { act: "walk", from: [5.8, 7.0], to: [5.8, 4.8], speed: 0.86 },
-            { act: "walk", from: [5.8, 4.8], to: [5.1, 4.35], speed: 0.86 },
+            { act: "walk", from: [5.1, 4.35], to: [5.8, 4.8], speed: 0.92 },
+            { act: "walk", from: [5.8, 4.8], to: [5.8, 7.0], speed: 0.92 },
+            { act: "walk", from: [5.8, 7.0], to: [3.8, 7.0], speed: 0.9 },
+            { act: "walk", from: [3.8, 7.0], to: [3.8, 8.6], speed: 0.9 },
+            { act: "walk", from: [3.8, 8.6], to: [2.2, 8.6], speed: 0.88 },
+            { act: "wait", pos: [2.2, 8.6], yaw: Math.PI / 2, dur: 3.6, mode: "idle", look: true },
+            { act: "walk", from: [2.2, 8.6], to: [3.8, 8.6], speed: 0.88 },
+            { act: "walk", from: [3.8, 8.6], to: [3.8, 7.0], speed: 0.9 },
+            { act: "walk", from: [3.8, 7.0], to: [5.8, 7.0], speed: 0.9 },
+            { act: "walk", from: [5.8, 7.0], to: [5.8, 4.8], speed: 0.92 },
+            { act: "walk", from: [5.8, 4.8], to: [5.1, 4.35], speed: 0.92 },
           ],
           initIdx: 0,
         },
@@ -1896,6 +1897,7 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
         const rig = buildHDHuman(THREE, hdAssets, mats, {
           index: spec.index,
           mode: "idle",
+          holdCup: Boolean(spec.holdCup),
           femaleWalk: spec.index % 2 === 1,
           topColor: OFFICE_SHIRTS[spec.index % OFFICE_SHIRTS.length],
         }) || buildWalkerRig(THREE, humanAssets, mats, { index: spec.index, holdCup: spec.holdCup });
@@ -1905,39 +1907,41 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
         walkers.push(npc);
       }
 
+      // Cặp đôi đối thoại luân phiên tự nhiên (1 người nói, 1 người lắng nghe & gật đầu — không nói chồng cùng lúc!)
       const ambientStaff = [
-        // Nhân viên lễ tân đứng sau quầy hướng mặt về khách (+Z = rotY PI) & khách hướng về quầy (-Z = rotY 0)
-        { index: 35, x: 3.7, z: 2.05, rotY: Math.PI, holdCup: false },
-        { index: 36, x: 3.9, z: 4.35, rotY: 0, holdCup: false },
-        // Hai đồng nghiệp trò chuyện đối diện nhau tại quầy Pantry
-        { index: 33, x: 31.4, z: 2.55, rotY: -1.35, holdCup: true },
-        { index: 34, x: 32.6, z: 2.65, rotY: 1.55, holdCup: false },
+        { index: 35, x: 3.7, z: 2.05, rotY: Math.PI, holdCup: false, turnGroup: "rec", turnSlot: 0 },
+        { index: 36, x: 3.9, z: 4.35, rotY: 0, holdCup: false, turnGroup: "rec", turnSlot: 1 },
+        { index: 33, x: 31.4, z: 2.55, rotY: -1.35, holdCup: true, turnGroup: "pan", turnSlot: 0 },
+        { index: 34, x: 32.6, z: 2.65, rotY: 1.55, holdCup: false, turnGroup: "pan", turnSlot: 1 },
       ];
       for (const spec of ambientStaff) {
         physics.setHuman("indoor", `static_${spec.index}`, spec.x, spec.z, 0.38);
         const w = buildHDHuman(THREE, hdAssets, mats, {
           ...spec,
-          mode: "talk",
+          mode: spec.turnSlot === 0 ? "talk" : "idle",
           femaleWalk: spec.index % 2 === 1,
           topColor: OFFICE_SHIRTS[spec.index % OFFICE_SHIRTS.length],
         }) || buildWalkerRig(THREE, humanAssets, mats, spec);
+        w.turnGroup = spec.turnGroup;
+        w.turnSlot = spec.turnSlot;
         floorRoot.add(w.root);
         walkers.push(w);
       }
 
-      // Giám đốc ngồi ghế da sau bàn lớn + 6 thành viên đang họp trong Phòng họp
+      // Giám đốc điều hành (role: "director") + 6 thành viên họp luân phiên phát biểu & lắng nghe (role: "meeting")
       const seatedRoles = [
-        { index: 37, x: 10.9, z: 4.55, rotY: 0, state: "work" }, // Giám đốc
-        { index: 38, x: 16.5, z: 2.52, rotY: Math.PI, state: "work" },
-        { index: 39, x: 19.0, z: 2.52, rotY: Math.PI, state: "work" },
-        { index: 40, x: 21.5, z: 2.52, rotY: Math.PI, state: "wait" },
-        { index: 41, x: 16.5, z: 4.88, rotY: 0, state: "work" },
-        { index: 42, x: 19.0, z: 4.88, rotY: 0, state: "wait" },
-        { index: 43, x: 21.5, z: 4.88, rotY: 0, state: "work" },
+        { index: 37, x: 10.9, z: 4.55, rotY: 0, state: "work", role: "director" },
+        { index: 38, x: 16.5, z: 2.52, rotY: Math.PI, state: "work", role: "meeting", meetingIdx: 0 },
+        { index: 39, x: 19.0, z: 2.52, rotY: Math.PI, state: "work", role: "meeting", meetingIdx: 1 },
+        { index: 40, x: 21.5, z: 2.52, rotY: Math.PI, state: "work", role: "meeting", meetingIdx: 2 },
+        { index: 41, x: 16.5, z: 4.88, rotY: 0, state: "work", role: "meeting", meetingIdx: 3 },
+        { index: 42, x: 19.0, z: 4.88, rotY: 0, state: "work", role: "meeting", meetingIdx: 4 },
+        { index: 43, x: 21.5, z: 4.88, rotY: 0, state: "work", role: "meeting", meetingIdx: 5 },
       ];
       for (const r of seatedRoles) {
         const rig = buildSeatedHDHuman(THREE, humanAssets, hdAssets, mats, {
           index: r.index, theme: th, seat: { state: r.state }, season: opts.season, noChair: true,
+          role: r.role, meetingIdx: r.meetingIdx,
         }) || buildHumanRig(THREE, humanAssets, mats, {
           index: r.index, theme: th, seat: { state: r.state }, season: opts.season, noChair: true,
         });
@@ -1981,7 +1985,7 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
     zb,
     cutaway,
     physics,
-    setHero(visible, x, z, rotY, walkPhase, moving, t) {
+    setHero(visible, x, z, rotY, walkPhase, moving, t, actualSpeed = 1.35) {
       if (!hero) return;
       hero.root.visible = Boolean(visible);
       if (!visible) return;
@@ -1990,7 +1994,7 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
       if (hero.isHD) {
         const dt = heroPrevT ? Math.min(0.06, Math.max(0.001, (t || 0) - heroPrevT)) : 0.016;
         heroPrevT = t || 0;
-        animateHDHuman(hero, t || 0, dt, true, moving ? "walk" : "idle");
+        animateHDHuman(hero, t || 0, dt, true, moving ? "walk" : "idle", moving ? actualSpeed / 1.38 : 1.0);
         return;
       }
       if (moving) {
@@ -2068,8 +2072,15 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
       }
       for (const w of walkers) {
         if (w.isScheduled) stepScheduledNPC(w, t, dt, motion, { physics, layer: "indoor" });
-        else if (w.isHD) animateHDHuman(w, t, dt, motion, w.curMode || "idle");
-        else animateWalkerRig(w, t, motion);
+        else if (w.isHD) {
+          let mode = w.curMode || "idle";
+          if (w.turnGroup) {
+            const turn = Math.floor((t + (w.turnGroup === "pan" ? 2.4 : 0)) / 4.8) % 2;
+            mode = turn === w.turnSlot ? "talk" : "idle";
+            w.lookAround = mode === "idle";
+          }
+          animateHDHuman(w, t, dt, motion, mode, 1.0);
+        } else animateWalkerRig(w, t, motion);
       }
       for (const st of agentStations) {
         if (st.orb.visible) {

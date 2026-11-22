@@ -621,6 +621,7 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
           walk.z = sp.z;
         }
         walk.yaw = Math.atan2(-26 - walk.x, -17 - walk.z);
+        walk.bodyYaw = walk.yaw + Math.PI;
         walk.pitch = 0.14;
         walk.dist = 2.85;
         walk.seeded = true;
@@ -635,12 +636,14 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
         const fx = Math.sin(walk.yaw), fz = Math.cos(walk.yaw);
         const rx = -fz, rz = fx;
         let nextX = walk.x, nextZ = walk.z;
-        if (fwdMove || strMove) {
-          walkMoving = true;
-          const speed = 4.6 * dtFrame;
-          nextX = Math.max(-42, Math.min(plan.W + 32, walk.x + (fx * fwdMove + rx * strMove) * speed));
-          nextZ = Math.max(-22, Math.min(plan.D + 38, walk.z + (fz * fwdMove + rz * strMove) * speed));
-          walk.phase += dtFrame * 7.2;
+        const inLen = Math.hypot(fwdMove, strMove);
+        if (inLen > 0) {
+          const baseSpd = (walk.keys.has("ShiftLeft") || walk.keys.has("ShiftRight")) ? 4.2 : 2.55;
+          const step = baseSpd * dtFrame;
+          const mx = (fx * fwdMove + rx * strMove) / inLen;
+          const mz = (fz * fwdMove + rz * strMove) / inLen;
+          nextX = Math.max(-42, Math.min(plan.W + 32, walk.x + mx * step));
+          nextZ = Math.max(-22, Math.min(plan.D + 38, walk.z + mz * step));
         }
         if (officeObj.physics) {
           const res = officeObj.physics.resolveCircle("outdoor", nextX, nextZ, 0.38, "hero");
@@ -648,14 +651,29 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
           nextZ = res.z;
           officeObj.physics.setHuman("outdoor", "hero", nextX, nextZ, 0.38);
         }
+        const mvX = nextX - walk.x;
+        const mvZ = nextZ - walk.z;
+        const moved = Math.hypot(mvX, mvZ);
+        const actualSpeed = moved / Math.max(dtFrame, 1e-3);
+        walkMoving = moved > 0.004 && actualSpeed > 0.18;
+        if (walkMoving) {
+          walk.phase += dtFrame * (actualSpeed * 2.5);
+          const targetBodyYaw = Math.atan2(-mvX, -mvZ);
+          let dy = targetBodyYaw - (walk.bodyYaw ?? (walk.yaw + Math.PI));
+          while (dy > Math.PI) dy -= Math.PI * 2;
+          while (dy < -Math.PI) dy += Math.PI * 2;
+          walk.bodyYaw = (walk.bodyYaw ?? (walk.yaw + Math.PI)) + dy * Math.min(1, dtFrame * 11);
+        } else if (walk.bodyYaw === undefined) {
+          walk.bodyYaw = walk.yaw + Math.PI;
+        }
         walk.x = nextX;
         walk.z = nextZ;
         if (officeObj.setHero) {
-          officeObj.setHero(true, walk.x, walk.z, walk.yaw + Math.PI, walk.phase, walkMoving, tNow);
+          officeObj.setHero(true, walk.x, walk.z, walk.bodyYaw, walk.phase, walkMoving, tNow, actualSpeed);
         }
       } else {
         if (officeObj.physics) officeObj.physics.removeHuman("outdoor", "hero");
-        if (officeObj.setHero) officeObj.setHero(false, 0, 0, 0, 0, false, tNow);
+        if (officeObj.setHero) officeObj.setHero(false, 0, 0, 0, 0, false, tNow, 0);
       }
 
       // Hệ hạt 3D (tuyết / mưa neon / sao / bụi nắng)
