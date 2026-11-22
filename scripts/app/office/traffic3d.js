@@ -44,6 +44,112 @@ function addShadow(THREE, group, natureAssets, mats, sx, sz) {
   group.add(m);
 }
 
+// ---------------------------------------------------------------- Đổi màu sơn thân xe trên vân PBR 2K (giữ nguyên lốp đen, la-zăng chrome, kính & đèn)
+const RECOLOR_MODES = {
+  veh_sedan: "red",
+  veh_pickup: "red",
+  veh_bus: "red",
+  veh_scooter: "cyan",
+  veh_suv: "neutral",
+  veh_delivery: "neutral",
+  veh_van: "neutral",
+  veh_moto: "moto",
+};
+const _recolorTexCache = new WeakMap();
+
+function recolorVehicleTexture(THREE, srcTex, hexColor, mode) {
+  if (!srcTex || !srcTex.image || !hexColor || !mode || typeof document === "undefined") return srcTex;
+  let byCol = _recolorTexCache.get(srcTex);
+  if (!byCol) {
+    byCol = new Map();
+    _recolorTexCache.set(srcTex, byCol);
+  }
+  const cacheKey = `${mode}|${hexColor}`;
+  if (byCol.has(cacheKey)) return byCol.get(cacheKey);
+
+  const img = srcTex.image;
+  const srcW = img.width || 512;
+  const srcH = img.height || 512;
+  const maxDim = 512;
+  const scale = Math.min(1, maxDim / Math.max(srcW, srcH));
+  const cw = Math.max(64, Math.round(srcW * scale));
+  const ch = Math.max(64, Math.round(srcH * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = cw;
+  canvas.height = ch;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return srcTex;
+  ctx.drawImage(img, 0, 0, cw, ch);
+
+  const imgData = ctx.getImageData(0, 0, cw, ch);
+  const d = imgData.data;
+  const c = new THREE.Color(hexColor);
+  const tr = c.r * 255;
+  const tg = c.g * 255;
+  const tb = c.b * 255;
+
+  for (let i = 0; i < d.length; i += 4) {
+    const a = d[i + 3];
+    if (a < 16) continue;
+    const r = d[i];
+    const g = d[i + 1];
+    const b = d[i + 2];
+    const maxC = Math.max(r, g, b);
+    const minC = Math.min(r, g, b);
+    const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    const sat = maxC > 0 ? (maxC - minC) / maxC : 0;
+
+    let weight = 0;
+    if (mode === "red") {
+      // Thân sơn đỏ gốc của sedan/pickup/bus: nhận diện chính xác điểm đỏ đậm, giữ nguyên lốp/kính/chrome
+      const excess = r - Math.max(g, b);
+      if (excess > 26 && r > 62) weight = Math.min(1, (excess - 22) / 52);
+    } else if (mode === "cyan") {
+      // Thân sơn xanh ngọc gốc của xe tay ga: nhận diện chính xác điểm cyan/mint, giữ nguyên yên/lốp/vành
+      const excess = Math.min(g, b) - r;
+      if (excess > 20 && maxC > 70) weight = Math.min(1, (excess - 16) / 48);
+    } else if (mode === "neutral") {
+      // Thân sơn bạc/trắng xám của SUV/van/xe tải: chỉ đổi dải sáng trung-cao ít bão hòa, giữ nguyên lốp tối & đèn sáng
+      if (lum > 0.34 && lum < 0.89 && sat < 0.24) {
+        const lowF = Math.min(1, (lum - 0.34) / 0.12);
+        const hiF = Math.min(1, (0.89 - lum) / 0.1);
+        weight = Math.min(lowF, hiF) * 0.84;
+      }
+    } else if (mode === "moto") {
+      if (sat > 0.25 && lum > 0.15 && lum < 0.86) weight = 0.88;
+    }
+
+    if (weight > 0.01) {
+      // Giữ nguyên sắc độ đổ bóng & nếp dập thân xe (luminance-preserving metallic paint)
+      const shade = mode === "red"
+        ? Math.min(1.38, Math.max(0.28, (r / 205) * 0.92 + lum * 0.22))
+        : mode === "cyan"
+          ? Math.min(1.35, Math.max(0.3, (maxC / 195) * 0.9 + lum * 0.2))
+          : Math.min(1.28, Math.max(0.32, lum * 1.48));
+      const nr = Math.min(255, tr * shade);
+      const ng = Math.min(255, tg * shade);
+      const nb = Math.min(255, tb * shade);
+      d[i] = Math.round(r + (nr - r) * weight);
+      d[i + 1] = Math.round(g + (ng - g) * weight);
+      d[i + 2] = Math.round(b + (nb - b) * weight);
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.flipY = srcTex.flipY;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = srcTex.wrapS;
+  tex.wrapT = srcTex.wrapT;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.anisotropy = 4;
+  tex.needsUpdate = true;
+  byCol.set(cacheKey, tex);
+  return tex;
+}
+
 // ---------------------------------------------------------------- Nâng cấp xe .glb lên chuẩn vật liệu sơn clearcoat & kính phản chiếu + đèn phanh HDR
 export function upgradeVehicleGLB(THREE, natureAssets, mats, hdAssets, key, opts = {}) {
   const parsed = hdAssets && hdAssets.get(key);
@@ -122,20 +228,24 @@ export function upgradeVehicleGLB(THREE, natureAssets, mats, hdAssets, key, opts
       o.material = paintMat;
     } else if (srcMat && srcMat.map) {
       hasTexturedBody = true;
-      // Bảo toàn toàn bộ texture PBR 2K (lưới tản nhiệt, logo, đèn, la-zăng) và nâng lên lớp sơn phủ bóng clearcoat
+      // Bảo toàn toàn bộ texture PBR 2K (lưới tản nhiệt, logo, đèn, la-zăng), đổi màu sơn thân xe sắc nét & phủ bóng clearcoat
       if (!physCache.has(srcMat)) {
         const isGlass = Boolean(srcMat.transparent) && srcMat.alphaTest === 0;
+        const recolorMode = !isGlass ? RECOLOR_MODES[key] : null;
+        const paintMap = recolorMode && opts.color
+          ? recolorVehicleTexture(THREE, srcMat.map, opts.color, recolorMode)
+          : srcMat.map;
         const pm = new THREE.MeshPhysicalMaterial({
           color: srcMat.color ? srcMat.color.clone() : new THREE.Color("#ffffff"),
-          map: srcMat.map,
+          map: paintMap,
           normalMap: srcMat.normalMap || null,
           roughnessMap: srcMat.roughnessMap || null,
           metalnessMap: srcMat.metalnessMap || null,
-          roughness: isGlass ? 0.06 : Math.min(srcMat.roughness !== undefined ? srcMat.roughness : 0.38, 0.34),
-          metalness: isGlass ? 0.25 : Math.max(srcMat.metalness !== undefined ? srcMat.metalness : 0.22, 0.22),
-          clearcoat: isGlass ? 1.0 : 0.92,
-          clearcoatRoughness: isGlass ? 0.03 : 0.07,
-          envMapIntensity: isGlass ? 1.55 : 1.35,
+          roughness: isGlass ? 0.06 : Math.min(srcMat.roughness !== undefined ? srcMat.roughness : 0.36, 0.3),
+          metalness: isGlass ? 0.25 : Math.max(srcMat.metalness !== undefined ? srcMat.metalness : 0.26, 0.26),
+          clearcoat: isGlass ? 1.0 : 0.96,
+          clearcoatRoughness: isGlass ? 0.03 : 0.055,
+          envMapIntensity: isGlass ? 1.55 : 1.4,
           transparent: Boolean(srcMat.transparent),
           opacity: isGlass ? Math.max(srcMat.opacity !== undefined ? srcMat.opacity : 0.65, 0.72) : (srcMat.opacity !== undefined ? srcMat.opacity : 1),
           alphaTest: srcMat.alphaTest || 0,
@@ -546,6 +656,7 @@ function buildTrafficVehicle(THREE, tAssets, natureAssets, mats, s, hdAssets) {
       halfLen: isScooter ? 1.02 : 1.12,
       halfW: 0.44,
       rotY: Math.PI / 2,
+      color: s.col,
       singleTrack: true,
       wheelR: 0.28,
     });
@@ -562,6 +673,7 @@ function buildTrafficVehicle(THREE, tAssets, natureAssets, mats, s, hdAssets) {
       targetWidth: 2.75,
       halfLen: cfg[2],
       rotY: cfg[3],
+      color: s.col,
       wheelR: cfg[5],
       halfW: cfg[6],
     });
@@ -641,44 +753,44 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
   const nsNorthStop = [mainRoadZ + 6.0, northRoadZ + 6.0];
 
   const vehicleSpecs = [
-    // Đại lộ chính Nam (Eastbound +X)
-    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.75, pos: -48.0, maxV: 4.4, kind: "delivery", col: "#f1f5f9", stopLines: mainEastStop },
-    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.75, pos: -32.0, maxV: 4.8, kind: "pickup", col: "#991b1b", stopLines: mainEastStop },
+    // Đại lộ chính Nam (Eastbound +X) — phối đa dạng màu sơn kim loại nổi bật
+    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.75, pos: -48.0, maxV: 4.4, kind: "delivery", col: "#0284c7", stopLines: mainEastStop },
+    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.75, pos: -32.0, maxV: 4.8, kind: "pickup", col: "#ea580c", stopLines: mainEastStop },
     { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.2, pos: -18.0, maxV: 4.6, kind: "scooter", col: "#dc2626", j: "#1d4ed8", h: "#f8fafc", stopLines: mainEastStop },
     { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.75, pos: -2.5, maxV: 4.3, kind: "bus", col: "#059669", busStopX: 16.8, stopLines: mainEastStop },
-    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 2.25, pos: 13.0, maxV: 4.7, kind: "moto", col: "#0f766e", j: "#334155", h: "#111827", stopLines: mainEastStop },
+    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 2.25, pos: 13.0, maxV: 4.7, kind: "moto", col: "#10b981", j: "#334155", h: "#facc15", stopLines: mainEastStop },
     { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.75, pos: 29.0, maxV: 5.0, kind: "ferrari", col: "#dc2626", stopLines: mainEastStop },
-    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.75, pos: 46.0, maxV: 4.9, kind: "suv", col: "#e2e8f0", stopLines: mainEastStop },
-    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.2, pos: eastRoadX + 26.0, maxV: 4.7, kind: "scooter", col: "#ea580c", j: "#1e293b", h: "#f8fafc", stopLines: mainEastStop },
+    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.75, pos: 46.0, maxV: 4.9, kind: "suv", col: "#2563eb", stopLines: mainEastStop },
+    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.2, pos: eastRoadX + 26.0, maxV: 4.7, kind: "scooter", col: "#eab308", j: "#1e293b", h: "#f8fafc", stopLines: mainEastStop },
     // Đại lộ chính Nam (Westbound -X)
     { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.75, pos: eastRoadX + 36.0, maxV: 4.9, kind: "police", col: "#1e3a8a", stopLines: mainWestStop },
     { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.75, pos: eastRoadX + 18.0, maxV: 4.9, kind: "taxi", col: "#eab308", stopLines: mainWestStop },
-    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 2.25, pos: 40.0, maxV: 4.5, kind: "scooter", col: "#f8fafc", j: "#15803d", h: "#dc2626", stopLines: mainWestStop },
-    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.75, pos: 26.0, maxV: 4.8, kind: "sedan", col: "#3b82f6", stopLines: mainWestStop },
-    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.25, pos: 14.0, maxV: 4.6, kind: "moto", col: "#1e3a8a", j: "#c2410c", h: "#facc15", stopLines: mainWestStop },
-    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.75, pos: -2.0, maxV: 4.9, kind: "sports", col: "#0f172a", stopLines: mainWestStop },
-    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.75, pos: -24.0, maxV: 5.0, kind: "hatchback", col: "#0284c7", stopLines: mainWestStop },
-    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.25, pos: -46.0, maxV: 4.5, kind: "scooter", col: "#18181b", j: "#6d28d9", h: "#e2e8f0", stopLines: mainWestStop },
+    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 2.25, pos: 40.0, maxV: 4.5, kind: "scooter", col: "#06b6d4", j: "#15803d", h: "#dc2626", stopLines: mainWestStop },
+    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.75, pos: 26.0, maxV: 4.8, kind: "sedan", col: "#1d4ed8", stopLines: mainWestStop },
+    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.25, pos: 14.0, maxV: 4.6, kind: "moto", col: "#e11d48", j: "#c2410c", h: "#f8fafc", stopLines: mainWestStop },
+    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.75, pos: -2.0, maxV: 4.9, kind: "ferrari", col: "#eab308", stopLines: mainWestStop },
+    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.75, pos: -24.0, maxV: 5.0, kind: "hatchback", col: "#ea580c", stopLines: mainWestStop },
+    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.25, pos: -46.0, maxV: 4.5, kind: "scooter", col: "#7c3aed", j: "#6d28d9", h: "#e2e8f0", stopLines: mainWestStop },
     // Đại lộ phía Bắc (sau lưng văn phòng, chạy suốt tuyến)
-    { axis: "x", sigAxis: "ew", dir: 1, lane: northRoadZ + 1.55, pos: -32.0, maxV: 4.8, kind: "sedan_classic", col: "#cbd5e1", stopLines: northEastStop },
+    { axis: "x", sigAxis: "ew", dir: 1, lane: northRoadZ + 1.55, pos: -32.0, maxV: 4.8, kind: "sedan", col: "#0f766e", stopLines: northEastStop },
     { axis: "x", sigAxis: "ew", dir: 1, lane: northRoadZ + 1.55, pos: 14.0, maxV: 4.7, kind: "moto", col: "#0284c7", j: "#0f172a", h: "#f8fafc", stopLines: northEastStop },
     { axis: "x", sigAxis: "ew", dir: 1, lane: northRoadZ + 1.55, pos: eastRoadX + 18.0, maxV: 4.9, kind: "rancher", col: "#1d4ed8", stopLines: northEastStop },
-    { axis: "x", sigAxis: "ew", dir: -1, lane: northRoadZ - 1.55, pos: eastRoadX + 24.0, maxV: 4.5, kind: "delivery", col: "#0f766e", stopLines: northWestStop },
-    { axis: "x", sigAxis: "ew", dir: -1, lane: northRoadZ - 1.55, pos: 22.0, maxV: 4.6, kind: "scooter", col: "#b91c1c", j: "#1e293b", h: "#facc15", stopLines: northWestStop },
+    { axis: "x", sigAxis: "ew", dir: -1, lane: northRoadZ - 1.55, pos: eastRoadX + 24.0, maxV: 4.5, kind: "delivery", col: "#15803d", stopLines: northWestStop },
+    { axis: "x", sigAxis: "ew", dir: -1, lane: northRoadZ - 1.55, pos: 22.0, maxV: 4.6, kind: "scooter", col: "#f97316", j: "#1e293b", h: "#facc15", stopLines: northWestStop },
     { axis: "x", sigAxis: "ew", dir: -1, lane: northRoadZ - 1.55, pos: -26.0, maxV: 4.8, kind: "taxi", col: "#eab308", stopLines: northWestStop },
     // Đại lộ nhánh Tây (Bắc-Nam)
     { axis: "z", sigAxis: "ns", dir: 1, lane: westRoadX - 1.65, pos: -34.0, maxV: 4.8, kind: "car", col: "#f8fafc", stopLines: nsSouthStop },
     { axis: "z", sigAxis: "ns", dir: 1, lane: westRoadX - 1.2, pos: 6.0, maxV: 4.5, kind: "moto", col: "#dc2626", j: "#1d4ed8", h: "#f8fafc", stopLines: nsSouthStop },
     { axis: "z", sigAxis: "ns", dir: 1, lane: westRoadX - 1.65, pos: mainRoadZ + 18.0, maxV: 4.9, kind: "pickup", col: "#0284c7", stopLines: nsSouthStop },
-    { axis: "z", sigAxis: "ns", dir: -1, lane: westRoadX + 1.65, pos: mainRoadZ + 28.0, maxV: 4.8, kind: "sedan", col: "#334155", stopLines: nsNorthStop },
-    { axis: "z", sigAxis: "ns", dir: -1, lane: westRoadX + 1.2, pos: 14.0, maxV: 4.4, kind: "scooter", col: "#0f766e", j: "#c2410c", h: "#f8fafc", stopLines: nsNorthStop },
+    { axis: "z", sigAxis: "ns", dir: -1, lane: westRoadX + 1.65, pos: mainRoadZ + 28.0, maxV: 4.8, kind: "sedan", col: "#be123c", stopLines: nsNorthStop },
+    { axis: "z", sigAxis: "ns", dir: -1, lane: westRoadX + 1.2, pos: 14.0, maxV: 4.4, kind: "scooter", col: "#10b981", j: "#c2410c", h: "#f8fafc", stopLines: nsNorthStop },
     { axis: "z", sigAxis: "ns", dir: -1, lane: westRoadX + 1.65, pos: -24.0, maxV: 4.9, kind: "sports", col: "#b91c1c", stopLines: nsNorthStop },
     // Đại lộ nhánh Đông (Bắc-Nam)
-    { axis: "z", sigAxis: "ns", dir: 1, lane: eastRoadX - 1.65, pos: -28.0, maxV: 4.3, kind: "bus", col: "#0369a1", stopLines: nsSouthStop },
-    { axis: "z", sigAxis: "ns", dir: 1, lane: eastRoadX - 1.2, pos: 9.0, maxV: 4.5, kind: "moto", col: "#1e3a8a", j: "#334155", h: "#facc15", stopLines: nsSouthStop },
-    { axis: "z", sigAxis: "ns", dir: 1, lane: eastRoadX - 1.65, pos: mainRoadZ + 20.0, maxV: 4.7, kind: "van", col: "#15803d", stopLines: nsSouthStop },
-    { axis: "z", sigAxis: "ns", dir: -1, lane: eastRoadX + 1.65, pos: mainRoadZ + 32.0, maxV: 4.8, kind: "rancher", col: "#f1f5f9", stopLines: nsNorthStop },
-    { axis: "z", sigAxis: "ns", dir: -1, lane: eastRoadX + 1.2, pos: 17.0, maxV: 4.4, kind: "scooter", col: "#ea580c", j: "#1d4ed8", h: "#f8fafc", stopLines: nsNorthStop },
+    { axis: "z", sigAxis: "ns", dir: 1, lane: eastRoadX - 1.65, pos: -28.0, maxV: 4.3, kind: "bus", col: "#0284c7", stopLines: nsSouthStop },
+    { axis: "z", sigAxis: "ns", dir: 1, lane: eastRoadX - 1.2, pos: 9.0, maxV: 4.5, kind: "moto", col: "#2563eb", j: "#334155", h: "#facc15", stopLines: nsSouthStop },
+    { axis: "z", sigAxis: "ns", dir: 1, lane: eastRoadX - 1.65, pos: mainRoadZ + 20.0, maxV: 4.7, kind: "suv", col: "#15803d", stopLines: nsSouthStop },
+    { axis: "z", sigAxis: "ns", dir: -1, lane: eastRoadX + 1.65, pos: mainRoadZ + 32.0, maxV: 4.8, kind: "suv", col: "#d97706", stopLines: nsNorthStop },
+    { axis: "z", sigAxis: "ns", dir: -1, lane: eastRoadX + 1.2, pos: 17.0, maxV: 4.4, kind: "scooter", col: "#ec4899", j: "#1d4ed8", h: "#f8fafc", stopLines: nsNorthStop },
     { axis: "z", sigAxis: "ns", dir: -1, lane: eastRoadX + 1.65, pos: -22.0, maxV: 4.8, kind: "sedan_classic", col: "#0284c7", stopLines: nsNorthStop },
   ];
 

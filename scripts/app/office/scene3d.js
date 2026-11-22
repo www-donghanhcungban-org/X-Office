@@ -572,6 +572,52 @@ function buildBuilding(THREE, sceneAssets, mats, plan, th) {
   const doorGlass = mats.physical("#38bdf8", { roughness: 0.08, clearcoat: 1, emissive: "#0ea5e9", emissiveIntensity: 0.25 });
   addBox(THREE, group, g.unitBox, doorGlass, 4.05, 1.25, D + 0.11, 1.75, 2.45, 0.06, false, false);
   addBox(THREE, group, g.unitBox, doorGlass, 5.95, 1.25, D + 0.11, 1.75, 2.45, 0.06, false, false);
+
+  // Bảng tên kiến trúc cỡ lớn gắn vương miện mặt tiền & mặt hông tháp toà nhà: "ĐỒNG HÀNH CÙNG BẠN · www.donghanhcungban.org"
+  const topY = levels * levelH;
+  const crownDark = mats.standard("#0b1526", { roughness: 0.24, metalness: 0.78 });
+  const crownGold = mats.standard("#e0b65a", { roughness: 0.22, metalness: 0.88 });
+  const crownLed = mats.standard("#fef08a", { roughness: 0.12, emissive: "#fde047", emissiveIntensity: 1.45 });
+  const towerSignMat = mats.standard("#ffffff", {
+    roughness: 0.2,
+    metalness: 0.1,
+    tex: "brandSign:tower",
+    emissive: "#ffffff",
+    emissiveMap: true,
+    emissiveIntensity: 0.56,
+  });
+
+  // 1. Bảng lớn mặt chính phía Nam (20.6m × 4.4m) kèm phào vàng kim, trụ đứng & dải LED hắt sáng
+  const fY = Math.max(6.2, topY - 2.35);
+  const fW = Math.min(20.6, W * 0.5);
+  const fH = 4.35;
+  addBox(THREE, group, g.unitBox, crownDark, W / 2, fY, D + 0.28, fW + 0.8, fH + 0.65, 0.42, true, true);
+  addBox(THREE, group, g.unitBox, crownGold, W / 2, fY + fH / 2 + 0.36, D + 0.34, fW + 1.35, 0.16, 0.56, false, false);
+  addBox(THREE, group, g.unitBox, crownGold, W / 2, fY - fH / 2 - 0.36, D + 0.34, fW + 1.15, 0.14, 0.5, false, false);
+  addBox(THREE, group, g.unitBox, crownLed, W / 2, fY + fH / 2 + 0.25, D + 0.52, fW + 0.4, 0.06, 0.06, false, false);
+  addBox(THREE, group, g.unitBox, crownLed, W / 2, fY - fH / 2 - 0.25, D + 0.52, fW + 0.4, 0.06, 0.06, false, false);
+  for (const sx of [-1, 1]) {
+    addBox(THREE, group, g.unitBox, crownGold, W / 2 + sx * (fW / 2 + 0.42), fY, D + 0.36, 0.18, fH + 0.92, 0.52, false, false);
+  }
+  const southTowerFace = new THREE.Mesh(g.unitPlane, towerSignMat);
+  southTowerFace.position.set(W / 2, fY, D + 0.505);
+  southTowerFace.scale.set(fW, fH, 1);
+  group.add(southTowerFace);
+
+  // 2. Bảng lớn mặt hông phía Đông (13.4m × 3.2m) hướng ra đại lộ Đông & góc nhìn Toàn cảnh
+  const eW = Math.min(13.4, D * 0.64);
+  const eH = 3.15;
+  addBox(THREE, group, g.unitBox, crownDark, W + 0.26, fY, D / 2, 0.4, eH + 0.54, eW + 0.72, true, true);
+  addBox(THREE, group, g.unitBox, crownGold, W + 0.32, fY + eH / 2 + 0.3, D / 2, 0.52, 0.14, eW + 1.1, false, false);
+  addBox(THREE, group, g.unitBox, crownGold, W + 0.32, fY - eH / 2 - 0.3, D / 2, 0.5, 0.12, eW + 0.96, false, false);
+  addBox(THREE, group, g.unitBox, crownLed, W + 0.48, fY + eH / 2 + 0.2, D / 2, 0.06, 0.055, eW + 0.3, false, false);
+  addBox(THREE, group, g.unitBox, crownLed, W + 0.48, fY - eH / 2 - 0.2, D / 2, 0.06, 0.055, eW + 0.3, false, false);
+  const eastTowerFace = new THREE.Mesh(g.unitPlane, towerSignMat);
+  eastTowerFace.position.set(W + 0.475, fY, D / 2);
+  eastTowerFace.rotation.y = Math.PI / 2;
+  eastTowerFace.scale.set(eW, eH, 1);
+  group.add(eastTowerFace);
+
   return group;
 }
 
@@ -651,6 +697,42 @@ function buildArchitecture(THREE, sceneAssets, mats, hdAssets, plan, th, cutaway
   addBox(THREE, cutaway.back, g.unitBox, wallMat, W / 2, H / 2, -0.15, W, H, 0.3, true, true);
   addBox(THREE, cutaway.back, g.unitBox, trimMat, W / 2, 0.09, 0.025, W, 0.18, 0.05, false, true);
   addBox(THREE, cutaway.back, g.unitBox, crownMat, W / 2, H - 0.06, 0.025, W, 0.12, 0.05, false, false);
+
+  // Vương miện bảng tên lớn trên đỉnh nóc tháp (chỉ dựng cho toà nhà Tập đoàn / Công ty, 2 mặt phát sáng)
+  if (plan.levels || W >= 30) {
+    const rDark = mats.standard("#0b1526", { roughness: 0.24, metalness: 0.78 });
+    const rGold = mats.standard("#e0b65a", { roughness: 0.22, metalness: 0.88 });
+    const rLed = mats.standard("#fef08a", { roughness: 0.12, emissive: "#fde047", emissiveIntensity: 1.5 });
+    const rFaceMat = mats.standard("#ffffff", {
+      roughness: 0.2,
+      metalness: 0.1,
+      tex: "brandSign:tower",
+      emissive: "#ffffff",
+      emissiveMap: true,
+      emissiveIntensity: 0.58,
+    });
+    const rW = Math.min(18.0, W * 0.44);
+    const rH = 3.55;
+    const rY = H + 2.35;
+    // Hai trụ khung vương miện đỡ bảng đỉnh tháp
+    for (const sx of [-1, 1]) {
+      addBox(THREE, cutaway.back, g.unitBox, rDark, W / 2 + sx * (rW * 0.36), H + 0.55, -0.15, 0.42, 1.1, 0.42, false, false);
+      addBox(THREE, cutaway.back, g.unitBox, rGold, W / 2 + sx * (rW / 2 + 0.36), rY, -0.15, 0.22, rH + 0.72, 0.54, false, false);
+    }
+    addBox(THREE, cutaway.back, g.unitBox, rDark, W / 2, rY, -0.15, rW + 0.64, rH + 0.52, 0.44, false, false);
+    addBox(THREE, cutaway.back, g.unitBox, rGold, W / 2, rY + rH / 2 + 0.32, -0.15, rW + 1.25, 0.18, 0.6, false, false);
+    addBox(THREE, cutaway.back, g.unitBox, rGold, W / 2, rY - rH / 2 - 0.32, -0.15, rW + 1.05, 0.15, 0.54, false, false);
+    addBox(THREE, cutaway.back, g.unitBox, rLed, W / 2, rY + rH / 2 + 0.2, 0.1, rW + 0.3, 0.06, 0.06, false, false);
+    addBox(THREE, cutaway.back, g.unitBox, rLed, W / 2, rY - rH / 2 - 0.2, 0.1, rW + 0.3, 0.06, 0.06, false, false);
+    const roofFront = new THREE.Mesh(g.unitPlane, rFaceMat);
+    roofFront.position.set(W / 2, rY, 0.085);
+    roofFront.scale.set(rW, rH, 1);
+    const roofBack = new THREE.Mesh(g.unitPlane, rFaceMat);
+    roofBack.position.set(W / 2, rY, -0.385);
+    roofBack.rotation.y = Math.PI;
+    roofBack.scale.set(rW, rH, 1);
+    cutaway.back.add(roofFront, roofBack);
+  }
 
   // Cửa sổ kính khung nhôm có quang cảnh ngoài trời
   const frameMat = mats.standard(th.edge ? th.trim : "#334155", { roughness: 0.3, metalness: 0.72, emissive: th.edge || null, emissiveIntensity: 0.4 });
