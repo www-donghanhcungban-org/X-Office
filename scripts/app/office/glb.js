@@ -224,11 +224,13 @@ export async function parseGLB(THREE, arrayBuffer) {
     for (const j of sk.joints || []) jointIndices.add(j);
   }
 
-  // Tạo node cây
+  // Tạo node cây (giữ nguyên tên chuẩn của bộ xương để AnimationClip ngoài khớp trực tiếp, chỉ gắn hậu tố khi trùng)
+  const usedNames = new Set();
   const nodeObjs = (json.nodes || []).map((n, idx) => {
     const obj = jointIndices.has(idx) ? new THREE.Bone() : new THREE.Group();
-    const safe = (n.name || "node").replace(/[.\[\]:/\\]/g, "_");
-    obj.name = `${safe}_${idx}`;
+    const safe = (n.name || `node_${idx}`).replace(/[.\[\]:/\\]/g, "_");
+    obj.name = usedNames.has(safe) ? `${safe}_${idx}` : safe;
+    usedNames.add(obj.name);
     obj.userData.glbNodeIdx = idx;
     if (n.matrix) {
       const m = new THREE.Matrix4().fromArray(n.matrix);
@@ -429,6 +431,33 @@ export function instantiateGLB(THREE, parsed, opts = {}) {
   }
 
   return { group: wrapper, root, mixer, action };
+}
+
+// Nạp & retarget AnimationClip từ file .glb chuyển động ngoài lên cây xương đích (tự lọc bone không tồn tại & khử dịch chuyển root)
+export function bindAnimationClip(THREE, parsedAnim, targetRoot, opts = {}) {
+  const srcClip = parsedAnim && parsedAnim.animations && parsedAnim.animations[opts.clipIndex || 0];
+  if (!srcClip || !srcClip.tracks || !targetRoot) return null;
+  const valid = new Set();
+  targetRoot.traverse((o) => { if (o.name) valid.add(o.name); });
+  const tracks = [];
+  for (const tr of srcClip.tracks) {
+    const dot = tr.name.lastIndexOf(".");
+    if (dot <= 0) continue;
+    const nodeName = tr.name.slice(0, dot);
+    const prop = tr.name.slice(dot + 1);
+    if (!valid.has(nodeName)) continue;
+    const next = tr.clone();
+    if (opts.inPlace !== false && prop === "position" && nodeName.toLowerCase().includes("hip")) {
+      const z0 = next.values[2] || 0;
+      const x0 = next.values[0] || 0;
+      for (let i = 0; i < next.values.length; i += 3) {
+        if (opts.lockX) next.values[i] = x0;
+        next.values[i + 2] = z0;
+      }
+    }
+    tracks.push(next);
+  }
+  return tracks.length ? new THREE.AnimationClip(opts.name || srcClip.name, srcClip.duration, tracks) : null;
 }
 
 export function createHDAssetManager(THREE, onReady) {

@@ -1,5 +1,6 @@
-// Nhân vật 3D điêu khắc + ghế công thái học + khớp chuyển động theo trạng thái agent (Three.js PBR).
-// Hệ toạ độ cục bộ: gốc (0, 0, 0) là mặt sàn tâm ghế, nhân vật quay mặt về hướng -z (phía bàn & màn hình).
+// Nhân vật 3D điêu khắc + nhân vật xương Ready Player Me HD chuyển động thật + ghế công thái học (Three.js PBR).
+// Hệ toạ độ cục bộ: gốc (0, 0, 0) là mặt sàn, nhân vật luôn quay mặt về hướng -z.
+import { instantiateGLB, bindAnimationClip } from "./glb.js";
 
 const SKIN = ["#eab68e", "#dca072", "#c88656", "#e4ae84", "#b57449", "#e0a97b", "#9c623d"];
 const HAIR = ["#1f1510", "#4e2e1c", "#111827", "#8d5524", "#3b3f46", "#6b2d18", "#2c1d13"];
@@ -873,5 +874,127 @@ export function animateWalkerRig(w, t, motion) {
     w.head.rotation.set(Math.sin(t * 1.4 + i) * 0.05, Math.sin(t * 0.8 + i * 2) * 0.2, 0);
     w.leftArm.rotation.x = 0.12 + Math.sin(t * 2.1 + i) * 0.12;
     w.rightArm.rotation.x = w.holdCup ? 0.68 + Math.sin(t * 1.2 + i) * 0.08 : 0.14 - Math.sin(t * 1.8 + i) * 0.1;
+  }
+}
+
+// ---------------------------------------------------------------- Nhân vật 3D HD Ready Player Me + Motion Capture (tự quay mặt hướng -Z)
+const HD_SHADOW_GEO = { geo: null };
+
+export function buildHDHuman(THREE, hdAssets, mats, opts = {}) {
+  if (!hdAssets) return null;
+  const variant = opts.variant || ((opts.index || 0) % 2 === 0 ? "rpm_a" : "rpm_b");
+  const parsed = hdAssets.get(variant === "rpm_b" ? "human_rpm_b" : "human_rpm_a")
+    || hdAssets.get("human_rpm_a")
+    || hdAssets.get("human_rpm_b");
+  if (!parsed) return null;
+
+  const inst = instantiateGLB(THREE, parsed, { targetHeight: opts.height || 1.74, rotY: Math.PI });
+  if (opts.topColor || opts.bottomColor) {
+    inst.root.traverse((o) => {
+      if (!o.isMesh || !o.material) return;
+      const mn = o.material.name || "";
+      if (mn === "Wolf3D_Outfit_Top" && opts.topColor) {
+        const m = o.material.clone();
+        m.color.set(opts.topColor);
+        if (variant === "rpm_a") m.map = null;
+        m.needsUpdate = true;
+        mats.own(m);
+        o.material = m;
+      } else if (mn === "Wolf3D_Outfit_Bottom" && opts.bottomColor) {
+        const m = o.material.clone();
+        m.color.set(opts.bottomColor);
+        if (variant === "rpm_a") m.map = null;
+        m.needsUpdate = true;
+        mats.own(m);
+        o.material = m;
+      }
+    });
+  }
+
+  if (!HD_SHADOW_GEO.geo) HD_SHADOW_GEO.geo = new THREE.PlaneGeometry(0.95, 0.95);
+  const sh = new THREE.Mesh(HD_SHADOW_GEO.geo, mats.shadow());
+  sh.rotation.x = -Math.PI / 2;
+  sh.position.y = 0.016;
+  inst.group.add(sh);
+
+  const mixer = new THREE.AnimationMixer(inst.root);
+  const actions = {};
+  const clips = {
+    walk: hdAssets.get(opts.femaleWalk ? "anim_walk_f" : "anim_walk_m") || hdAssets.get("anim_walk_m"),
+    idle: hdAssets.get("anim_idle_m"),
+    talk: hdAssets.get("anim_talk"),
+  };
+  for (const [k, cp] of Object.entries(clips)) {
+    const clip = cp ? bindAnimationClip(THREE, cp, inst.root, { inPlace: true, name: `hd_${k}` }) : null;
+    if (clip) actions[k] = mixer.clipAction(clip);
+  }
+  const initKey = actions[opts.mode || "idle"] ? (opts.mode || "idle") : (actions.idle ? "idle" : Object.keys(actions)[0]);
+  if (initKey && actions[initKey]) {
+    actions[initKey].play();
+    mixer.setTime((opts.phase || ((opts.index || 0) * 0.73)) % 2.4);
+  }
+
+  inst.group.position.set(opts.x || 0, 0, opts.z || 0);
+  if (opts.rotY) inst.group.rotation.y = opts.rotY;
+
+  return {
+    root: inst.group,
+    isHD: true,
+    mixer,
+    actions,
+    curMode: initKey || "",
+    path: opts.path || null,
+    speed: opts.speed || 0.78,
+    index: opts.index || 0,
+  };
+}
+
+export function setHDHumanMode(h, mode) {
+  if (!h || !h.actions) return;
+  const nextKey = h.actions[mode] ? mode : (h.actions.idle ? "idle" : Object.keys(h.actions)[0]);
+  if (!nextKey || nextKey === h.curMode) return;
+  const prev = h.curMode ? h.actions[h.curMode] : null;
+  const next = h.actions[nextKey];
+  if (prev) prev.fadeOut(0.18);
+  next.reset().fadeIn(0.18).play();
+  h.curMode = nextKey;
+}
+
+export function animateHDHuman(h, t, dt, motion, modeOverride) {
+  if (!h || !h.mixer) return;
+  if (!motion) {
+    setHDHumanMode(h, modeOverride || "idle");
+    h.mixer.update(0);
+    return;
+  }
+  if (h.path && h.path.length >= 2) {
+    const segs = h.path.length;
+    let total = 0;
+    const lens = [];
+    for (let k = 0; k < segs; k++) {
+      const a = h.path[k], b = h.path[(k + 1) % segs];
+      const d = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      lens.push(d);
+      total += d;
+    }
+    let dist = (t * h.speed + h.index * 3.1) % total;
+    let seg = 0;
+    while (seg < segs - 1 && dist > lens[seg]) {
+      dist -= lens[seg];
+      seg++;
+    }
+    const a = h.path[seg], b = h.path[(seg + 1) % segs];
+    const u = lens[seg] > 1e-4 ? dist / lens[seg] : 0;
+    h.root.position.set(a[0] + (b[0] - a[0]) * u, 0, a[1] + (b[1] - a[1]) * u);
+    const targetYaw = Math.atan2(-(b[0] - a[0]), -(b[1] - a[1]));
+    let diff = targetYaw - h.root.rotation.y;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    h.root.rotation.y += diff * 0.18;
+    setHDHumanMode(h, "walk");
+    h.mixer.update(dt * (h.speed / 0.85));
+  } else {
+    setHDHumanMode(h, modeOverride || h.curMode || "idle");
+    h.mixer.update(dt);
   }
 }
