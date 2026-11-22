@@ -67,6 +67,31 @@ function pushOutCircle(cx, cz, r, tx, tz, tr, fallbackAngle) {
   return [cx + Math.cos(fallbackAngle) * minD, cz + Math.sin(fallbackAngle) * minD];
 }
 
+function distToAABB(px, pz, b) {
+  const qx = Math.max(b.minX, Math.min(b.maxX, px));
+  const qz = Math.max(b.minZ, Math.min(b.maxZ, pz));
+  const dx = px - qx;
+  const dz = pz - qz;
+  const d = Math.hypot(dx, dz);
+  if (d > 1e-6) return d;
+  return -Math.min(px - b.minX, b.maxX - px, pz - b.minZ, b.maxZ - pz);
+}
+
+function distToOBB(px, pz, o) {
+  const vx = px - o.cx;
+  const vz = pz - o.cz;
+  const lx = vx * o.c - vz * o.s;
+  const lz = vx * o.s + vz * o.c;
+  const qlx = Math.max(-o.hl, Math.min(o.hl, lx));
+  const qlz = Math.max(-o.hw, Math.min(o.hw, lz));
+  const d = Math.hypot(lx - qlx, lz - qlz);
+  if (d > 1e-6) return d;
+  return -Math.min(o.hl - Math.abs(lx), o.hw - Math.abs(lz));
+}
+
+const FAN_ANGLES = [0, 0.34, -0.34, 0.7, -0.7, 1.08, -1.08, 1.48, -1.48, 1.92, -1.92, 2.42, -2.42];
+const FAN_PROBES = [0.5, 1.05, 1.72];
+
 export function createWorldPhysics() {
   const layers = {
     outdoor: { boxes: [], obbs: [], circles: [], humans: new Map() },
@@ -187,63 +212,99 @@ export function createWorldPhysics() {
       return { x: px, z: pz, collided };
     },
 
-    steerAround(layer, x, z, dirX, dirZ, r = 0.36, ignoreId = null) {
+    clearanceAt(layer, qx, qz, r = 0.36, ignoreId = null) {
+      const L = layerOf(layer);
+      let minC = 99;
+      for (let i = 0; i < L.boxes.length; i++) {
+        const c = distToAABB(qx, qz, L.boxes[i]) - r;
+        if (c < minC) minC = c;
+        if (minC < -0.5) return minC;
+      }
+      for (let i = 0; i < L.obbs.length; i++) {
+        const c = distToOBB(qx, qz, L.obbs[i]) - r;
+        if (c < minC) minC = c;
+      }
+      for (let i = 0; i < L.circles.length; i++) {
+        const ci = L.circles[i];
+        const c = Math.hypot(qx - ci.x, qz - ci.z) - (r + ci.r);
+        if (c < minC) minC = c;
+      }
+      for (const h of L.humans.values()) {
+        if (h.id === ignoreId) continue;
+        const c = Math.hypot(qx - h.x, qz - h.z) - (r + h.r + 0.08);
+        if (c < minC) minC = c;
+      }
+      if (layer === "outdoor") {
+        for (const v of vehicles.values()) {
+          const c = distToAABB(qx, qz, {
+            minX: v.x - v.halfX - 0.16,
+            minZ: v.z - v.halfZ - 0.16,
+            maxX: v.x + v.halfX + 0.16,
+            maxZ: v.z + v.halfZ + 0.16,
+          }) - r;
+          if (c < minC) minC = c;
+        }
+      }
+      return minC;
+    },
+
+    steerAround(layer, x, z, dirX, dirZ, r = 0.36, ignoreId = null, prefSide = 0) {
       const len = Math.hypot(dirX, dirZ);
-      if (len < 1e-5) return { dx: 0, dz: 0 };
+      if (len < 1e-5) return { dx: 0, dz: 0, side: 0, clear: true };
       const fx = dirX / len;
       const fz = dirZ / len;
       const rx = -fz;
       const rz = fx;
-      let sx = fx;
-      let sz = fz;
-      const L = layerOf(layer);
+      const self = this;
 
-      const avoidPoint = (ox, oz, orad, reach, strength, preferRight) => {
-        const vx = ox - x;
-        const vz = oz - z;
-        const fwd = vx * fx + vz * fz;
-        const side = vx * rx + vz * rz;
-        const margin = r + orad + 0.48;
-        if (fwd > -0.15 && fwd < reach && Math.abs(side) < margin) {
-          const sign = Math.abs(side) <= 0.08 ? (preferRight ? 1 : -1) : (side > 0 ? -1 : 1);
-          const w = ((reach - Math.max(0, fwd)) / reach) * ((margin - Math.abs(side)) / margin) * strength;
-          sx += rx * sign * w;
-          sz += rz * sign * w;
+      // Nhanh: kiểm tra hướng đi thẳng trước — nếu hành lang hoàn toàn thông thoáng thì đi thẳng mượt mà
+      let straightClear = 99;
+      for (let p = 0; p < FAN_PROBES.length; p++) {
+        const d = FAN_PROBES[p];
+        const c = self.clearanceAt(layer, x + fx * d, z + fz * d, r, ignoreId);
+        if (c < straightClear) straightClear = c;
+      }
+      if (straightClear > 0.16) {
+        return { dx: fx, dz: fz, side: 0, clear: true };
+      }
+
+      // Quét quạt 13 tia tránh chướng ngại vật (ưu tiên hướng đã chọn `prefSide` để tuyệt đối không giật lắc trái-phải)
+      let bestScore = -1e9;
+      let bestDx = fx;
+      let bestDz = fz;
+      let bestSide = prefSide;
+
+      for (let i = 0; i < FAN_ANGLES.length; i++) {
+        const ang = FAN_ANGLES[i];
+        const ca = Math.cos(ang);
+        const sa = Math.sin(ang);
+        const cx = fx * ca + rx * sa;
+        const cz = fz * ca + rz * sa;
+        const side = ang > 0.01 ? 1 : (ang < -0.01 ? -1 : 0);
+
+        let minC = 99;
+        let nearC = 99;
+        for (let p = 0; p < FAN_PROBES.length; p++) {
+          const d = FAN_PROBES[p];
+          const c = self.clearanceAt(layer, x + cx * d, z + cz * d, r, ignoreId);
+          if (c < minC) minC = c;
+          if (p === 0) nearC = c;
         }
-      };
+        const clearTerm = Math.min(0.65, minC) * 3.4 + (minC > 0.05 ? 1.25 : 0) + (nearC > 0.04 ? 0.55 : -0.8);
+        const anglePenalty = Math.abs(ang) * 0.62;
+        const commitBonus = prefSide !== 0 && side === prefSide ? 0.42 : 0;
+        const rightBias = side === 1 ? 0.06 : 0;
+        const score = clearTerm - anglePenalty + commitBonus + rightBias;
 
-      for (const c of L.circles) avoidPoint(c.x, c.z, c.r, 1.9, 1.8, false);
-      for (const h of L.humans.values()) {
-        if (h.id === ignoreId) continue;
-        // Hai người gặp nhau đối diện đều ưu tiên né sang phải để lướt qua mượt mà
-        avoidPoint(h.x, h.z, h.r, 2.25, 2.1, true);
-      }
-      if (layer === "outdoor") {
-        for (const o of L.obbs) avoidPoint(o.cx, o.cz, Math.max(o.hl, o.hw) * 0.72, 2.3, 1.6, false);
-        for (const v of vehicles.values()) avoidPoint(v.x, v.z, Math.max(v.halfX, v.halfZ) * 0.75, 2.6, 2.2, false);
-      }
-
-      // Kiểm tra điểm dò phía trước trước khối hộp tĩnh (tường, bàn, bồn hoa)
-      for (const probeDist of [0.85, 1.55]) {
-        const qx = x + fx * probeDist;
-        const qz = z + fz * probeDist;
-        for (const b of L.boxes) {
-          const hit = pushOutAABB(qx, qz, r + 0.14, b, 1);
-          if (hit) {
-            const pushX = hit[0] - qx;
-            const pushZ = hit[1] - qz;
-            const sideProj = pushX * rx + pushZ * rz;
-            const nudge = Math.abs(sideProj) > 0.02 ? Math.sign(sideProj) : 1;
-            sx += rx * nudge * 1.45;
-            sz += rz * nudge * 1.45;
-            break;
-          }
+        if (score > bestScore) {
+          bestScore = score;
+          bestDx = cx;
+          bestDz = cz;
+          bestSide = side !== 0 ? side : prefSide;
         }
       }
 
-      const outLen = Math.hypot(sx, sz);
-      if (outLen < 1e-5) return { dx: fx, dz: fz };
-      return { dx: sx / outLen, dz: sz / outLen };
+      return { dx: bestDx, dz: bestDz, side: bestSide, clear: false };
     },
 
     isCrossingSafe(fromX, fromZ, toX, toZ) {

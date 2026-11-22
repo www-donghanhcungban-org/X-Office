@@ -56,6 +56,7 @@ const RECOLOR_MODES = {
   veh_moto: "moto",
 };
 const _recolorTexCache = new WeakMap();
+const _vehPhysMatCache = new WeakMap();
 
 function recolorVehicleTexture(THREE, srcTex, hexColor, mode) {
   if (!srcTex || !srcTex.image || !hexColor || !mode || typeof document === "undefined") return srcTex;
@@ -199,10 +200,10 @@ export function upgradeVehicleGLB(THREE, natureAssets, mats, hdAssets, key, opts
   let hasTailMesh = false;
   let hasHeadMesh = false;
   let hasTexturedBody = false;
-  const physCache = new Map();
   inst.group.traverse((o) => {
     if (!o.isMesh) return;
-    o.castShadow = true;
+    // Xe đa giác cao 24k–67k tam giác đã có đĩa bóng tiếp đất mượt; không đổ bóng 2 lượt vào shadow map 2048px để giữ 60 FPS
+    o.castShadow = false;
     o.receiveShadow = true;
     const srcMat = o.material;
     const mn = (srcMat && srcMat.name) || "";
@@ -228,10 +229,16 @@ export function upgradeVehicleGLB(THREE, natureAssets, mats, hdAssets, key, opts
       o.material = paintMat;
     } else if (srcMat && srcMat.map) {
       hasTexturedBody = true;
-      // Bảo toàn toàn bộ texture PBR 2K (lưới tản nhiệt, logo, đèn, la-zăng), đổi màu sơn thân xe sắc nét & phủ bóng clearcoat
-      if (!physCache.has(srcMat)) {
-        const isGlass = Boolean(srcMat.transparent) && srcMat.alphaTest === 0;
-        const recolorMode = !isGlass ? RECOLOR_MODES[key] : null;
+      // Dùng chung bộ đệm vật liệu clearcoat theo (srcMat, màu sơn) giữa các xe để giảm draw-state & tăng FPS
+      let byColor = _vehPhysMatCache.get(srcMat);
+      if (!byColor) {
+        byColor = new Map();
+        _vehPhysMatCache.set(srcMat, byColor);
+      }
+      const isGlass = Boolean(srcMat.transparent) && srcMat.alphaTest === 0;
+      const recolorMode = !isGlass ? RECOLOR_MODES[key] : null;
+      const matKey = isGlass ? "__glass" : `${recolorMode || "raw"}|${opts.color || ""}`;
+      if (!byColor.has(matKey)) {
         const paintMap = recolorMode && opts.color
           ? recolorVehicleTexture(THREE, srcMat.map, opts.color, recolorMode)
           : srcMat.map;
@@ -251,9 +258,9 @@ export function upgradeVehicleGLB(THREE, natureAssets, mats, hdAssets, key, opts
           alphaTest: srcMat.alphaTest || 0,
           side: srcMat.side !== undefined ? srcMat.side : THREE.FrontSide,
         });
-        physCache.set(srcMat, pm);
+        byColor.set(matKey, pm);
       }
-      o.material = physCache.get(srcMat);
+      o.material = byColor.get(matKey);
     }
   });
   root.add(inst.group);
@@ -769,12 +776,12 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
     { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.75, pos: 26.0, maxV: 4.8, kind: "sedan", col: "#1d4ed8", stopLines: mainWestStop },
     { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.25, pos: 14.0, maxV: 4.6, kind: "moto", col: "#e11d48", j: "#c2410c", h: "#f8fafc", stopLines: mainWestStop },
     { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.75, pos: -2.0, maxV: 4.9, kind: "ferrari", col: "#eab308", stopLines: mainWestStop },
-    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.75, pos: -24.0, maxV: 5.0, kind: "hatchback", col: "#ea580c", stopLines: mainWestStop },
+    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.75, pos: -24.0, maxV: 5.0, kind: "car", col: "#0284c7", stopLines: mainWestStop },
     { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.25, pos: -46.0, maxV: 4.5, kind: "scooter", col: "#7c3aed", j: "#6d28d9", h: "#e2e8f0", stopLines: mainWestStop },
     // Đại lộ phía Bắc (sau lưng văn phòng, chạy suốt tuyến)
     { axis: "x", sigAxis: "ew", dir: 1, lane: northRoadZ + 1.55, pos: -32.0, maxV: 4.8, kind: "sedan", col: "#0f766e", stopLines: northEastStop },
     { axis: "x", sigAxis: "ew", dir: 1, lane: northRoadZ + 1.55, pos: 14.0, maxV: 4.7, kind: "moto", col: "#0284c7", j: "#0f172a", h: "#f8fafc", stopLines: northEastStop },
-    { axis: "x", sigAxis: "ew", dir: 1, lane: northRoadZ + 1.55, pos: eastRoadX + 18.0, maxV: 4.9, kind: "rancher", col: "#1d4ed8", stopLines: northEastStop },
+    { axis: "x", sigAxis: "ew", dir: 1, lane: northRoadZ + 1.55, pos: eastRoadX + 18.0, maxV: 4.9, kind: "suv", col: "#7c3aed", stopLines: northEastStop },
     { axis: "x", sigAxis: "ew", dir: -1, lane: northRoadZ - 1.55, pos: eastRoadX + 24.0, maxV: 4.5, kind: "delivery", col: "#15803d", stopLines: northWestStop },
     { axis: "x", sigAxis: "ew", dir: -1, lane: northRoadZ - 1.55, pos: 22.0, maxV: 4.6, kind: "scooter", col: "#f97316", j: "#1e293b", h: "#facc15", stopLines: northWestStop },
     { axis: "x", sigAxis: "ew", dir: -1, lane: northRoadZ - 1.55, pos: -26.0, maxV: 4.8, kind: "taxi", col: "#eab308", stopLines: northWestStop },
@@ -784,14 +791,14 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
     { axis: "z", sigAxis: "ns", dir: 1, lane: westRoadX - 1.65, pos: mainRoadZ + 18.0, maxV: 4.9, kind: "pickup", col: "#0284c7", stopLines: nsSouthStop },
     { axis: "z", sigAxis: "ns", dir: -1, lane: westRoadX + 1.65, pos: mainRoadZ + 28.0, maxV: 4.8, kind: "sedan", col: "#be123c", stopLines: nsNorthStop },
     { axis: "z", sigAxis: "ns", dir: -1, lane: westRoadX + 1.2, pos: 14.0, maxV: 4.4, kind: "scooter", col: "#10b981", j: "#c2410c", h: "#f8fafc", stopLines: nsNorthStop },
-    { axis: "z", sigAxis: "ns", dir: -1, lane: westRoadX + 1.65, pos: -24.0, maxV: 4.9, kind: "sports", col: "#b91c1c", stopLines: nsNorthStop },
+    { axis: "z", sigAxis: "ns", dir: -1, lane: westRoadX + 1.65, pos: -24.0, maxV: 4.9, kind: "ferrari", col: "#2563eb", stopLines: nsNorthStop },
     // Đại lộ nhánh Đông (Bắc-Nam)
     { axis: "z", sigAxis: "ns", dir: 1, lane: eastRoadX - 1.65, pos: -28.0, maxV: 4.3, kind: "bus", col: "#0284c7", stopLines: nsSouthStop },
     { axis: "z", sigAxis: "ns", dir: 1, lane: eastRoadX - 1.2, pos: 9.0, maxV: 4.5, kind: "moto", col: "#2563eb", j: "#334155", h: "#facc15", stopLines: nsSouthStop },
     { axis: "z", sigAxis: "ns", dir: 1, lane: eastRoadX - 1.65, pos: mainRoadZ + 20.0, maxV: 4.7, kind: "suv", col: "#15803d", stopLines: nsSouthStop },
     { axis: "z", sigAxis: "ns", dir: -1, lane: eastRoadX + 1.65, pos: mainRoadZ + 32.0, maxV: 4.8, kind: "suv", col: "#d97706", stopLines: nsNorthStop },
     { axis: "z", sigAxis: "ns", dir: -1, lane: eastRoadX + 1.2, pos: 17.0, maxV: 4.4, kind: "scooter", col: "#ec4899", j: "#1d4ed8", h: "#f8fafc", stopLines: nsNorthStop },
-    { axis: "z", sigAxis: "ns", dir: -1, lane: eastRoadX + 1.65, pos: -22.0, maxV: 4.8, kind: "sedan_classic", col: "#0284c7", stopLines: nsNorthStop },
+    { axis: "z", sigAxis: "ns", dir: -1, lane: eastRoadX + 1.65, pos: -22.0, maxV: 4.8, kind: "sedan", col: "#ea580c", stopLines: nsNorthStop },
   ];
 
   const vehicles = vehicleSpecs.map((s) => {
@@ -826,16 +833,16 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
     };
   });
 
-  // 3. 13 công dân Ready Player Me có lịch trình mục đích rõ ràng (giao hàng, đón xe buýt, cà phê vỉa hè, công viên, dạo liên tuyến phố)
+  // 3. 13 công dân Ready Player Me có lịch trình mục đích rõ ràng (mọi điểm dừng & hành lang đều cách vật cản >= 0.5m)
   const STREET_SHIRTS = ["#2563eb", "#be123c", "#15803d", "#0f766e", "#c2410c", "#6d28d9", "#0369a1", "#b45309", "#1e3a8a"];
   const zN = streetZ + 1.35;
   const zS = streetZ + 10.65;
   const xMainL = 4.35;
   const xMainR = 5.65;
-  const xWW = westRoadX - 4.75;
-  const xWE = westRoadX + 4.25;
-  const xEW = eastRoadX - 4.35;
-  const xEE = eastRoadX + 4.65;
+  const xWW = westRoadX - 5.15;
+  const xWE = westRoadX + 4.75;
+  const xEW = eastRoadX - 4.75;
+  const xEE = eastRoadX + 5.15;
   const zNN = northRoadZ - 4.05;
   const zNS = northRoadZ + 4.0;
   const xPark = 20.6;
@@ -854,14 +861,14 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
   }
 
   const citizensSpec = [
-    // Nhân viên giao hàng ôm kiện carton: từ xe tải đỗ ven đường → qua vạch đèn đỏ → quầy sảnh X-Office → quay về xe
+    // Nhân viên giao hàng ôm kiện carton: từ xe tải đỗ ven đường → qua vạch đèn đỏ → quầy sảnh → quay về xe
     {
       index: 41,
       parcel: true,
       topColor: "#b45309",
       steps: [
-        { act: "wait", pos: [10.6, streetZ + 11.4], yaw: Math.PI, dur: 2.8, mode: "idle" },
-        { act: "walk", from: [10.6, streetZ + 11.4], to: [10.6, zS], speed: 1.25 },
+        { act: "wait", pos: [10.6, streetZ + 10.95], yaw: Math.PI, dur: 2.8, mode: "idle" },
+        { act: "walk", from: [10.6, streetZ + 10.95], to: [10.6, zS], speed: 1.25 },
         { act: "walk", from: [10.6, zS], to: [xMainR, zS], speed: 1.32 },
         { act: "walk", from: [xMainR, zS], to: [xMainR, zN], cross: "ns", speed: 2.35 },
         { act: "walk", from: [xMainR, zN], to: [5.0, streetZ - 0.8], speed: 1.28 },
@@ -869,15 +876,15 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
         { act: "walk", from: [5.0, streetZ - 0.8], to: [xMainL, zN], speed: 1.28 },
         { act: "walk", from: [xMainL, zN], to: [xMainL, zS], cross: "ns", speed: 2.35 },
         { act: "walk", from: [xMainL, zS], to: [10.6, zS], speed: 1.32 },
-        { act: "walk", from: [10.6, zS], to: [10.6, streetZ + 11.4], speed: 1.25 },
+        { act: "walk", from: [10.6, zS], to: [10.6, streetZ + 10.95], speed: 1.25 },
       ],
       initIdx: 3,
     },
-    // Hành khách trạm xe buýt → đợi xe tại nhà chờ (x = 15.8..17.8) → sang đường qua lối đá tới sảnh văn phòng / tiếp tục qua ngã tư Đông
+    // Hành khách trạm xe buýt → đợi xe trước nhà chờ (x = 15.8..17.9, thoáng khỏi vách kính) → sang đường tới sảnh / qua ngã tư Đông
     {
       index: 42,
       steps: [
-        { act: "wait", pos: [15.8, streetZ + 10.95], yaw: 0, dur: 5.0, mode: "idle" },
+        { act: "wait", pos: [15.8, streetZ + 10.68], yaw: 0, dur: 5.0, mode: "idle" },
         { act: "walk", from: [15.8, zS], to: [xMainR, zS], speed: 1.36 },
         { act: "walk", from: [xMainR, zS], to: [xMainR, zN], cross: "ns", speed: 2.35 },
         { act: "walk", from: [xMainR, zN], to: [5.2, streetZ - 0.6], speed: 1.28 },
@@ -892,8 +899,8 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
     {
       index: 43,
       steps: [
-        { act: "wait", pos: [16.9, streetZ + 10.95], yaw: 0.4, dur: 4.5, mode: "talk" },
-        { act: "walk", from: [16.9, zS], to: [xEW, zS], speed: 1.34 },
+        { act: "wait", pos: [16.85, streetZ + 10.68], yaw: 0.4, dur: 4.5, mode: "talk" },
+        { act: "walk", from: [16.85, zS], to: [xEW, zS], speed: 1.34 },
         { act: "walk", from: [xEW, zS], to: [xEE, zS], cross: "ew", speed: 2.35 },
         { act: "walk", from: [xEE, zS], to: [xEE, zN], cross: "ns", speed: 2.35 },
         { act: "walk", from: [xEE, zN], to: [xEE, 17.0], speed: 1.3 },
@@ -901,40 +908,40 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
         { act: "walk", from: [xEE, 17.0], to: [xEE, zN], speed: 1.32 },
         { act: "walk", from: [xEE, zN], to: [xEW, zN], cross: "ew", speed: 2.35 },
         { act: "walk", from: [xEW, zN], to: [xEW, zS], cross: "ns", speed: 2.35 },
-        { act: "walk", from: [xEW, zS], to: [16.9, zS], speed: 1.34 },
+        { act: "walk", from: [xEW, zS], to: [16.85, zS], speed: 1.34 },
       ],
       initIdx: 2,
     },
     {
       index: 44,
       steps: [
-        { act: "wait", pos: [17.9, streetZ + 11.05], yaw: -0.35, dur: 5.2, mode: "talk" },
-        { act: "walk", from: [17.9, zS], to: [xWE, zS], speed: 1.38 },
+        { act: "wait", pos: [17.85, streetZ + 10.68], yaw: -0.35, dur: 5.2, mode: "talk" },
+        { act: "walk", from: [17.85, zS], to: [xWE, zS], speed: 1.38 },
         { act: "walk", from: [xWE, zS], to: [xWW, zS], cross: "ew", speed: 2.35 },
         { act: "walk", from: [xWW, zS], to: [xWW, zN], cross: "ns", speed: 2.35 },
         { act: "walk", from: [xWW, zN], to: [xWE, zN], cross: "ew", speed: 2.35 },
         { act: "walk", from: [xWE, zN], to: [xMainL, zN], speed: 1.36 },
         { act: "walk", from: [xMainL, zN], to: [xMainL, zS], cross: "ns", speed: 2.35 },
-        { act: "walk", from: [xMainL, zS], to: [17.9, zS], speed: 1.35 },
+        { act: "walk", from: [xMainL, zS], to: [17.85, zS], speed: 1.35 },
       ],
       initIdx: 5,
     },
-    // Khách cà phê vỉa hè Tây: gọi đồ trước hiên → ngồi/đứng bàn dù → vòng ra vỉa hè → sang vạch đèn đỏ → dạo tiếp sang Đông
+    // Khách cà phê vỉa hè Tây: gọi đồ trước hiên → đứng cạnh bàn dù (thoáng khỏi tán dù) → sang vạch đèn đỏ → dạo tiếp sang Đông
     {
       index: 45,
       steps: [
-        { act: "wait", pos: [3.2, streetZ + 12.1], yaw: Math.PI, dur: 3.8, mode: "talk" },
-        { act: "walk", from: [3.2, streetZ + 12.1], to: [2.2, streetZ + 12.2], speed: 1.15 },
-        { act: "wait", pos: [2.2, streetZ + 12.2], yaw: Math.PI / 2, dur: 4.8, mode: "idle" },
-        { act: "walk", from: [2.2, streetZ + 12.2], to: [2.2, zS], speed: 1.25 },
-        { act: "walk", from: [2.2, zS], to: [xMainL, zS], speed: 1.25 },
+        { act: "wait", pos: [3.2, streetZ + 11.85], yaw: Math.PI, dur: 3.8, mode: "talk" },
+        { act: "walk", from: [3.2, streetZ + 11.85], to: [2.55, streetZ + 11.85], speed: 1.15 },
+        { act: "wait", pos: [2.55, streetZ + 11.85], yaw: Math.PI / 2, dur: 4.8, mode: "idle" },
+        { act: "walk", from: [2.55, streetZ + 11.85], to: [2.55, zS], speed: 1.25 },
+        { act: "walk", from: [2.55, zS], to: [xMainL, zS], speed: 1.25 },
         { act: "walk", from: [xMainL, zS], to: [xMainL, zN], cross: "ns", speed: 2.35 },
         { act: "walk", from: [xMainL, zN], to: [xEW, zN], speed: 1.38 },
         { act: "walk", from: [xEW, zN], to: [xEE, zN], cross: "ew", speed: 2.35 },
         { act: "walk", from: [xEE, zN], to: [xEE, zS], cross: "ns", speed: 2.35 },
         { act: "walk", from: [xEE, zS], to: [xEW, zS], cross: "ew", speed: 2.35 },
         { act: "walk", from: [xEW, zS], to: [3.2, zS], speed: 1.38 },
-        { act: "walk", from: [3.2, zS], to: [3.2, streetZ + 12.1], speed: 1.15 },
+        { act: "walk", from: [3.2, zS], to: [3.2, streetZ + 11.85], speed: 1.15 },
       ],
       initIdx: 4,
     },
@@ -942,14 +949,16 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
     {
       index: 46,
       steps: [
-        { act: "wait", pos: [28.4, streetZ + 12.1], yaw: Math.PI, dur: 4.2, mode: "talk" },
-        { act: "walk", from: [28.4, streetZ + 12.1], to: [27.9, streetZ + 12.4], speed: 1.1 },
-        { act: "wait", pos: [27.9, streetZ + 12.4], yaw: 0, dur: 4.0, mode: "idle" },
-        { act: "walk", from: [27.9, zS], to: [xMainR, zS], speed: 1.36 },
+        { act: "wait", pos: [28.9, streetZ + 11.85], yaw: Math.PI, dur: 4.2, mode: "talk" },
+        { act: "walk", from: [28.9, streetZ + 11.85], to: [28.4, streetZ + 12.1], speed: 1.1 },
+        { act: "wait", pos: [28.4, streetZ + 12.1], yaw: 0, dur: 4.0, mode: "idle" },
+        { act: "walk", from: [28.4, streetZ + 12.1], to: [28.4, zS], speed: 1.25 },
+        { act: "walk", from: [28.4, zS], to: [xMainR, zS], speed: 1.36 },
         { act: "walk", from: [xMainR, zS], to: [xMainR, zN], cross: "ns", speed: 2.35 },
         { act: "walk", from: [xMainR, zN], to: [xEW, zN], speed: 1.36 },
         { act: "walk", from: [xEW, zN], to: [xEW, zS], cross: "ns", speed: 2.35 },
-        { act: "walk", from: [xEW, zS], to: [28.4, zS], speed: 1.34 },
+        { act: "walk", from: [xEW, zS], to: [28.9, zS], speed: 1.34 },
+        { act: "walk", from: [28.9, zS], to: [28.9, streetZ + 11.85], speed: 1.15 },
       ],
       initIdx: 4,
     },
@@ -967,34 +976,37 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
       ],
       initIdx: 2,
     },
-    // Nhân viên quán cà phê đứng đón khách bên bảng menu
+    // Nhân viên quán cà phê đứng đón khách thoáng cạnh dù & bảng menu
     {
       index: 48,
-      steps: [{ act: "wait", pos: [4.9, streetZ + 12.5], yaw: 0.35, dur: 12.0, mode: "talk" }],
+      steps: [{ act: "wait", pos: [4.25, streetZ + 11.95], yaw: 0.35, dur: 12.0, mode: "talk" }],
       initIdx: 0,
     },
-    // Khách tham quan công viên & đài phun nước Nam
+    // Khách tham quan công viên & đài phun nước Nam (đứng gọn quanh bồn nước, tuyệt đối không đâm vào bồn)
     {
       index: 49,
       steps: [
-        { act: "wait", pos: [19.4, streetZ + 16.8], yaw: -0.65, dur: 5.0, mode: "talk" },
-        { act: "walk", from: [19.4, streetZ + 16.8], to: [18.4, streetZ + 15.2], speed: 1.15 },
-        { act: "wait", pos: [18.4, streetZ + 15.2], yaw: Math.PI / 2, dur: 4.5, mode: "idle" },
-        { act: "walk", from: [18.4, streetZ + 15.2], to: [xPark, zS], speed: 1.25 },
+        { act: "wait", pos: [17.65, streetZ + 16.8], yaw: -0.65, dur: 5.0, mode: "talk" },
+        { act: "walk", from: [17.65, streetZ + 16.8], to: [18.1, streetZ + 14.3], speed: 1.15 },
+        { act: "wait", pos: [18.1, streetZ + 14.3], yaw: Math.PI / 2, dur: 4.5, mode: "idle" },
+        { act: "walk", from: [18.1, streetZ + 14.3], to: [xPark, streetZ + 13.6], speed: 1.25 },
+        { act: "walk", from: [xPark, streetZ + 13.6], to: [xPark, zS], speed: 1.25 },
         { act: "walk", from: [xPark, zS], to: [xMainL, zS], speed: 1.38 },
         { act: "walk", from: [xMainL, zS], to: [xMainL, zN], cross: "ns", speed: 2.35 },
         { act: "walk", from: [xMainL, zN], to: [xMainR, zN], speed: 1.25 },
         { act: "walk", from: [xMainR, zN], to: [xMainR, zS], cross: "ns", speed: 2.35 },
         { act: "walk", from: [xMainR, zS], to: [xPark, zS], speed: 1.38 },
-        { act: "walk", from: [xPark, zS], to: [19.4, streetZ + 16.8], speed: 1.22 },
+        { act: "walk", from: [xPark, zS], to: [xPark, streetZ + 13.6], speed: 1.25 },
+        { act: "walk", from: [xPark, streetZ + 13.6], to: [17.65, streetZ + 16.8], speed: 1.22 },
       ],
       initIdx: 0,
     },
     {
       index: 50,
       steps: [
-        { act: "wait", pos: [21.6, streetZ + 17.5], yaw: 1.2, dur: 4.8, mode: "idle" },
-        { act: "walk", from: [21.6, streetZ + 17.5], to: [xPark, zS], speed: 1.25 },
+        { act: "wait", pos: [23.5, streetZ + 17.5], yaw: 1.2, dur: 4.8, mode: "idle" },
+        { act: "walk", from: [23.5, streetZ + 17.5], to: [22.8, streetZ + 13.8], speed: 1.25 },
+        { act: "walk", from: [22.8, streetZ + 13.8], to: [xPark, zS], speed: 1.25 },
         { act: "walk", from: [xPark, zS], to: [xEW, zS], speed: 1.38 },
         { act: "walk", from: [xEW, zS], to: [xEW, zN], cross: "ns", speed: 2.35 },
         { act: "walk", from: [xEW, zN], to: [xEW, zNS], speed: 1.35 },
@@ -1006,7 +1018,8 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
         { act: "walk", from: [xEW, zNS], to: [xEW, zN], speed: 1.35 },
         { act: "walk", from: [xEW, zN], to: [xEW, zS], cross: "ns", speed: 2.35 },
         { act: "walk", from: [xEW, zS], to: [xPark, zS], speed: 1.36 },
-        { act: "walk", from: [xPark, zS], to: [21.6, streetZ + 17.5], speed: 1.22 },
+        { act: "walk", from: [xPark, zS], to: [22.8, streetZ + 13.8], speed: 1.25 },
+        { act: "walk", from: [22.8, streetZ + 13.8], to: [23.5, streetZ + 17.5], speed: 1.22 },
       ],
       initIdx: 3,
     },
