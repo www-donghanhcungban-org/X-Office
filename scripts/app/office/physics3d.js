@@ -89,8 +89,9 @@ function distToOBB(px, pz, o) {
   return -Math.min(o.hl - Math.abs(lx), o.hw - Math.abs(lz));
 }
 
-const FAN_ANGLES = [0, 0.34, -0.34, 0.7, -0.7, 1.08, -1.08, 1.48, -1.48, 1.92, -1.92, 2.42, -2.42];
-const FAN_PROBES = [0.5, 1.05, 1.72];
+// Góc né quạt phía trước tối đa ±60° (tuyệt đối không bẻ 85°–140° lao xuống lòng đường hay quay ngược!)
+const FAN_ANGLES = [0, 0.24, -0.24, 0.48, -0.48, 0.76, -0.76, 1.05, -1.05];
+const FAN_PROBES = [0.48, 0.96, 1.48];
 
 export function createWorldPhysics() {
   const layers = {
@@ -212,7 +213,7 @@ export function createWorldPhysics() {
       return { x: px, z: pz, collided };
     },
 
-    clearanceAt(layer, qx, qz, r = 0.36, ignoreId = null) {
+    clearanceAt(layer, qx, qz, r = 0.36, ignoreId = null, checkVehicles = false) {
       const L = layerOf(layer);
       let minC = 99;
       for (let i = 0; i < L.boxes.length; i++) {
@@ -231,16 +232,16 @@ export function createWorldPhysics() {
       }
       for (const h of L.humans.values()) {
         if (h.id === ignoreId) continue;
-        const c = Math.hypot(qx - h.x, qz - h.z) - (r + h.r + 0.08);
+        const c = Math.hypot(qx - h.x, qz - h.z) - (r + h.r + 0.06);
         if (c < minC) minC = c;
       }
-      if (layer === "outdoor") {
+      if (layer === "outdoor" && checkVehicles) {
         for (const v of vehicles.values()) {
           const c = distToAABB(qx, qz, {
-            minX: v.x - v.halfX - 0.16,
-            minZ: v.z - v.halfZ - 0.16,
-            maxX: v.x + v.halfX + 0.16,
-            maxZ: v.z + v.halfZ + 0.16,
+            minX: v.x - v.halfX - 0.14,
+            minZ: v.z - v.halfZ - 0.14,
+            maxX: v.x + v.halfX + 0.14,
+            maxZ: v.z + v.halfZ + 0.14,
           }) - r;
           if (c < minC) minC = c;
         }
@@ -248,7 +249,7 @@ export function createWorldPhysics() {
       return minC;
     },
 
-    steerAround(layer, x, z, dirX, dirZ, r = 0.36, ignoreId = null, prefSide = 0) {
+    steerAround(layer, x, z, dirX, dirZ, r = 0.36, ignoreId = null, prefSide = 0, checkVehicles = false) {
       const len = Math.hypot(dirX, dirZ);
       if (len < 1e-5) return { dx: 0, dz: 0, side: 0, clear: true };
       const fx = dirX / len;
@@ -257,18 +258,18 @@ export function createWorldPhysics() {
       const rz = fx;
       const self = this;
 
-      // Nhanh: kiểm tra hướng đi thẳng trước — nếu hành lang hoàn toàn thông thoáng thì đi thẳng mượt mà
+      // Nhanh: kiểm tra hướng đi thẳng trước — nếu hành lang thông thoáng thì đi thẳng mượt mà
       let straightClear = 99;
       for (let p = 0; p < FAN_PROBES.length; p++) {
         const d = FAN_PROBES[p];
-        const c = self.clearanceAt(layer, x + fx * d, z + fz * d, r, ignoreId);
+        const c = self.clearanceAt(layer, x + fx * d, z + fz * d, r, ignoreId, checkVehicles);
         if (c < straightClear) straightClear = c;
       }
-      if (straightClear > 0.16) {
+      if (straightClear > 0.12) {
         return { dx: fx, dz: fz, side: 0, clear: true };
       }
 
-      // Quét quạt 13 tia tránh chướng ngại vật (ưu tiên hướng đã chọn `prefSide` để tuyệt đối không giật lắc trái-phải)
+      // Quét quạt phía trước (±60° tối đa) — lách nhẹ giữ đúng vỉa hè, tuyệt đối không lao xuống lòng đường hay quay đầu
       let bestScore = -1e9;
       let bestDx = fx;
       let bestDz = fz;
@@ -286,14 +287,14 @@ export function createWorldPhysics() {
         let nearC = 99;
         for (let p = 0; p < FAN_PROBES.length; p++) {
           const d = FAN_PROBES[p];
-          const c = self.clearanceAt(layer, x + cx * d, z + cz * d, r, ignoreId);
+          const c = self.clearanceAt(layer, x + cx * d, z + cz * d, r, ignoreId, checkVehicles);
           if (c < minC) minC = c;
           if (p === 0) nearC = c;
         }
-        const clearTerm = Math.min(0.65, minC) * 3.4 + (minC > 0.05 ? 1.25 : 0) + (nearC > 0.04 ? 0.55 : -0.8);
-        const anglePenalty = Math.abs(ang) * 0.62;
-        const commitBonus = prefSide !== 0 && side === prefSide ? 0.42 : 0;
-        const rightBias = side === 1 ? 0.06 : 0;
+        const clearTerm = Math.min(0.32, minC) * 2.4 + (minC > 0.04 ? 0.95 : 0) + (nearC > 0.03 ? 0.45 : -0.75);
+        const anglePenalty = Math.abs(ang) * 1.45;
+        const commitBonus = prefSide !== 0 && side === prefSide ? 0.34 : 0;
+        const rightBias = side === 1 ? 0.05 : 0;
         const score = clearTerm - anglePenalty + commitBonus + rightBias;
 
         if (score > bestScore) {
@@ -341,9 +342,10 @@ export function createWorldPhysics() {
         const vz = z - v.z;
         const fwd = vx * v.dirX + vz * v.dirZ;
         const lat = vx * perpX + vz * perpZ;
-        const maxFwd = v.halfLen + Math.max(7.0, v.speed * 2.2);
-        const maxLat = v.halfW + 1.15 + r;
-        if (fwd >= -v.halfLen * 0.4 && fwd <= maxFwd && Math.abs(lat) <= maxLat) {
+        const maxFwd = v.halfLen + Math.max(6.5, v.speed * 2.0);
+        // Chỉ báo nguy hiểm khi người thực sự nằm trong lòng làn xe (không bao giờ kích hoạt khi đang đi an toàn trên vỉa hè!)
+        const maxLat = v.halfW + 0.38 + r;
+        if (fwd >= -v.halfLen * 0.35 && fwd <= maxFwd && Math.abs(lat) <= maxLat) {
           if (!best || fwd < best.fwd) {
             const sideSign = lat >= 0 ? 1 : -1;
             best = {

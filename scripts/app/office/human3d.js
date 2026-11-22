@@ -943,14 +943,14 @@ export function buildHDHuman(THREE, hdAssets, mats, opts = {}) {
   let parcelGroup = null;
   if (opts.parcel) {
     parcelGroup = new THREE.Group();
-    parcelGroup.position.set(0, 1.02, -0.32);
+    parcelGroup.position.set(0.24, 0.88, -0.14);
     const box = new THREE.Mesh(
-      new THREE.BoxGeometry(0.32, 0.22, 0.28),
+      new THREE.BoxGeometry(0.28, 0.22, 0.26),
       mats.standard("#c89d66", { roughness: 0.84 }),
     );
     box.castShadow = true;
     const tape = new THREE.Mesh(
-      new THREE.BoxGeometry(0.324, 0.025, 0.06),
+      new THREE.BoxGeometry(0.284, 0.025, 0.06),
       mats.standard("#fef3c7", { roughness: 0.45 }),
     );
     tape.position.set(0, 0.112, 0);
@@ -1086,26 +1086,14 @@ export function animateHDHuman(h, t, dt, motion, modeOverride, speedScale = 1) {
     h.mixer.update(dt * rate);
   }
 
-  // Tư thế tay tự nhiên sau mocap: ôm kiện hàng hai tay / cầm cốc cà phê ngay ngắn / ngoái nhìn quanh tự nhiên
+  // Nhịp đạo cụ tự nhiên & ngoái nhìn quanh nhẹ (không ghi đè Euler xương tay làm vặn khớp Ready Player Me!)
   const b = h.bones;
-  if (b) {
-    if (h.carryingParcel && h.parcelGroup) {
-      const bob = h.curMode === "walk" ? Math.sin(t * 7.2 + h.index) * 0.018 : Math.sin(t * 2.1 + h.index) * 0.006;
-      h.parcelGroup.position.y = 1.02 + bob;
-      // Khóa hai tay đưa ra trước ôm chắc hai bên thùng carton thay vì vung tay tự do
-      if (b.LeftArm) b.LeftArm.rotation.set(0.62, 0.22, -0.92);
-      if (b.RightArm) b.RightArm.rotation.set(0.62, -0.22, 0.92);
-      if (b.LeftForeArm) b.LeftForeArm.rotation.set(0.82, 0.35, 0.18);
-      if (b.RightForeArm) b.RightForeArm.rotation.set(0.82, -0.35, -0.18);
-    } else if (h.holdingCup && b.RightArm && b.RightForeArm) {
-      // Tay phải gập nhẹ ngang ngực giữ cốc cà phê thăng bằng khi đi bộ hoặc trò chuyện
-      b.RightArm.rotation.set(0.32, -0.12, 1.08);
-      b.RightForeArm.rotation.set(1.05, -0.15, -0.1);
-    }
-    if (h.lookAround && h.curMode !== "walk" && b.Head) {
-      nudgeLocalBone(b.Head, 0, 1, 0, Math.sin(t * 0.65 + h.index * 1.9) * 0.36);
-      nudgeLocalBone(b.Head, 1, 0, 0, Math.sin(t * 0.42 + h.index) * 0.08);
-    }
+  if (h.carryingParcel && h.parcelGroup) {
+    const bob = h.curMode === "walk" ? Math.sin(t * 7.0 + h.index) * 0.018 : Math.sin(t * 2.0 + h.index) * 0.005;
+    h.parcelGroup.position.y = 0.88 + bob;
+  }
+  if (b && h.lookAround && h.curMode !== "walk" && b.Head) {
+    nudgeLocalBone(b.Head, 0, 1, 0, Math.sin(t * 0.65 + h.index * 1.9) * 0.24);
   }
 }
 
@@ -1753,7 +1741,8 @@ export function stepScheduledNPC(npc, t, dt, motion, opts = {}) {
     npc.committed = true;
   }
 
-  const threat = (physics && layer === "outdoor") ? physics.getVehicleThreat(npc.x, npc.z, 0.38) : null;
+  // Chỉ kiểm tra nguy cơ xe lao tới khi NPC đang thực sự sang đường (không bao giờ hoảng loạn khi đang đi trên vỉa hè!)
+  const threat = (physics && layer === "outdoor" && s.cross) ? physics.getVehicleThreat(npc.x, npc.z, 0.38) : null;
   let tgtX = s.to[0];
   let tgtZ = s.to[1];
   let spd = s.speed || 1.35;
@@ -1763,7 +1752,7 @@ export function stepScheduledNPC(npc, t, dt, motion, opts = {}) {
 
   if (threat) {
     const distFromEntry = Math.hypot(npc.x - s.from[0], npc.z - s.from[1]);
-    if (s.cross && distFromEntry < 2.2) {
+    if (distFromEntry < 2.4) {
       tgtX = s.from[0];
       tgtZ = s.from[1];
       dirX = tgtX - npc.x;
@@ -1775,16 +1764,16 @@ export function stepScheduledNPC(npc, t, dt, motion, opts = {}) {
       dirZ = threat.escapeZ;
       rem = 1;
     }
-    spd = 3.15;
+    spd = 2.65;
   } else if (physics) {
-    const st = physics.steerAround(layer, npc.x, npc.z, dirX, dirZ, 0.36, npc.id, npc.detourSide);
+    const st = physics.steerAround(layer, npc.x, npc.z, dirX, dirZ, 0.36, npc.id, npc.detourSide, Boolean(s.cross));
     dirX = st.dx;
     dirZ = st.dz;
     if (st.clear && npc.detourHold <= 0) {
       npc.detourSide = 0;
     } else if (!st.clear && st.side !== 0) {
       npc.detourSide = st.side;
-      npc.detourHold = Math.max(npc.detourHold, 0.65);
+      npc.detourHold = Math.max(npc.detourHold, 0.55);
     }
   } else if (rem > 1e-4) {
     dirX /= rem;
@@ -1808,7 +1797,9 @@ export function stepScheduledNPC(npc, t, dt, motion, opts = {}) {
   const stepD = threat ? spd * dt : Math.min(Math.max(rem, 0.25), spd * dt);
   const propX = npc.x + dirX * stepD;
   const propZ = npc.z + dirZ * stepD;
-  const res = physics ? physics.resolveCircle(layer, propX, propZ, 0.36, npc.id) : { x: propX, z: propZ };
+  const res = physics
+    ? physics.resolveCircle(layer, propX, propZ, 0.36, npc.id, { ignoreVehicles: !s.cross })
+    : { x: propX, z: propZ };
   const mvX = res.x - npc.x;
   const mvZ = res.z - npc.z;
   const moved = Math.hypot(mvX, mvZ);
@@ -1826,7 +1817,7 @@ export function stepScheduledNPC(npc, t, dt, motion, opts = {}) {
       npc.stallTime += dt;
       if (npc.stallTime > 1.35 && npc.detourHold <= 0) {
         npc.detourSide = npc.detourSide ? -npc.detourSide : 1;
-        npc.detourHold = 1.1;
+        npc.detourHold = 0.9;
       }
     }
   }
@@ -1841,7 +1832,8 @@ export function stepScheduledNPC(npc, t, dt, motion, opts = {}) {
     playNPCPose(w, t, dt, 0, "idle", false);
   }
 
-  if (!threat && (newRem <= 0.48 || npc.stallTime > 4.5)) {
+  // Tuyệt đối không bỏ qua bước sang đường (s.cross) để NPC không bao giờ băng chéo giữa giao lộ!
+  if (!threat && (newRem <= 0.48 || (!s.cross && npc.stallTime > 7.5))) {
     advanceStep();
   }
 }
