@@ -55,14 +55,14 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
   const fill = new THREE.DirectionalLight(0xbae6fd, 0.42);
   fill.position.set(-18, 11, -14);
   scene.add(fill);
-  const sun = new THREE.DirectionalLight(0xfff0d4, 2.75);
+  const sun = new THREE.DirectionalLight(0xfff1d6, 3.35);
   sun.position.set(22, 16, 14);
   sun.target.position.copy(target);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.radius = 2.8;
-  sun.shadow.bias = -0.0004;
-  sun.shadow.normalBias = 0.022;
+  sun.shadow.radius = 2.2;
+  sun.shadow.bias = -0.00045;
+  sun.shadow.normalBias = 0.032;
   Object.assign(sun.shadow.camera, { left: -16, right: 16, top: 16, bottom: -16, near: 1, far: 90 });
   scene.add(sun, sun.target);
 
@@ -229,41 +229,35 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
   const sunUv = new THREE.Vector2(0.5, 0.5);
   const sunTmp = new THREE.Vector3();
   const walk = {
-    active: false, x: 22, z: 38.6, yaw: -2.42, pitch: 0.20, dist: 2.65, phase: 0, moving: false, seeded: false,
+    active: false, x: 14.2, z: 38.6, yaw: -2.42, pitch: 0.14, dist: 2.85, phase: 0, moving: false, seeded: false,
     keys: new Set(),
   };
 
   function place(zoom, v, plan, mood) {
     target.set((v.x0 + v.x1) / 2 + view.panX, (v.z0 + v.z1) / 2, (v.y0 + v.y1) / 2 + view.panZ);
-    const sh = Math.max(plan.W, plan.D) * 0.78 + 5;
-    Object.assign(sun.shadow.camera, { left: -sh, right: sh, top: sh, bottom: -sh, far: sh * 4.2 });
-    sun.shadow.camera.updateProjectionMatrix();
-    sun.target.position.set(plan.W / 2, 0, plan.D / 2);
-    if (mood === "sunset") {
-      // Nắng chiều thấp phía Tây-Bắc tỏa qua hàng cây và công trình biểu tượng dọc đại lộ
-      sun.position.set(plan.W / 2 - sh * 1.55, sh * 0.24 + (v.z1 || 0), plan.D / 2 - sh * 0.45);
-    } else if (mood === "night") {
-      sun.position.set(plan.W / 2 - sh * 0.75, sh * 1.05 + (v.z1 || 0), plan.D / 2 + sh * 0.7);
-    } else {
-      sun.position.set(plan.W / 2 + sh * 0.92, sh * 1.05 + (v.z1 || 0), plan.D / 2 + sh * 0.62);
-    }
-    sunDir.copy(sun.position).sub(sun.target.position).normalize();
-
     const aspect = view.w / view.h;
     if (walk.active) {
       const fx = Math.sin(walk.yaw), fz = Math.cos(walk.yaw);
       const rx = -fz, rz = fx;
-      const shoulderOffset = walk.dist > 1.2 ? 0.56 : 0.0;
-      const lookTargetX = walk.x + fx * 14.0 + rx * 0.55;
-      const lookTargetY = 1.55 + Math.sin(walk.pitch) * 14.0;
-      const lookTargetZ = walk.z + fz * 14.0 + rz * 0.55;
-      perspCam.fov = 46;
+      sun.target.position.set(walk.x + fx * 10, 0, walk.z + fz * 10);
+      Object.assign(sun.shadow.camera, { left: -26, right: 26, top: 26, bottom: -26, near: 1, far: 110 });
+      sun.shadow.camera.updateProjectionMatrix();
+      if (mood === "sunset") sun.position.set(sun.target.position.x - 36, 20.5, sun.target.position.z + 14);
+      else if (mood === "night") sun.position.set(sun.target.position.x - 22, 32, sun.target.position.z + 18);
+      else sun.position.set(sun.target.position.x + 34, 24, sun.target.position.z + 20);
+      sunDir.copy(sun.position).sub(sun.target.position).normalize();
+
+      const shoulderOffset = walk.dist > 1.2 ? 0.44 : 0.0;
+      const lookTargetX = walk.x + fx * 14.0 + rx * 0.45;
+      const lookTargetY = 1.52 + Math.sin(walk.pitch) * 14.0;
+      const lookTargetZ = walk.z + fz * 14.0 + rz * 0.45;
+      perspCam.fov = 44;
       perspCam.aspect = aspect;
       perspCam.near = 0.2;
       perspCam.far = 270;
       perspCam.position.set(
         walk.x - fx * walk.dist + rx * shoulderOffset,
-        Math.max(0.85, 1.68 + (walk.dist - 2.65) * 0.12 - Math.sin(walk.pitch) * 0.45),
+        Math.max(0.85, 1.66 + (walk.dist - 2.85) * 0.12 - Math.sin(walk.pitch) * 0.45),
         walk.z - fz * walk.dist + rz * shoulderOffset,
       );
       perspCam.lookAt(lookTargetX, lookTargetY, lookTargetZ);
@@ -272,6 +266,20 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
       curDist = walk.dist;
       return perspCam;
     }
+
+    const sh = Math.max(plan.W, plan.D) * 0.72 + 5;
+    Object.assign(sun.shadow.camera, { left: -sh, right: sh, top: sh, bottom: -sh, near: 1, far: sh * 4.2 });
+    sun.shadow.camera.updateProjectionMatrix();
+    sun.target.position.set(plan.W / 2, 0, plan.D / 2);
+    if (mood === "sunset") {
+      // Nắng chiều nghiêng thấp phía Tây-Nam hắt qua hàng cây & công trình đổ bóng dài xuống đại lộ
+      sun.position.set(plan.W / 2 - sh * 1.45, sh * 0.42 + (v.z1 || 0), plan.D / 2 + sh * 0.48);
+    } else if (mood === "night") {
+      sun.position.set(plan.W / 2 - sh * 0.75, sh * 1.05 + (v.z1 || 0), plan.D / 2 + sh * 0.7);
+    } else {
+      sun.position.set(plan.W / 2 + sh * 0.92, sh * 1.05 + (v.z1 || 0), plan.D / 2 + sh * 0.62);
+    }
+    sunDir.copy(sun.position).sub(sun.target.position).normalize();
 
     const dx = Math.sin(view.az) * Math.cos(view.el);
     const dy = Math.sin(view.el);
@@ -528,7 +536,7 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
     },
     draw(opts) {
       const glowOn = opts.quality !== "low";
-      const shadows = glowOn && (opts.scale || "team") !== "corp";
+      const shadows = glowOn;
       renderer.shadowMap.enabled = shadows;
       sun.castShadow = shadows;
 
@@ -541,15 +549,15 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
       const sunset = mood === "sunset";
 
       renderer.toneMappingExposure = dark ? 1.18 : sunset ? 1.08 : 1.04;
-      hemi.color.set(dark ? 0x64748b : sunset ? 0xffedd5 : 0xdbeafe);
-      hemi.groundColor.set(dark ? 0x0f172a : sunset ? 0x57423a : 0x6b7280);
-      hemi.intensity = dark ? 0.5 : sunset ? 0.56 : 0.62;
-      sun.color.set(dark ? 0xc7d2fe : sunset ? 0xffb86c : 0xfff0d4);
-      sun.intensity = dark ? 1.38 : sunset ? 2.65 : 2.75;
-      fill.intensity = dark ? 0.36 : sunset ? 0.38 : 0.42;
+      hemi.color.set(dark ? 0x64748b : sunset ? 0xfde2c4 : 0xcbe4ff);
+      hemi.groundColor.set(dark ? 0x0b1120 : sunset ? 0x352b2d : 0x3b4654);
+      hemi.intensity = dark ? 0.42 : sunset ? 0.44 : 0.48;
+      sun.color.set(dark ? 0xc7d2fe : sunset ? 0xffb35c : 0xfff1d6);
+      sun.intensity = dark ? 1.42 : sunset ? 3.45 : 3.35;
+      fill.intensity = dark ? 0.30 : sunset ? 0.24 : 0.28;
       scene.background = textures.sky(opts.theme.bg, opts.theme.glow, dark, mood);
       scene.environment = glowOn ? textures.envMap(renderer, opts.theme, dark, mood) : null;
-      if ("environmentIntensity" in scene) scene.environmentIntensity = dark ? 0.72 : sunset ? 0.68 : 0.62;
+      if ("environmentIntensity" in scene) scene.environmentIntensity = dark ? 0.66 : sunset ? 0.58 : 0.56;
 
       const nextKey = [
         opts.scale || "team",
@@ -605,11 +613,11 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
 
       if (walk.active && !walk.seeded) {
         const pad = plan.levels ? 6 : 4;
-        walk.x = Math.min(plan.W - 6, Math.max(10, 13.2));
-        walk.z = plan.D + pad + 10.05;
+        walk.x = Math.min(plan.W - 6, Math.max(10, 14.2));
+        walk.z = plan.D + pad + 10.15;
         walk.yaw = Math.atan2(-26 - walk.x, -17 - walk.z);
-        walk.pitch = 0.20;
-        walk.dist = 2.65;
+        walk.pitch = 0.14;
+        walk.dist = 2.85;
         walk.seeded = true;
       }
       let walkMoving = false;
@@ -723,8 +731,8 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
           focusDist: walk.active ? walk.dist : curDist,
           dofStrength,
           exposure: dark ? 1.18 : sunset ? 1.08 : 1.05,
-          aoStrength: dark ? 0.48 : 0.56,
-          aoRadius: (opts.scale || "team") === "team" ? 0.9 : 1.5,
+          aoStrength: dark ? 0.54 : (walk.active ? 0.74 : 0.64),
+          aoRadius: walk.active ? 1.15 : ((opts.scale || "team") === "team" ? 0.9 : 1.5),
         });
       } else {
         renderer.toneMapping = THREE.ACESFilmicToneMapping;

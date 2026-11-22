@@ -4,6 +4,7 @@
 import { buildTree, buildFlowerbed } from "./nature3d.js";
 import { instantiateGLB } from "./glb.js";
 import { buildSaigonLandmarks } from "./saigon3d.js";
+import { upgradeVehicleGLB } from "./traffic3d.js";
 
 function rnd(s) {
   const x = Math.sin(s * 127.1 + 311.7) * 43758.5453;
@@ -66,7 +67,7 @@ export function buildSurroundingCity(THREE, cityAssets, natureAssets, sgAssets, 
   ];
 
   // 1. Nền đô thị mở rộng + mạng lưới đường phố 4 hướng bao quanh khối nhà X-Office
-  const urbanBase = mats.standard("#b5b8be", { roughness: 0.94 });
+  const urbanBase = mats.standard("#9499a1", { roughness: 0.94 });
   const ground = new THREE.Mesh(g.unitPlane, urbanBase);
   ground.rotation.x = -Math.PI / 2;
   ground.position.set(W / 2, -0.068, streetZ / 2 + 4);
@@ -74,10 +75,11 @@ export function buildSurroundingCity(THREE, cityAssets, natureAssets, sgAssets, 
   ground.receiveShadow = true;
   root.add(ground);
 
-  const roadMat = mats.standard("#c5cbd4", { roughness: 0.87, tex: "road", normal: 0.55, roughMap: true });
+  const roadMat = mats.standard("#8a919c", { roughness: 0.88, tex: "road", normal: 0.6, roughMap: true });
   const swMat = mats.standard("#dedad2", { roughness: 0.86, tex: "sidewalk", normal: 0.45 });
   const curbMat = mats.standard("#a8a29e", { roughness: 0.84, tex: "stone" });
   const stripeMat = mats.standard("#f1f5f9", { roughness: 0.72, polygonOffset: true, offsetUnits: -2 });
+  const centerStripeMat = mats.standard("#e5a93c", { roughness: 0.72, polygonOffset: true, offsetUnits: -2 });
 
   const addRoad = (x, z, sx, sz, y = -0.036) => {
     const m = new THREE.Mesh(g.unitPlane, roadMat);
@@ -97,9 +99,9 @@ export function buildSurroundingCity(THREE, cityAssets, natureAssets, sgAssets, 
   addRoad(westRoadX, streetZ / 2 + 4, 6.8, 160, -0.035);
   addRoad(eastRoadX, streetZ / 2 + 4, 6.8, 160, -0.035);
 
-  // Vạch phân làn trên các tuyến đường nhánh & đoạn đại lộ mở rộng
-  const addDash = (x, z, sx, sz) => {
-    const ln = new THREE.Mesh(g.unitPlane, stripeMat);
+  // Vạch phân làn vàng ấm & vạch trắng ngã tư
+  const addDash = (x, z, sx, sz, mat = stripeMat) => {
+    const ln = new THREE.Mesh(g.unitPlane, mat);
     ln.rotation.x = -Math.PI / 2;
     ln.position.set(x, -0.02, z);
     ln.scale.set(sx, sz, 1);
@@ -107,18 +109,18 @@ export function buildSurroundingCity(THREE, cityAssets, natureAssets, sgAssets, 
   };
   for (let x = -72; x < -12; x += 4.6) {
     if (Math.abs(x - westRoadX) < 6.0) continue;
-    addDash(x, mainRoadZ, 2.2, 0.16);
-    addDash(x, northRoadZ, 2.0, 0.15);
+    addDash(x, mainRoadZ, 2.2, 0.16, centerStripeMat);
+    addDash(x, northRoadZ, 2.0, 0.15, centerStripeMat);
   }
   for (let x = eastRoadX + 6; x < eastRoadX + 64; x += 4.6) {
-    addDash(x, mainRoadZ, 2.2, 0.16);
-    addDash(x, northRoadZ, 2.0, 0.15);
+    addDash(x, mainRoadZ, 2.2, 0.16, centerStripeMat);
+    addDash(x, northRoadZ, 2.0, 0.15, centerStripeMat);
   }
-  for (let x = -1; x < W + pad; x += 4.6) addDash(x, northRoadZ, 2.0, 0.15);
+  for (let x = -1; x < W + pad; x += 4.6) addDash(x, northRoadZ, 2.0, 0.15, centerStripeMat);
   for (let z = -54; z < streetZ + 52; z += 4.6) {
     if (Math.abs(z - mainRoadZ) < 6.5 || Math.abs(z - northRoadZ) < 6.0) continue;
-    addDash(westRoadX, z, 0.16, 2.2);
-    addDash(eastRoadX, z, 0.16, 2.2);
+    addDash(westRoadX, z, 0.16, 2.2, centerStripeMat);
+    addDash(eastRoadX, z, 0.16, 2.2, centerStripeMat);
   }
 
   // Vạch qua đường & vạch dừng đèn đỏ tại cả 4 ngã tư (Tây-Nam, Đông-Nam, Tây-Bắc, Đông-Bắc)
@@ -434,15 +436,15 @@ export function buildSurroundingCity(THREE, cityAssets, natureAssets, sgAssets, 
     root.add(gl);
   }
 
-  // ---------------------------------------------------------------- 2. Ô PHỐ PHÍA NAM (đối diện đại lộ — thấp tầng ấm cúng, KHÔNG che xe hay văn phòng)
+  // ---------------------------------------------------------------- 2. Ô PHỐ PHÍA NAM (đối diện đại lộ — đổ bóng thật xuống lòng đường nhựa)
   const sfZ = streetZ + 17.8; // mặt trước ở streetZ + 13.8 (cách vỉa hè Nam 2m dành cho patio cà phê!)
   const southFront = [
     { x: 3.4, z: sfZ, w: 8.0, d: 8.0, h: 4.8, style: "cafe", color: "#f6eadb", accent: "#c2410c", face: "north", seed: 101, signIdx: 1, cast: true },
     { x: 11.8, z: sfZ, w: 7.4, d: 7.8, h: 5.4, style: "shophouse", color: "#eef2f6", accent: "#0284c7", face: "north", seed: 102, signIdx: 0, cast: true },
     // (X = 16.2 .. 25.0 để mở cho Công viên tiểu cảnh + Đài phun nước + Trạm xe buýt!)
     { x: 29.0, z: sfZ, w: 7.2, d: 7.8, h: 5.0, style: "cafe", color: "#f5efe6", accent: "#15803d", face: "north", seed: 103, signIdx: 2, cast: true },
-    { x: 36.2, z: sfZ, w: 6.2, d: 7.8, h: 5.6, style: "shophouse", color: "#e8dfd5", accent: "#9a3412", face: "north", seed: 104, pitched: true },
-    { x: 43.2, z: sfZ, w: 6.8, d: 7.8, h: 5.2, style: "shophouse", color: "#f1f5f9", accent: "#1d4ed8", face: "north", seed: 105, signIdx: 3 },
+    { x: 36.2, z: sfZ, w: 6.2, d: 7.8, h: 5.6, style: "shophouse", color: "#e8dfd5", accent: "#9a3412", face: "north", seed: 104, pitched: true, cast: true },
+    { x: 43.2, z: sfZ, w: 6.8, d: 7.8, h: 5.2, style: "shophouse", color: "#f1f5f9", accent: "#1d4ed8", face: "north", seed: 105, signIdx: 3, cast: true },
   ];
   for (const b of southFront) addBuilding(b);
 
@@ -551,15 +553,15 @@ export function buildSurroundingCity(THREE, cityAssets, natureAssets, sgAssets, 
   ];
   for (const b of northBack) addBuilding(b);
 
-  // ---------------------------------------------------------------- 4. Ô PHỐ PHÍA TÂY (trái văn phòng, qua đại lộ nhánh Tây — khung cảnh phố sống động!)
+  // ---------------------------------------------------------------- 4. Ô PHỐ PHÍA TÂY (trái văn phòng, qua đại lộ nhánh Tây — đổ bóng chiều xuống đường!)
   const w1X = -16.8;
   const westRow = [
-    { x: w1X + 0.4, z: 3.5, w: 8.6, d: 7.4, h: 13.4, style: "apartment", color: "#f1ece1", accent: "#475569", face: "east", seed: 302 },
-    { x: w1X + 0.6, z: 11.0, w: 8.2, d: 6.2, h: 9.6, style: "townhouse", color: "#f4e2d2", accent: "#c2410c", face: "east", seed: 303, pitched: true },
-    { x: w1X + 0.6, z: 17.6, w: 8.2, d: 6.0, h: 10.8, style: "shophouse", color: "#e8eff5", accent: "#0f766e", face: "east", seed: 304, signIdx: 2 },
-    { x: w1X + 0.4, z: 24.4, w: 8.6, d: 6.6, h: 8.2, style: "cafe", color: "#f7efe4", accent: "#b91c1c", face: "east", seed: 305, signIdx: 1 },
+    { x: w1X + 0.4, z: 3.5, w: 8.6, d: 7.4, h: 13.4, style: "apartment", color: "#f1ece1", accent: "#475569", face: "east", seed: 302, cast: true },
+    { x: w1X + 0.6, z: 11.0, w: 8.2, d: 6.2, h: 9.6, style: "townhouse", color: "#f4e2d2", accent: "#c2410c", face: "east", seed: 303, pitched: true, cast: true },
+    { x: w1X + 0.6, z: 17.6, w: 8.2, d: 6.0, h: 10.8, style: "shophouse", color: "#e8eff5", accent: "#0f766e", face: "east", seed: 304, signIdx: 2, cast: true },
+    { x: w1X + 0.4, z: 24.4, w: 8.6, d: 6.6, h: 8.2, style: "cafe", color: "#f7efe4", accent: "#b91c1c", face: "east", seed: 305, signIdx: 1, cast: true },
     // Góc Tây-Nam (bên kia đại lộ)
-    { x: w1X + 0.4, z: sfZ, w: 8.8, d: 8.0, h: 6.2, style: "shophouse", color: "#f2ebe0", accent: "#1d4ed8", face: "north", seed: 306, signIdx: 0 },
+    { x: w1X + 0.4, z: sfZ, w: 8.8, d: 8.0, h: 6.2, style: "shophouse", color: "#f2ebe0", accent: "#1d4ed8", face: "north", seed: 306, signIdx: 0, cast: true },
     { x: w1X - 12.0, z: 8.0, w: 10.5, d: 11.0, h: 11.5, style: "tower", color: "#20334a", face: "east", seed: 307 },
     { x: w1X - 12.0, z: 21.0, w: 10.0, d: 10.2, h: 15.6, style: "apartment", color: "#ebe8e0", accent: "#64748b", face: "east", seed: 308 },
   ];
@@ -571,30 +573,133 @@ export function buildSurroundingCity(THREE, cityAssets, natureAssets, sgAssets, 
     // Góc Đông-Bắc (sau góc nhìn -> cao ốc hiện đại)
     { x: e1X + 0.5, z: -17.5, w: 9.8, d: 10.4, h: 21.0, style: "tower", color: "#273b52", face: "west", seed: 401 },
     { x: e1X + 12.5, z: -17.5, w: 10.4, d: 10.6, h: 26.5, style: "tower", color: "#1e3248", face: "west", seed: 402 },
-    { x: e1X + 0.4, z: 2.5, w: 8.6, d: 7.4, h: 12.0, style: "apartment", color: "#f0ece2", accent: "#334155", face: "west", seed: 403 },
+    { x: e1X + 0.4, z: 2.5, w: 8.6, d: 7.4, h: 12.0, style: "apartment", color: "#f0ece2", accent: "#334155", face: "west", seed: 403, cast: true },
     // Mặt Đông song song sân vườn (h = 5.0..6.2m nên không che vườn hay hồ bơi ở góc nhìn chuẩn!)
-    { x: e1X + 0.4, z: 10.2, w: 8.4, d: 6.4, h: 5.8, style: "townhouse", color: "#f4e5d6", accent: "#c2410c", face: "west", seed: 404, pitched: true },
-    { x: e1X + 0.4, z: 17.0, w: 8.4, d: 6.2, h: 5.2, style: "cafe", color: "#f6efe5", accent: "#15803d", face: "west", seed: 405, signIdx: 2 },
-    { x: e1X + 0.4, z: 23.8, w: 8.4, d: 6.4, h: 5.6, style: "shophouse", color: "#edf2f7", accent: "#0284c7", face: "west", seed: 406, signIdx: 0 },
+    { x: e1X + 0.4, z: 10.2, w: 8.4, d: 6.4, h: 5.8, style: "townhouse", color: "#f4e5d6", accent: "#c2410c", face: "west", seed: 404, pitched: true, cast: true },
+    { x: e1X + 0.4, z: 17.0, w: 8.4, d: 6.2, h: 5.2, style: "cafe", color: "#f6efe5", accent: "#15803d", face: "west", seed: 405, signIdx: 2, cast: true },
+    { x: e1X + 0.4, z: 23.8, w: 8.4, d: 6.4, h: 5.6, style: "shophouse", color: "#edf2f7", accent: "#0284c7", face: "west", seed: 406, signIdx: 0, cast: true },
     // Góc Đông-Nam (qua ngã tư đại lộ)
-    { x: e1X + 0.4, z: sfZ, w: 8.6, d: 8.0, h: 5.4, style: "shophouse", color: "#f2ece2", accent: "#9a3412", face: "north", seed: 407, signIdx: 3 },
+    { x: e1X + 0.4, z: sfZ, w: 8.6, d: 8.0, h: 5.4, style: "shophouse", color: "#f2ece2", accent: "#9a3412", face: "north", seed: 407, signIdx: 3, cast: true },
     { x: e1X + 13.0, z: 14.0, w: 9.8, d: 10.4, h: 11.2, style: "apartment", color: "#eae7de", accent: "#475569", face: "west", seed: 408 },
     { x: e1X + 13.0, z: sfZ + 12.0, w: 10.0, d: 10.0, h: 12.5, style: "apartment", color: "#e6ecf2", accent: "#334155", face: "north", seed: 409 },
   ];
   for (const b of eastRow) addBuilding(b);
 
-  // ---------------------------------------------------------------- 6. Cây xanh vỉa hè, đèn đường đô thị & xe đỗ gọn trên đường nhánh
-  for (let x = 2; x <= W + 2; x += 10.5) {
-    root.add(buildTree(THREE, natureAssets, mats, { x, y: -10.5, color: x % 2 ? "#2f855a" : "#3b8f4f", scale: 0.9 }, anim));
-    addCityLamp(x + 4.5, -10.3);
+  // ---------------------------------------------------------------- 6. Hàng cây nhiệt đới dày xanh, cột điện & đường dây võng, xe đỗ ven đường & chi tiết đường phố AAA
+  const extraGeos = [];
+  const poleWood = mats.standard("#5c4433", { roughness: 0.9, tex: "bark" });
+  const wireMat = mats.standard("#18181b", { roughness: 0.65, metalness: 0.35 });
+  const ceramicMat = mats.standard("#e2e8f0", { roughness: 0.25 });
+
+  function buildUtilityLine(pts, armAlongZ) {
+    const offsets = [-0.56, 0, 0.56];
+    for (let idx = 0; idx < pts.length; idx++) {
+      const [px, pz] = pts[idx];
+      const pole = new THREE.Mesh(g.unitCyl, poleWood);
+      pole.position.set(px, 3.7, pz);
+      pole.scale.set(0.22, 7.4, 0.22);
+      pole.castShadow = pole.receiveShadow = true;
+      root.add(pole);
+      putBox(
+        THREE, root, g.unitBox, trimDark,
+        px, 6.9, pz,
+        armAlongZ ? 0.14 : 1.45, 0.12, armAlongZ ? 1.45 : 0.14, true, false,
+      );
+      for (const off of offsets) {
+        const ix = armAlongZ ? px : px + off;
+        const iz = armAlongZ ? pz + off : pz;
+        const ins = new THREE.Mesh(g.unitCyl, ceramicMat);
+        ins.position.set(ix, 7.02, iz);
+        ins.scale.set(0.08, 0.14, 0.08);
+        root.add(ins);
+      }
+      if (idx % 2 === 1) {
+        const xf = new THREE.Mesh(g.unitCyl, metalMat);
+        xf.position.set(px + (armAlongZ ? 0.28 : 0), 5.45, pz + (armAlongZ ? 0 : 0.28));
+        xf.scale.set(0.42, 0.68, 0.42);
+        xf.castShadow = true;
+        root.add(xf);
+      }
+      if (idx > 0) {
+        const [qx, qz] = pts[idx - 1];
+        for (const off of offsets) {
+          const p0 = new THREE.Vector3(armAlongZ ? qx : qx + off, 7.05, armAlongZ ? qz + off : qz);
+          const p1 = new THREE.Vector3(armAlongZ ? px : px + off, 7.05, armAlongZ ? pz + off : pz);
+          const mid = p0.clone().add(p1).multiplyScalar(0.5);
+          mid.y -= 0.42;
+          const tubeGeo = new THREE.TubeGeometry(new THREE.CatmullRomCurve3([p0, mid, p1]), 10, 0.016, 5, false);
+          extraGeos.push(tubeGeo);
+          root.add(new THREE.Mesh(tubeGeo, wireMat));
+        }
+      }
+    }
+  }
+
+  buildUtilityLine(
+    [-26, -11, 6, 22, 38, 54].map((x) => [x, streetZ + 11.48]),
+    true,
+  );
+  buildUtilityLine(
+    [-22, -10.8, 2, 16, streetZ + 11.48].map((z) => [-10.9, z]),
+    false,
+  );
+
+  // Xe ô tô & xe bán tải đỗ tự nhiên dọc lề đường & trước sân nhà phố (như xe ngoài đời thật)
+  const parkedSpecs = [
+    ["veh_delivery", "#f1f5f9", 10.8, streetZ + 12.6, 0, 5.05, true],
+    ["veh_pickup", "#991b1b", -14.8, streetZ + 12.8, 0.04, 4.75, false],
+    ["veh_pickup", "#1e293b", -22.4, streetZ + 12.7, Math.PI, 4.75, false],
+    ["veh_suv", "#e2e8f0", 41.2, streetZ + 12.6, Math.PI, 4.7, false],
+    ["veh_sedan_classic", "#334155", -13.0, 14.0, Math.PI / 2, 4.4, false],
+    ["veh_hatchback", "#0f766e", eastRoadX + 6.4, 13.8, -Math.PI / 2, 4.0, false],
+  ];
+  for (const [key, color, px, pz, ry, targetLength, keepWhite] of parkedSpecs) {
+    const pv = upgradeVehicleGLB(THREE, natureAssets, mats, hdAssets, key, {
+      targetLength,
+      rotY: -Math.PI / 2,
+      color,
+      keepWhitePaint: keepWhite,
+      parked: true,
+    });
+    if (pv) {
+      pv.root.position.set(px, 0, pz);
+      pv.root.rotation.y = ry;
+      root.add(pv.root);
+    }
+  }
+
+  // Hàng rào sân bên & bạt phủ xanh ven vỉa hè khu nhà phố Tây-Nam
+  putBox(THREE, root, g.unitBox, mats.standard("#2d4a36", { roughness: 0.78 }), -18.2, 0.52, streetZ + 13.8, 2.8, 1.04, 1.35, true, true);
+  for (const fx of [-25.5, -23.0, -20.5, -18.0, -15.5, -13.0]) {
+    putBox(THREE, root, g.unitBox, trimDark, fx, 0.55, streetZ + 13.2, 0.08, 1.1, 0.08, true, false);
+  }
+  putBox(THREE, root, g.unitBox, metalMat, -19.25, 0.88, streetZ + 13.2, 12.6, 0.05, 0.05);
+
+  // Cây tán rộng & cây dừa nhiệt đới đổ bóng dày dặn khắp 4 đại lộ
+  for (let x = -28; x <= W + 16; x += 10.5) {
+    if (x < -1.0 || x > 7.5) {
+      const isPalm = Math.abs(Math.round(x)) % 2 === 1;
+      root.add(buildTree(THREE, natureAssets, mats, {
+        x, y: streetZ + 11.45, color: isPalm ? "#316b3b" : "#285e38", palm: isPalm, scale: isPalm ? 1.25 : 1.05,
+      }, anim));
+    }
+    if (x >= 2 && x <= W + 2) {
+      root.add(buildTree(THREE, natureAssets, mats, { x, y: -10.5, color: x % 2 ? "#2f855a" : "#3b8f4f", scale: 0.95 }, anim));
+      addCityLamp(x + 4.5, -10.3);
+    }
+  }
+  for (const [bx, bz, isPalm] of [[-26, streetZ + 0.5, true], [-18, streetZ + 0.5, false], [-12.5, streetZ + 0.5, true]]) {
+    root.add(buildTree(THREE, natureAssets, mats, {
+      x: bx, y: bz, color: "#2d6a3e", palm: isPalm, scale: isPalm ? 1.22 : 1.1,
+    }, anim));
   }
   for (const x of [9.0, 15.8, 25.0, 34.5, 42.5]) {
     addCityLamp(x, streetZ + 11.68);
   }
   for (const z of [-1.0, 8.5, 18.5]) {
-    root.add(buildTree(THREE, natureAssets, mats, { x: -11.0, y: z, color: "#3b8f4f", scale: 0.88 }, anim));
-    root.add(buildTree(THREE, natureAssets, mats, { x: eastRoadX + 4.4, y: z, color: "#2f855a", scale: 0.88 }, anim));
-    addCityLamp(-10.8, z + 4.2);
+    root.add(buildTree(THREE, natureAssets, mats, { x: -10.8, y: z, color: "#3b8f4f", scale: 0.96 }, anim));
+    root.add(buildTree(THREE, natureAssets, mats, { x: eastRoadX + 4.4, y: z, color: "#2f855a", scale: 0.96 }, anim));
+    addCityLamp(-10.6, z + 4.2);
     addCityLamp(eastRoadX + 4.2, z + 4.2);
   }
 
@@ -622,6 +727,23 @@ export function buildSurroundingCity(THREE, cityAssets, natureAssets, sgAssets, 
   for (const [kx, kz] of [[eastRoadX - 4.8, streetZ + 9.6], [eastRoadX - 4.0, streetZ + 9.6]]) {
     placeCityHD("traffic_cone", { targetHeight: 0.68 }, kx, 0, kz);
   }
+  for (const [sx, sz, h] of [
+    [-13.5, streetZ + 13.4, 0.95],
+    [-16.2, streetZ + 13.6, 1.05],
+    [-20.5, streetZ + 13.5, 0.88],
+    [8.2, streetZ + 12.4, 0.82],
+    [14.8, streetZ + 12.4, 0.86],
+    [34.0, streetZ + 12.5, 0.92],
+  ]) {
+    placeCityHD("shrub", { targetHeight: h }, sx, 0, sz);
+  }
+  for (const [fx, fz, h] of [[-12.2, streetZ + 12.9, 0.65], [-19.4, streetZ + 13.1, 0.7], [32.8, streetZ + 12.4, 0.62]]) {
+    placeCityHD("fern", { targetHeight: h }, fx, 0, fz);
+  }
+  for (const [px, pz, h] of [[-11.8, streetZ + 13.8, 1.8], [6.4, streetZ + 12.6, 1.65]]) {
+    placeCityHD("palm_plant", { targetHeight: h }, px, 0, pz);
+  }
+
   for (const [ax, ay, az, ry] of [
     [11.8, 3.2, sfZ - 3.95, Math.PI],
     [36.2, 3.2, sfZ - 3.95, Math.PI],
@@ -704,6 +826,7 @@ export function buildSurroundingCity(THREE, cityAssets, natureAssets, sgAssets, 
       if (saigon) saigon.animate(t, motion);
     },
     dispose() {
+      for (const eg of extraGeos) eg.dispose();
       if (saigon) saigon.dispose();
     },
   };

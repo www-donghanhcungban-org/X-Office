@@ -1,9 +1,10 @@
-// Hệ thống giao thông đô thị 3D đa ngã tư bao quanh khu phố văn phòng:
-// - Đèn tín hiệu giao thông đồng bộ 2 pha tại nút qua đường chính & cả 4 ngã tư (Tây-Nam, Đông-Nam, Tây-Bắc, Đông-Bắc).
-// - Ô tô sơn bóng clearcoat & xe máy kèm người lái đội mũ bảo hiểm chạy dọc hết cả 4 tuyến đường (Đông-Tây & Bắc-Nam).
-// - Xe tự giữ khoảng cách an toàn, dừng đúng vạch trắng đèn đỏ ở mọi ngã tư và sáng đèn phanh HDR.
-// - Người đi bộ dạo trên vỉa hè cả 4 tuyến phố và qua đường đúng nhịp đèn đỏ tại nút chính + các ngã tư.
-import { buildWalkerRig, animateWalkerRig, buildHDHuman, animateHDHuman } from "./human3d.js";
+// Hệ thống giao thông đô thị & cộng đồng NPC sống động quanh X-Office:
+// - 12 loại phương tiện HD phủ sơn bóng clearcoat (SUV, sedan, hatchback, taxi, van, xe giao hàng, bán tải,
+//   xe cảnh sát, siêu xe Ferrari, xe tải, xe buýt kéo điểm dừng & xe máy kèm người lái).
+// - Đèn giao thông 2 pha đồng bộ 18 cột tại nút chính & 4 ngã tư; xe buýt tự ghé trạm đón khách trên đại lộ.
+// - 13 công dân Ready Player Me có lịch trình có mục đích (giao hàng tới sảnh, chờ xe buýt, gọi cà phê vỉa hè,
+//   dạo công viên đài phun nước, qua vạch đèn đỏ và tiếp tục hành trình qua các tuyến phố).
+import { buildWalkerRig, buildHDHuman, createScheduledNPC, stepScheduledNPC } from "./human3d.js";
 import { instantiateGLB } from "./glb.js";
 
 const CYCLE = 18.0; // 0–8.5s ĐT Xanh/BN Đỏ · 8.5–10.5s ĐT Vàng/BN Đỏ · 10.5–16.5s ĐT Đỏ/BN Xanh · 16.5–18s ĐT Đỏ/BN Vàng
@@ -41,6 +42,99 @@ function addShadow(THREE, group, natureAssets, mats, sx, sz) {
   m.position.y = 0.016;
   m.scale.set(sx, sz, 1);
   group.add(m);
+}
+
+// ---------------------------------------------------------------- Nâng cấp xe .glb lên chuẩn vật liệu sơn clearcoat & kính phản chiếu + đèn phanh HDR
+export function upgradeVehicleGLB(THREE, natureAssets, mats, hdAssets, key, opts = {}) {
+  const parsed = hdAssets && hdAssets.get(key);
+  if (!parsed) return null;
+
+  const targetLen = opts.targetLength || 4.55;
+  const targetWidth = opts.targetWidth || 2.35;
+  const halfLen = opts.halfLen || targetLen * 0.52;
+  const root = new THREE.Group();
+  addShadow(THREE, root, natureAssets, mats, targetLen * 1.08, targetWidth);
+
+  const inst = instantiateGLB(THREE, parsed, { targetLength: targetLen });
+  inst.group.rotation.y = opts.rotY !== undefined ? opts.rotY : 0;
+
+  const paintMat = mats.physical(opts.color || "#475569", {
+    roughness: 0.16,
+    metalness: 0.34,
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.05,
+  });
+  const whitePaintMat = opts.keepWhitePaint
+    ? mats.physical("#f1f5f9", { roughness: 0.18, metalness: 0.22, clearcoat: 0.9, clearcoatRoughness: 0.08 })
+    : null;
+  const alloyMat = mats.standard("#cbd5e1", { roughness: 0.24, metalness: 0.85 });
+  const glassMat = mats.physical("#0f172a", {
+    roughness: 0.05,
+    metalness: 0.28,
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.03,
+  });
+  const tireMat = mats.standard("#18181b", { roughness: 0.86, metalness: 0.04 });
+  const trimMat = mats.standard("#27272a", { roughness: 0.42, metalness: 0.25 });
+  const headMat = mats.standard("#fffbeb", {
+    roughness: 0.08,
+    emissive: "#fef3c7",
+    emissiveIntensity: opts.parked ? 0.08 : 1.85,
+  });
+  const tailMat = mats.freshStandard("#ef4444", {
+    roughness: 0.12,
+    emissive: "#ef4444",
+    emissiveIntensity: opts.parked ? 0.06 : 0.75,
+  });
+  const policeLightMat = key === "veh_police"
+    ? mats.freshStandard("#38bdf8", { roughness: 0.12, emissive: "#38bdf8", emissiveIntensity: opts.parked ? 0.05 : 2.1 })
+    : null;
+
+  let hasTailMesh = false;
+  inst.group.traverse((o) => {
+    if (!o.isMesh) return;
+    o.castShadow = true;
+    o.receiveShadow = true;
+    const mn = (o.material && o.material.name) || "";
+    if (mn === "lightBack" || mn === "Taillight_Glass") {
+      o.material = tailMat;
+      hasTailMesh = true;
+    } else if (mn === "lightFront" || mn === "Projector_Glass") {
+      o.material = headMat;
+    } else if (mn === "lightBlue" && policeLightMat) {
+      o.material = policeLightMat;
+    } else if (mn === "window" || mn === "Glass_Gray") {
+      o.material = glassMat;
+    } else if (mn === "carTire" || mn === "Tires") {
+      o.material = tireMat;
+    } else if (mn === "_defaultMat") {
+      o.material = alloyMat;
+    } else if (mn === "plastic" || mn === "plastic_gray") {
+      o.material = trimMat;
+    } else if (mn === "paintWhite" && whitePaintMat) {
+      o.material = whitePaintMat;
+    } else if (mn.startsWith("paint") || mn === "Body_Color" || mn === "Paint 1 Carmine") {
+      o.material = paintMat;
+    }
+  });
+  root.add(inst.group);
+
+  if (!hasTailMesh && !opts.parked) {
+    const tl = new THREE.Mesh(natureAssets.geos.unitBox, tailMat);
+    tl.position.set(-halfLen + 0.14, 0.72, 0);
+    tl.scale.set(0.06, 0.09, 1.38);
+    root.add(tl);
+  }
+
+  return {
+    root,
+    wheels: [],
+    mixer: inst.mixer || null,
+    tailMat,
+    policeLightMat,
+    halfLen,
+    wheelR: opts.wheelR || 0.34,
+  };
 }
 
 // ---------------------------------------------------------------- Cột đèn giao thông 3 màu + đèn đi bộ (xoay được theo hướng đường)
@@ -104,34 +198,17 @@ function buildTrafficLight(THREE, tAssets, mats, x, z, dirZ, rotY, sigAxis) {
   return { root, sigAxis, redMat, yelMat, grnMat, pedRedMat, pedGrnMat };
 }
 
-// ---------------------------------------------------------------- Ô tô chạy đường bộ (bánh xoay + đèn phanh HDR)
-function buildTrafficCar(THREE, natureAssets, mats, color, hdAssets) {
+// ---------------------------------------------------------------- Ô tô dự phòng khi chưa cài gói .xoffice-hd
+function buildFallbackCar(THREE, natureAssets, mats, color) {
   const g = natureAssets.geos;
   const root = new THREE.Group();
   addShadow(THREE, root, natureAssets, mats, 4.9, 2.35);
-
-  const carParsed = hdAssets && hdAssets.get("car");
-  const tailMat = mats.freshStandard("#ef4444", { roughness: 0.12, emissive: "#ef4444", emissiveIntensity: 0.75 });
-  if (carParsed) {
-    const inst = instantiateGLB(THREE, carParsed, { targetLength: 4.55 });
-    const carPaint = mats.physical(color, { roughness: 0.16, metalness: 0.65, clearcoat: 1.0, clearcoatRoughness: 0.06 });
-    inst.group.traverse((o) => {
-      if (o.isMesh && o.material && o.material.name === "Paint 1 Carmine") o.material = carPaint;
-    });
-    const sz = new THREE.Box3().setFromObject(inst.group).getSize(new THREE.Vector3());
-    if (sz.z > sz.x) inst.group.rotation.y = Math.PI / 2;
-    root.add(inst.group);
-    const tl = new THREE.Mesh(g.unitBox, tailMat);
-    tl.position.set(-2.22, 0.72, 0);
-    tl.scale.set(0.06, 0.09, 1.38);
-    root.add(tl);
-    return { root, wheels: [], mixer: null, tailMat, halfLen: 2.35, wheelR: 0.32 };
-  }
 
   const paintMat = mats.physical(color, { roughness: 0.15, metalness: 0.72, clearcoat: 1.0, clearcoatRoughness: 0.05 });
   const glassMat = mats.physical("#0f172a", { roughness: 0.06, metalness: 0.15, clearcoat: 1.0, clearcoatRoughness: 0.04 });
   const tireMat = mats.standard("#18181b", { roughness: 0.85, metalness: 0.05 });
   const rimMat = mats.standard("#e2e8f0", { roughness: 0.14, metalness: 0.94 });
+  const tailMat = mats.freshStandard("#ef4444", { roughness: 0.12, emissive: "#ef4444", emissiveIntensity: 0.75 });
 
   const body = new THREE.Mesh(g.carBody, paintMat);
   body.castShadow = body.receiveShadow = true;
@@ -167,25 +244,66 @@ function buildTrafficCar(THREE, natureAssets, mats, color, hdAssets) {
     root.add(wg);
     wheels.push(wg);
   }
-  return { root, wheels, mixer: null, tailMat, halfLen: 2.35, wheelR: 0.32 };
+  return { root, wheels, mixer: null, tailMat, policeLightMat: null, halfLen: 2.35, wheelR: 0.32 };
 }
 
-function buildTrafficTruck(THREE, natureAssets, mats, color, hdAssets) {
-  const truckParsed = hdAssets && hdAssets.get("truck");
-  if (!truckParsed) return buildTrafficCar(THREE, natureAssets, mats, color, hdAssets);
+// ---------------------------------------------------------------- Xe buýt đô thị Sài Gòn (8.2m, kính toàn cảnh, bảng LED tuyến & 4 bánh quay)
+function buildCityBus(THREE, natureAssets, mats, color) {
   const g = natureAssets.geos;
   const root = new THREE.Group();
-  addShadow(THREE, root, natureAssets, mats, 5.6, 2.45);
-  const inst = instantiateGLB(THREE, truckParsed, { targetLength: 5.2 });
-  const sz = new THREE.Box3().setFromObject(inst.group).getSize(new THREE.Vector3());
-  if (sz.z > sz.x) inst.group.rotation.y = Math.PI / 2;
-  root.add(inst.group);
+  addShadow(THREE, root, natureAssets, mats, 8.8, 2.75);
+
+  const paintMat = mats.physical(color || "#059669", { roughness: 0.18, metalness: 0.42, clearcoat: 0.95, clearcoatRoughness: 0.06 });
+  const upperMat = mats.physical("#f1f5f9", { roughness: 0.22, metalness: 0.15, clearcoat: 0.85 });
+  const darkMat = mats.standard("#18181b", { roughness: 0.72, metalness: 0.18 });
+  const glassMat = mats.physical("#0f172a", { roughness: 0.05, metalness: 0.3, clearcoat: 1.0, clearcoatRoughness: 0.03 });
+  const roofMat = mats.standard("#cbd5e1", { roughness: 0.45, metalness: 0.25 });
+  const rimMat = mats.standard("#e2e8f0", { roughness: 0.16, metalness: 0.92 });
+  const headMat = mats.standard("#fffbeb", { roughness: 0.1, emissive: "#fef3c7", emissiveIntensity: 1.75 });
   const tailMat = mats.freshStandard("#ef4444", { roughness: 0.12, emissive: "#ef4444", emissiveIntensity: 0.75 });
-  const tl = new THREE.Mesh(g.unitBox, tailMat);
-  tl.position.set(-2.55, 0.82, 0);
-  tl.scale.set(0.06, 0.1, 1.5);
-  root.add(tl);
-  return { root, wheels: [], mixer: inst.mixer || null, tailMat, halfLen: 2.75, wheelR: 0.4 };
+
+  const add = (geo, mat, x, y, z, sx, sy, sz, cast = true) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(x, y, z);
+    m.scale.set(sx, sy, sz);
+    m.castShadow = cast;
+    m.receiveShadow = true;
+    root.add(m);
+    return m;
+  };
+
+  add(g.unitBox, darkMat, 0, 0.44, 0, 8.15, 0.24, 2.26);         // Cản gầm tối
+  add(g.unitBox, paintMat, 0, 0.95, 0, 8.2, 0.82, 2.28);         // Thân dưới sơn xanh
+  add(g.unitBox, upperMat, 0, 1.98, 0, 8.16, 1.28, 2.24);        // Thân trên trắng ngọc
+  add(g.unitBox, glassMat, 0.06, 1.88, 0, 7.75, 0.86, 2.27, false); // Dải kính toàn cảnh
+  for (let px = -3.1; px <= 3.1; px += 1.55) {
+    add(g.unitBox, upperMat, px, 1.88, 0, 0.16, 0.88, 2.29, false); // Trụ chia khoang cửa sổ
+  }
+  add(g.unitBox, glassMat, 4.08, 1.78, 0, 0.08, 1.12, 2.04, false); // Kính chắn gió trước
+  add(g.unitBox, mats.standard("#f59e0b", { roughness: 0.2, emissive: "#f59e0b", emissiveIntensity: 1.5 }), 4.1, 2.48, 0, 0.05, 0.2, 1.32, false);
+  for (const ax of [-1.25, 1.55]) add(g.unitBox, roofMat, ax, 2.74, 0, 1.75, 0.24, 1.48); // Cụm điều hòa nóc
+  for (const mz of [-1.22, 1.22]) add(g.unitBox, darkMat, 4.04, 1.75, mz, 0.14, 0.22, 0.08); // Gương chiếu hậu
+  for (const lz of [-0.78, 0.78]) {
+    add(g.unitBox, headMat, 4.11, 0.72, lz, 0.06, 0.14, 0.28, false);
+    add(g.unitBox, tailMat, -4.11, 0.82, lz, 0.06, 0.22, 0.22, false);
+  }
+
+  const wheels = [];
+  for (const [wx, wz] of [[2.55, 1.06], [2.55, -1.06], [-2.45, 1.06], [-2.45, -1.06]]) {
+    const wg = new THREE.Group();
+    wg.position.set(wx, 0.42, wz);
+    const tire = new THREE.Mesh(g.carWheel, darkMat);
+    tire.rotation.x = Math.PI / 2;
+    tire.scale.set(1.3, 1.1, 1.3);
+    tire.castShadow = true;
+    const rim = new THREE.Mesh(g.carRim, rimMat);
+    rim.rotation.x = Math.PI / 2;
+    rim.scale.set(1.25, 1.15, 1.25);
+    wg.add(tire, rim);
+    root.add(wg);
+    wheels.push(wg);
+  }
+  return { root, wheels, mixer: null, tailMat, policeLightMat: null, halfLen: 4.25, wheelR: 0.42 };
 }
 
 // ---------------------------------------------------------------- Xe máy / tay ga kèm người lái đội mũ bảo hiểm
@@ -194,10 +312,11 @@ function buildMotorbike(THREE, tAssets, natureAssets, mats, bodyColor, jacketCol
   const root = new THREE.Group();
   addShadow(THREE, root, natureAssets, mats, 2.05, 0.95);
 
-  const paintMat = mats.physical(bodyColor, { roughness: 0.18, metalness: 0.55, clearcoat: 1.0, clearcoatRoughness: 0.06 });
+  const paintMat = mats.physical(bodyColor, { roughness: 0.16, metalness: 0.6, clearcoat: 1.0, clearcoatRoughness: 0.05 });
   const darkMat = mats.standard("#18181b", { roughness: 0.55, metalness: 0.25 });
   const chromeMat = mats.standard("#e2e8f0", { roughness: 0.14, metalness: 0.94 });
   const seatMat = mats.physical("#1e293b", { roughness: 0.58, clearcoat: 0.2 });
+  const shieldGlass = mats.physical("#0f172a", { roughness: 0.06, clearcoat: 1.0, transparent: true, opacity: 0.68 });
 
   const wheels = [];
   for (const wx of [0.62, -0.6]) {
@@ -218,13 +337,20 @@ function buildMotorbike(THREE, tAssets, natureAssets, mats, bodyColor, jacketCol
   deck.scale.set(0.86, 0.12, 0.36);
   const body = new THREE.Mesh(g.unitBox, paintMat);
   body.position.set(-0.34, 0.54, 0);
-  body.scale.set(0.76, 0.3, 0.38);
+  body.scale.set(0.78, 0.32, 0.4);
   body.castShadow = true;
   const shield = new THREE.Mesh(g.unitBox, paintMat);
   shield.position.set(0.46, 0.64, 0);
   shield.rotation.z = 0.26;
-  shield.scale.set(0.24, 0.62, 0.36);
+  shield.scale.set(0.24, 0.62, 0.38);
   shield.castShadow = true;
+  const wind = new THREE.Mesh(g.unitBox, shieldGlass);
+  wind.position.set(0.46, 1.05, 0);
+  wind.rotation.z = 0.35;
+  wind.scale.set(0.04, 0.24, 0.26);
+  const fender = new THREE.Mesh(g.unitBox, paintMat);
+  fender.position.set(0.62, 0.48, 0);
+  fender.scale.set(0.32, 0.06, 0.18);
   const seat = new THREE.Mesh(g.unitBox, seatMat);
   seat.position.set(-0.28, 0.72, 0);
   seat.scale.set(0.72, 0.1, 0.34);
@@ -244,7 +370,13 @@ function buildMotorbike(THREE, tAssets, natureAssets, mats, bodyColor, jacketCol
   const tailLamp = new THREE.Mesh(g.unitBox, tailMat);
   tailLamp.position.set(-0.74, 0.66, 0);
   tailLamp.scale.set(0.05, 0.09, 0.2);
-  root.add(deck, body, shield, seat, fork, handle, exhaust, headLamp, tailLamp);
+  root.add(deck, body, shield, wind, fender, seat, fork, handle, exhaust, headLamp, tailLamp);
+  for (const ms of [-0.3, 0.3]) {
+    const mir = new THREE.Mesh(g.unitBox, chromeMat);
+    mir.position.set(0.42, 1.05, ms);
+    mir.scale.set(0.04, 0.07, 0.1);
+    root.add(mir);
+  }
 
   const rider = new THREE.Group();
   root.add(rider);
@@ -278,10 +410,51 @@ function buildMotorbike(THREE, tAssets, natureAssets, mats, bodyColor, jacketCol
   visor.rotation.y = Math.PI / 2;
   rider.add(helm, visor);
 
-  return { root, wheels, tailMat, halfLen: 1.05, wheelR: 0.24 };
+  return { root, wheels, mixer: null, tailMat, policeLightMat: null, halfLen: 1.05, wheelR: 0.24 };
 }
 
-// ---------------------------------------------------------------- Hệ thống giao thông hoàn chỉnh toàn khu phố
+const VEHICLE_GLB_TABLE = {
+  suv: ["veh_suv", 4.75, 2.48, -Math.PI / 2, false, 0.36],
+  sedan: ["veh_sedan", 4.55, 2.38, -Math.PI / 2, false, 0.33],
+  sedan_classic: ["veh_sedan_classic", 4.45, 2.34, -Math.PI / 2, false, 0.32],
+  hatchback: ["veh_hatchback", 4.05, 2.12, -Math.PI / 2, false, 0.31],
+  taxi: ["veh_taxi", 4.45, 2.32, -Math.PI / 2, false, 0.32],
+  van: ["veh_van", 4.95, 2.58, -Math.PI / 2, false, 0.35],
+  delivery: ["veh_delivery", 5.15, 2.68, -Math.PI / 2, true, 0.36],
+  pickup: ["veh_pickup", 4.85, 2.54, -Math.PI / 2, false, 0.37],
+  police: ["veh_police", 4.55, 2.38, -Math.PI / 2, true, 0.33],
+  ferrari: ["veh_ferrari", 4.52, 2.36, -Math.PI / 2, false, 0.33],
+  car: ["car", 4.55, 2.35, Math.PI / 2, false, 0.32],
+  truck: ["truck", 5.2, 2.75, Math.PI / 2, false, 0.4],
+};
+
+function buildTrafficVehicle(THREE, tAssets, natureAssets, mats, s, hdAssets) {
+  if (s.kind === "moto") return buildMotorbike(THREE, tAssets, natureAssets, mats, s.col, s.j, s.h);
+  if (s.kind === "bus") return buildCityBus(THREE, natureAssets, mats, s.col);
+
+  const cfg = VEHICLE_GLB_TABLE[s.kind];
+  if (cfg) {
+    const [key, targetLength, halfLen, rotY, keepWhitePaint, wheelR] = cfg;
+    const col = s.kind === "taxi" ? (s.col || "#eab308") : (s.kind === "police" ? "#1e3a8a" : s.col);
+    const v = upgradeVehicleGLB(THREE, natureAssets, mats, hdAssets, key, {
+      targetLength,
+      halfLen,
+      rotY,
+      color: col,
+      keepWhitePaint,
+      wheelR,
+    });
+    if (v) return v;
+  }
+  return upgradeVehicleGLB(THREE, natureAssets, mats, hdAssets, "car", {
+    targetLength: 4.55,
+    halfLen: 2.35,
+    rotY: Math.PI / 2,
+    color: s.col,
+  }) || buildFallbackCar(THREE, natureAssets, mats, s.col);
+}
+
+// ---------------------------------------------------------------- Hệ thống giao thông & công dân đô thị hoàn chỉnh
 export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, mats, plan, streetZ, hdAssets) {
   const root = new THREE.Group();
   const pad = plan.levels ? 6 : 4;
@@ -291,13 +464,11 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
   const northRoadZ = -6.4;
   const mainRoadZ = streetZ + 5.9;
 
-  // Toàn tuyến chạy dọc hết đường phố hiển thị
-  const ewMin = -64.0, ewMax = eastRoadX + 58.0, ewSpan = ewMax - ewMin;
-  const nsMin = -52.0, nsMax = streetZ + 50.0, nsSpan = nsMax - nsMin;
+  const ewMin = -64.0, ewMax = eastRoadX + 58.0;
+  const nsMin = -52.0, nsMax = streetZ + 50.0;
 
-  // 1. Hệ thống 18 cột đèn tín hiệu đủ 4 góc tại cả 4 ngã tư & nút qua đường chính (tay vươn luôn vươn ra lòng đường!)
+  // 1. Hệ thống 18 cột đèn tín hiệu đủ 4 góc tại cả 4 ngã tư & nút qua đường chính
   const lightSpecs = [
-    // Nút qua đường chính trước sảnh X-Office (Đông-Tây)
     [8.2, streetZ + 2.12, 1, 0, "ew"],
     [1.9, streetZ + 9.68, -1, 0, "ew"],
   ];
@@ -310,10 +481,10 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
     const hw = 3.75;
     const hd = iz === mainRoadZ ? 3.85 : 3.55;
     lightSpecs.push(
-      [ix - hw, iz - hd, 1, Math.PI / 2, "ns"],   // Tây-Bắc: tay vươn +X ra làn Nam
-      [ix + hw, iz + hd, -1, Math.PI / 2, "ns"],  // Đông-Nam: tay vươn -X ra làn Bắc
-      [ix + hw, iz - hd, 1, 0, "ew"],             // Đông-Bắc: tay vươn +Z ra làn Tây
-      [ix - hw, iz + hd, -1, 0, "ew"],            // Tây-Nam: tay vươn -Z ra làn Đông
+      [ix - hw, iz - hd, 1, Math.PI / 2, "ns"],
+      [ix + hw, iz + hd, -1, Math.PI / 2, "ns"],
+      [ix + hw, iz - hd, 1, 0, "ew"],
+      [ix - hw, iz + hd, -1, 0, "ew"],
     );
   }
   const lights = lightSpecs.map(([lx, lz, dirZ, rotY, sigAxis]) => {
@@ -322,7 +493,7 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
     return l;
   });
 
-  // 2. Đội xe chạy dọc hết cả 4 tuyến đường (Đông-Tây & Bắc-Nam)
+  // 2. Đội 32 phương tiện đa dạng chạy dọc cả 4 tuyến đại lộ (+ xe buýt tự ghé trạm dừng)
   const mainEastStop = [westRoadX - 5.9, 1.85, eastRoadX - 5.9];
   const mainWestStop = [eastRoadX + 5.9, 8.25, westRoadX + 5.9];
   const northEastStop = [westRoadX - 5.9, eastRoadX - 5.9];
@@ -332,48 +503,48 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
 
   const vehicleSpecs = [
     // Đại lộ chính Nam (Eastbound +X)
-    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.75, pos: -38.0, maxV: 4.5, kind: "truck", col: "#f1f5f9", stopLines: mainEastStop },
-    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.2, pos: -16.0, maxV: 4.5, kind: "moto", col: "#dc2626", j: "#1d4ed8", h: "#f8fafc", stopLines: mainEastStop },
-    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.75, pos: 12.0, maxV: 5.0, kind: "car", col: "#0284c7", stopLines: mainEastStop },
-    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 2.25, pos: 26.0, maxV: 4.6, kind: "moto", col: "#0f766e", j: "#334155", h: "#111827", stopLines: mainEastStop },
-    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.75, pos: 42.0, maxV: 4.8, kind: "car", col: "#b91c1c", stopLines: mainEastStop },
+    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.75, pos: -48.0, maxV: 4.4, kind: "truck", col: "#f1f5f9", stopLines: mainEastStop },
+    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.75, pos: -32.0, maxV: 4.8, kind: "pickup", col: "#991b1b", stopLines: mainEastStop },
+    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.2, pos: -18.0, maxV: 4.6, kind: "moto", col: "#dc2626", j: "#1d4ed8", h: "#f8fafc", stopLines: mainEastStop },
+    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.75, pos: -2.5, maxV: 4.3, kind: "bus", col: "#059669", busStopX: 19.5, stopLines: mainEastStop },
+    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 2.25, pos: 13.0, maxV: 4.7, kind: "moto", col: "#0f766e", j: "#334155", h: "#111827", stopLines: mainEastStop },
+    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.75, pos: 29.0, maxV: 5.0, kind: "ferrari", col: "#dc2626", stopLines: mainEastStop },
+    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.75, pos: 46.0, maxV: 4.9, kind: "suv", col: "#e2e8f0", stopLines: mainEastStop },
     { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.2, pos: eastRoadX + 26.0, maxV: 4.7, kind: "moto", col: "#ea580c", j: "#1e293b", h: "#f8fafc", stopLines: mainEastStop },
     // Đại lộ chính Nam (Westbound -X)
-    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.75, pos: eastRoadX + 34.0, maxV: 5.1, kind: "car", col: "#94a3b8", stopLines: mainWestStop },
-    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 2.25, pos: 35.0, maxV: 4.4, kind: "moto", col: "#f8fafc", j: "#15803d", h: "#dc2626", stopLines: mainWestStop },
-    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.75, pos: 18.0, maxV: 4.9, kind: "car", col: "#0f766e", stopLines: mainWestStop },
-    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.25, pos: 1.5, maxV: 4.6, kind: "moto", col: "#1e3a8a", j: "#c2410c", h: "#facc15", stopLines: mainWestStop },
-    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.75, pos: -24.0, maxV: 5.0, kind: "car", col: "#334155", stopLines: mainWestStop },
-    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.25, pos: -48.0, maxV: 4.5, kind: "moto", col: "#18181b", j: "#6d28d9", h: "#e2e8f0", stopLines: mainWestStop },
+    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.75, pos: eastRoadX + 36.0, maxV: 4.9, kind: "police", col: "#1e3a8a", stopLines: mainWestStop },
+    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.75, pos: eastRoadX + 18.0, maxV: 4.9, kind: "taxi", col: "#eab308", stopLines: mainWestStop },
+    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 2.25, pos: 40.0, maxV: 4.5, kind: "moto", col: "#f8fafc", j: "#15803d", h: "#dc2626", stopLines: mainWestStop },
+    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.75, pos: 26.0, maxV: 4.8, kind: "sedan", col: "#3b82f6", stopLines: mainWestStop },
+    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.25, pos: 14.0, maxV: 4.6, kind: "moto", col: "#1e3a8a", j: "#c2410c", h: "#facc15", stopLines: mainWestStop },
+    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.75, pos: -2.0, maxV: 4.7, kind: "van", col: "#64748b", stopLines: mainWestStop },
+    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.75, pos: -24.0, maxV: 5.0, kind: "hatchback", col: "#0284c7", stopLines: mainWestStop },
+    { axis: "x", sigAxis: "ew", dir: -1, lane: mainRoadZ - 1.25, pos: -46.0, maxV: 4.5, kind: "moto", col: "#18181b", j: "#6d28d9", h: "#e2e8f0", stopLines: mainWestStop },
     // Đại lộ phía Bắc (sau lưng văn phòng, chạy suốt tuyến)
-    { axis: "x", sigAxis: "ew", dir: 1, lane: northRoadZ + 1.55, pos: -32.0, maxV: 4.8, kind: "car", col: "#e2e8f0", stopLines: northEastStop },
+    { axis: "x", sigAxis: "ew", dir: 1, lane: northRoadZ + 1.55, pos: -32.0, maxV: 4.8, kind: "sedan_classic", col: "#cbd5e1", stopLines: northEastStop },
     { axis: "x", sigAxis: "ew", dir: 1, lane: northRoadZ + 1.55, pos: 14.0, maxV: 4.7, kind: "moto", col: "#0284c7", j: "#0f172a", h: "#f8fafc", stopLines: northEastStop },
-    { axis: "x", sigAxis: "ew", dir: 1, lane: northRoadZ + 1.55, pos: eastRoadX + 18.0, maxV: 4.9, kind: "car", col: "#1d4ed8", stopLines: northEastStop },
-    { axis: "x", sigAxis: "ew", dir: -1, lane: northRoadZ - 1.55, pos: eastRoadX + 24.0, maxV: 4.5, kind: "truck", col: "#0f766e", stopLines: northWestStop },
+    { axis: "x", sigAxis: "ew", dir: 1, lane: northRoadZ + 1.55, pos: eastRoadX + 18.0, maxV: 4.9, kind: "suv", col: "#1d4ed8", stopLines: northEastStop },
+    { axis: "x", sigAxis: "ew", dir: -1, lane: northRoadZ - 1.55, pos: eastRoadX + 24.0, maxV: 4.5, kind: "delivery", col: "#0f766e", stopLines: northWestStop },
     { axis: "x", sigAxis: "ew", dir: -1, lane: northRoadZ - 1.55, pos: 22.0, maxV: 4.6, kind: "moto", col: "#b91c1c", j: "#1e293b", h: "#facc15", stopLines: northWestStop },
-    { axis: "x", sigAxis: "ew", dir: -1, lane: northRoadZ - 1.55, pos: -26.0, maxV: 4.8, kind: "car", col: "#64748b", stopLines: northWestStop },
-    // Đại lộ nhánh Tây (Bắc-Nam, qua ngã tư Tây-Bắc & Tây-Nam)
+    { axis: "x", sigAxis: "ew", dir: -1, lane: northRoadZ - 1.55, pos: -26.0, maxV: 4.8, kind: "taxi", col: "#eab308", stopLines: northWestStop },
+    // Đại lộ nhánh Tây (Bắc-Nam)
     { axis: "z", sigAxis: "ns", dir: 1, lane: westRoadX - 1.65, pos: -34.0, maxV: 4.8, kind: "car", col: "#f8fafc", stopLines: nsSouthStop },
     { axis: "z", sigAxis: "ns", dir: 1, lane: westRoadX - 1.2, pos: 6.0, maxV: 4.5, kind: "moto", col: "#dc2626", j: "#1d4ed8", h: "#f8fafc", stopLines: nsSouthStop },
-    { axis: "z", sigAxis: "ns", dir: 1, lane: westRoadX - 1.65, pos: mainRoadZ + 18.0, maxV: 4.9, kind: "car", col: "#0284c7", stopLines: nsSouthStop },
-    { axis: "z", sigAxis: "ns", dir: -1, lane: westRoadX + 1.65, pos: mainRoadZ + 28.0, maxV: 4.8, kind: "car", col: "#334155", stopLines: nsNorthStop },
+    { axis: "z", sigAxis: "ns", dir: 1, lane: westRoadX - 1.65, pos: mainRoadZ + 18.0, maxV: 4.9, kind: "pickup", col: "#0284c7", stopLines: nsSouthStop },
+    { axis: "z", sigAxis: "ns", dir: -1, lane: westRoadX + 1.65, pos: mainRoadZ + 28.0, maxV: 4.8, kind: "sedan", col: "#334155", stopLines: nsNorthStop },
     { axis: "z", sigAxis: "ns", dir: -1, lane: westRoadX + 1.2, pos: 14.0, maxV: 4.4, kind: "moto", col: "#0f766e", j: "#c2410c", h: "#f8fafc", stopLines: nsNorthStop },
-    { axis: "z", sigAxis: "ns", dir: -1, lane: westRoadX + 1.65, pos: -24.0, maxV: 4.7, kind: "car", col: "#b91c1c", stopLines: nsNorthStop },
-    // Đại lộ nhánh Đông (Bắc-Nam, qua ngã tư Đông-Bắc & Đông-Nam)
-    { axis: "z", sigAxis: "ns", dir: 1, lane: eastRoadX - 1.65, pos: -28.0, maxV: 4.4, kind: "truck", col: "#94a3b8", stopLines: nsSouthStop },
+    { axis: "z", sigAxis: "ns", dir: -1, lane: westRoadX + 1.65, pos: -24.0, maxV: 4.7, kind: "hatchback", col: "#b91c1c", stopLines: nsNorthStop },
+    // Đại lộ nhánh Đông (Bắc-Nam)
+    { axis: "z", sigAxis: "ns", dir: 1, lane: eastRoadX - 1.65, pos: -28.0, maxV: 4.3, kind: "bus", col: "#0369a1", stopLines: nsSouthStop },
     { axis: "z", sigAxis: "ns", dir: 1, lane: eastRoadX - 1.2, pos: 9.0, maxV: 4.5, kind: "moto", col: "#1e3a8a", j: "#334155", h: "#facc15", stopLines: nsSouthStop },
-    { axis: "z", sigAxis: "ns", dir: 1, lane: eastRoadX - 1.65, pos: mainRoadZ + 20.0, maxV: 4.7, kind: "car", col: "#15803d", stopLines: nsSouthStop },
-    { axis: "z", sigAxis: "ns", dir: -1, lane: eastRoadX + 1.65, pos: mainRoadZ + 32.0, maxV: 4.8, kind: "car", col: "#f1f5f9", stopLines: nsNorthStop },
+    { axis: "z", sigAxis: "ns", dir: 1, lane: eastRoadX - 1.65, pos: mainRoadZ + 20.0, maxV: 4.7, kind: "van", col: "#15803d", stopLines: nsSouthStop },
+    { axis: "z", sigAxis: "ns", dir: -1, lane: eastRoadX + 1.65, pos: mainRoadZ + 32.0, maxV: 4.8, kind: "suv", col: "#f1f5f9", stopLines: nsNorthStop },
     { axis: "z", sigAxis: "ns", dir: -1, lane: eastRoadX + 1.2, pos: 17.0, maxV: 4.4, kind: "moto", col: "#ea580c", j: "#1d4ed8", h: "#f8fafc", stopLines: nsNorthStop },
-    { axis: "z", sigAxis: "ns", dir: -1, lane: eastRoadX + 1.65, pos: -22.0, maxV: 4.8, kind: "car", col: "#0284c7", stopLines: nsNorthStop },
+    { axis: "z", sigAxis: "ns", dir: -1, lane: eastRoadX + 1.65, pos: -22.0, maxV: 4.8, kind: "sedan_classic", col: "#0284c7", stopLines: nsNorthStop },
   ];
 
   const vehicles = vehicleSpecs.map((s) => {
-    const v = s.kind === "truck"
-      ? buildTrafficTruck(THREE, natureAssets, mats, s.col, hdAssets)
-      : s.kind === "car"
-        ? buildTrafficCar(THREE, natureAssets, mats, s.col, hdAssets)
-        : buildMotorbike(THREE, tAssets, natureAssets, mats, s.col, s.j, s.h);
+    const v = buildTrafficVehicle(THREE, tAssets, natureAssets, mats, s, hdAssets);
     if (s.axis === "x") {
       v.root.position.set(s.pos, 0, s.lane);
       v.root.rotation.y = s.dir > 0 ? 0 : Math.PI;
@@ -398,64 +569,248 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
       speed: s.maxV * 0.72,
       maxV: s.maxV,
       stopLines: s.stopLines,
+      busStopX: s.busStopX,
+      stopTimer: 0,
+      stopCooldown: 0,
     };
   });
 
-  // 3. Người đi bộ dạo trên vỉa hè cả 4 tuyến đường bao quanh khu phố (dùng nhân vật Ready Player Me HD khi có)
-  const STREET_SHIRTS = ["#2563eb", "#be123c", "#15803d", "#0f766e", "#c2410c", "#6d28d9", "#0369a1", "#b45309"];
-  const sidewalkWalkers = [];
-  [
-    { index: 41, path: [[9.5, streetZ + 1.15], [W + 1.5, streetZ + 1.15]], x: 16.0, z: streetZ + 1.15, holdCup: true, speed: 0.78 },
-    { index: 42, path: [[W + 0.5, streetZ + 1.55], [10.0, streetZ + 1.55]], x: 28.0, z: streetZ + 1.55, holdCup: false, speed: 0.72 },
-    { index: 43, path: [[8.5, streetZ + 10.4], [W + 2.0, streetZ + 10.4]], x: 14.0, z: streetZ + 10.4, holdCup: false, speed: 0.75 },
-    { index: 44, path: [[W + 1.0, streetZ + 10.85], [8.5, streetZ + 10.85]], x: 30.0, z: streetZ + 10.85, holdCup: true, speed: 0.7 },
-    { index: 47, path: [[0.5, -10.8], [W + 2.0, -10.8]], x: 12.0, z: -10.8, holdCup: false, speed: 0.74 },
-    { index: 48, path: [[-11.3, 1.0], [-11.3, streetZ - 1.5]], x: -11.3, z: 10.0, holdCup: true, speed: 0.76 },
-    { index: 49, path: [[eastRoadX + 4.5, streetZ - 1.5], [eastRoadX + 4.5, 1.0]], x: eastRoadX + 4.5, z: 14.0, holdCup: false, speed: 0.73 },
-  ].forEach((spec, idx) => {
-    const hd = buildHDHuman(THREE, hdAssets, mats, {
-      ...spec,
-      mode: "walk",
-      femaleWalk: idx % 2 === 1,
-      topColor: STREET_SHIRTS[idx % STREET_SHIRTS.length],
-    });
-    const w = hd || buildWalkerRig(THREE, humanAssets, mats, spec);
-    root.add(w.root);
-    sidewalkWalkers.push(w);
-  });
+  // 3. 13 công dân Ready Player Me có lịch trình mục đích rõ ràng (giao hàng, đón xe buýt, cà phê vỉa hè, công viên, dạo liên tuyến phố)
+  const STREET_SHIRTS = ["#2563eb", "#be123c", "#15803d", "#0f766e", "#c2410c", "#6d28d9", "#0369a1", "#b45309", "#1e3a8a"];
+  const zN = streetZ + 1.35;
+  const zS = streetZ + 10.65;
+  const xMainL = 4.35;
+  const xMainR = 5.65;
+  const xWW = westRoadX - 4.75;
+  const xWE = westRoadX + 4.25;
+  const xEW = eastRoadX - 4.35;
+  const xEE = eastRoadX + 4.65;
+  const zNN = northRoadZ - 4.05;
+  const zNS = northRoadZ + 4.0;
+  const xPark = 20.6;
 
-  // 4. Người đi bộ băng qua vạch trắng tại nút chính & 4 ngã tư (luôn quay mặt đúng hướng -Z tiến tới & dứt khoát trước đèn xanh xe!)
-  const crossers = [
-    // Nút chính trước X-Office (băng qua đại lộ theo chiều Bắc-Nam)
-    { index: 45, axis: "z", pedGroup: "ns", fixed: 4.3, p0: streetZ + 1.65, p1: streetZ + 10.25, from0: true },
-    { index: 46, axis: "z", pedGroup: "ns", fixed: 5.75, p0: streetZ + 1.65, p1: streetZ + 10.25, from0: false },
-    // Ngã tư Tây-Nam
-    { index: 50, axis: "z", pedGroup: "ns", fixed: westRoadX - 4.4, p0: mainRoadZ - 4.4, p1: mainRoadZ + 4.4, from0: true },
-    { index: 51, axis: "x", pedGroup: "ew", fixed: mainRoadZ + 4.6, p0: westRoadX - 4.2, p1: westRoadX + 4.2, from0: false },
-    // Ngã tư Đông-Nam
-    { index: 52, axis: "z", pedGroup: "ns", fixed: eastRoadX + 4.4, p0: mainRoadZ - 4.4, p1: mainRoadZ + 4.4, from0: false },
-    { index: 53, axis: "x", pedGroup: "ew", fixed: mainRoadZ + 4.6, p0: eastRoadX - 4.2, p1: eastRoadX + 4.2, from0: true },
-    // Ngã tư Tây-Bắc & Đông-Bắc
-    { index: 54, axis: "z", pedGroup: "ns", fixed: westRoadX - 4.4, p0: northRoadZ - 3.8, p1: northRoadZ + 3.8, from0: true },
-    { index: 55, axis: "z", pedGroup: "ns", fixed: eastRoadX + 4.4, p0: northRoadZ - 3.8, p1: northRoadZ + 3.8, from0: false },
-  ].map((c) => {
-    const startP = c.from0 ? c.p0 : c.p1;
-    const x = c.axis === "z" ? c.fixed : startP;
-    const z = c.axis === "z" ? startP : c.fixed;
-    const initDir = c.from0 ? 1 : -1;
-    const rotY = c.axis === "z" ? (initDir > 0 ? Math.PI : 0) : (initDir > 0 ? -Math.PI / 2 : Math.PI / 2);
-    const w = buildHDHuman(THREE, hdAssets, mats, {
-      index: c.index,
-      x,
-      z,
-      rotY,
+  function mkRig(idx, opts = {}) {
+    const r = buildHDHuman(THREE, hdAssets, mats, {
+      index: idx,
+      variant: idx % 2 === 0 ? "rpm_a" : "rpm_b",
       mode: "idle",
-      femaleWalk: c.index % 2 === 1,
-      topColor: STREET_SHIRTS[c.index % STREET_SHIRTS.length],
-    }) || buildWalkerRig(THREE, humanAssets, mats, { index: c.index, x, z, rotY });
-    root.add(w.root);
-    return { rig: w, ...c, progress: 0, dir: initDir, initDir, initRotY: rotY };
-  });
+      femaleWalk: idx % 2 === 1,
+      topColor: opts.topColor || STREET_SHIRTS[idx % STREET_SHIRTS.length],
+      parcel: Boolean(opts.parcel),
+    }) || buildWalkerRig(THREE, humanAssets, mats, { index: idx, parcel: Boolean(opts.parcel) });
+    root.add(r.root);
+    return r;
+  }
+
+  const citizensSpec = [
+    // Nhân viên giao hàng ôm kiện carton: từ xe tải đỗ ven đường → qua vạch đèn đỏ → quầy sảnh X-Office → quay về xe
+    {
+      index: 41,
+      parcel: true,
+      topColor: "#b45309",
+      steps: [
+        { act: "wait", pos: [10.6, streetZ + 11.4], yaw: Math.PI, dur: 2.8, mode: "idle" },
+        { act: "walk", from: [10.6, streetZ + 11.4], to: [10.6, zS], speed: 1.25 },
+        { act: "walk", from: [10.6, zS], to: [xMainR, zS], speed: 1.32 },
+        { act: "walk", from: [xMainR, zS], to: [xMainR, zN], cross: "ns", speed: 2.35 },
+        { act: "walk", from: [xMainR, zN], to: [5.0, streetZ - 0.8], speed: 1.28 },
+        { act: "wait", pos: [5.0, streetZ - 0.8], yaw: Math.PI, dur: 4.5, mode: "talk" },
+        { act: "walk", from: [5.0, streetZ - 0.8], to: [xMainL, zN], speed: 1.28 },
+        { act: "walk", from: [xMainL, zN], to: [xMainL, zS], cross: "ns", speed: 2.35 },
+        { act: "walk", from: [xMainL, zS], to: [10.6, zS], speed: 1.32 },
+        { act: "walk", from: [10.6, zS], to: [10.6, streetZ + 11.4], speed: 1.25 },
+      ],
+      initIdx: 3,
+    },
+    // Hành khách trạm xe buýt → đợi xe tại nhà chờ → sang đường tới sảnh văn phòng / tiếp tục qua ngã tư Đông
+    {
+      index: 42,
+      steps: [
+        { act: "wait", pos: [18.7, streetZ + 10.9], yaw: 0, dur: 5.0, mode: "idle" },
+        { act: "walk", from: [18.7, zS], to: [xMainR, zS], speed: 1.36 },
+        { act: "walk", from: [xMainR, zS], to: [xMainR, zN], cross: "ns", speed: 2.35 },
+        { act: "walk", from: [xMainR, zN], to: [5.2, streetZ - 0.6], speed: 1.28 },
+        { act: "wait", pos: [5.2, streetZ - 0.6], yaw: 0, dur: 3.4, mode: "talk" },
+        { act: "walk", from: [5.2, streetZ - 0.6], to: [xEW, zN], speed: 1.38 },
+        { act: "walk", from: [xEW, zN], to: [xEW, zS], cross: "ns", speed: 2.35 },
+        { act: "walk", from: [xEW, zS], to: [18.7, zS], speed: 1.35 },
+      ],
+      initIdx: 0,
+    },
+    {
+      index: 43,
+      steps: [
+        { act: "wait", pos: [20.1, streetZ + 10.9], yaw: 0.4, dur: 4.5, mode: "talk" },
+        { act: "walk", from: [20.1, zS], to: [xEW, zS], speed: 1.34 },
+        { act: "walk", from: [xEW, zS], to: [xEE, zS], cross: "ew", speed: 2.35 },
+        { act: "walk", from: [xEE, zS], to: [xEE, zN], cross: "ns", speed: 2.35 },
+        { act: "walk", from: [xEE, zN], to: [xEE, 17.0], speed: 1.3 },
+        { act: "wait", pos: [xEE, 17.0], yaw: Math.PI / 2, dur: 4.0, mode: "talk" },
+        { act: "walk", from: [xEE, 17.0], to: [xEE, zN], speed: 1.32 },
+        { act: "walk", from: [xEE, zN], to: [xEW, zN], cross: "ew", speed: 2.35 },
+        { act: "walk", from: [xEW, zN], to: [xEW, zS], cross: "ns", speed: 2.35 },
+        { act: "walk", from: [xEW, zS], to: [20.1, zS], speed: 1.34 },
+      ],
+      initIdx: 2,
+    },
+    {
+      index: 44,
+      steps: [
+        { act: "wait", pos: [21.0, streetZ + 11.1], yaw: -0.35, dur: 5.2, mode: "talk" },
+        { act: "walk", from: [21.0, zS], to: [xWE, zS], speed: 1.38 },
+        { act: "walk", from: [xWE, zS], to: [xWW, zS], cross: "ew", speed: 2.35 },
+        { act: "walk", from: [xWW, zS], to: [xWW, zN], cross: "ns", speed: 2.35 },
+        { act: "walk", from: [xWW, zN], to: [xWE, zN], cross: "ew", speed: 2.35 },
+        { act: "walk", from: [xWE, zN], to: [xMainL, zN], speed: 1.36 },
+        { act: "walk", from: [xMainL, zN], to: [xMainL, zS], cross: "ns", speed: 2.35 },
+        { act: "walk", from: [xMainL, zS], to: [21.0, zS], speed: 1.35 },
+      ],
+      initIdx: 5,
+    },
+    // Khách cà phê vỉa hè Tây: gọi đồ trước hiên → ngồi/đứng bàn dù → sang vạch đèn đỏ → dạo tiếp sang Đông
+    {
+      index: 45,
+      steps: [
+        { act: "wait", pos: [3.4, streetZ + 12.1], yaw: Math.PI, dur: 3.8, mode: "talk" },
+        { act: "walk", from: [3.4, streetZ + 12.1], to: [1.9, streetZ + 12.4], speed: 1.15 },
+        { act: "wait", pos: [1.9, streetZ + 12.4], yaw: Math.PI / 2, dur: 4.8, mode: "idle" },
+        { act: "walk", from: [1.9, streetZ + 12.4], to: [xMainL, zS], speed: 1.25 },
+        { act: "walk", from: [xMainL, zS], to: [xMainL, zN], cross: "ns", speed: 2.35 },
+        { act: "walk", from: [xMainL, zN], to: [xEW, zN], speed: 1.38 },
+        { act: "walk", from: [xEW, zN], to: [xEE, zN], cross: "ew", speed: 2.35 },
+        { act: "walk", from: [xEE, zN], to: [xEE, zS], cross: "ns", speed: 2.35 },
+        { act: "walk", from: [xEE, zS], to: [xEW, zS], cross: "ew", speed: 2.35 },
+        { act: "walk", from: [xEW, zS], to: [3.4, zS], speed: 1.38 },
+        { act: "walk", from: [3.4, zS], to: [3.4, streetZ + 12.1], speed: 1.15 },
+      ],
+      initIdx: 3,
+    },
+    // Khách cà phê vỉa hè Đông → dạo tới vạch chính → sang đường tiếp tục hành trình
+    {
+      index: 46,
+      steps: [
+        { act: "wait", pos: [28.4, streetZ + 12.1], yaw: Math.PI, dur: 4.2, mode: "talk" },
+        { act: "walk", from: [28.4, streetZ + 12.1], to: [27.9, streetZ + 12.4], speed: 1.1 },
+        { act: "wait", pos: [27.9, streetZ + 12.4], yaw: 0, dur: 4.0, mode: "idle" },
+        { act: "walk", from: [27.9, zS], to: [xMainR, zS], speed: 1.36 },
+        { act: "walk", from: [xMainR, zS], to: [xMainR, zN], cross: "ns", speed: 2.35 },
+        { act: "walk", from: [xMainR, zN], to: [xEW, zN], speed: 1.36 },
+        { act: "walk", from: [xEW, zN], to: [xEW, zS], cross: "ns", speed: 2.35 },
+        { act: "walk", from: [xEW, zS], to: [28.4, zS], speed: 1.34 },
+      ],
+      initIdx: 4,
+    },
+    // Khách dạo phố Tây ↔ quán cà phê góc Tây
+    {
+      index: 47,
+      steps: [
+        { act: "wait", pos: [xWW, 24.0], yaw: Math.PI / 2, dur: 4.5, mode: "talk" },
+        { act: "walk", from: [xWW, 24.0], to: [xWW, zN], speed: 1.32 },
+        { act: "walk", from: [xWW, zN], to: [xWW, zS], cross: "ns", speed: 2.35 },
+        { act: "walk", from: [xWW, zS], to: [xWE, zS], cross: "ew", speed: 2.35 },
+        { act: "walk", from: [xWE, zS], to: [xWE, zN], cross: "ns", speed: 2.35 },
+        { act: "walk", from: [xWE, zN], to: [xWW, zN], cross: "ew", speed: 2.35 },
+        { act: "walk", from: [xWW, zN], to: [xWW, 24.0], speed: 1.32 },
+      ],
+      initIdx: 2,
+    },
+    // Nhân viên quán cà phê đứng đón khách bên bảng menu
+    {
+      index: 48,
+      steps: [{ act: "wait", pos: [4.9, streetZ + 12.5], yaw: 0.35, dur: 12.0, mode: "talk" }],
+      initIdx: 0,
+    },
+    // Khách tham quan công viên & đài phun nước Nam
+    {
+      index: 49,
+      steps: [
+        { act: "wait", pos: [19.4, streetZ + 16.8], yaw: -0.65, dur: 5.0, mode: "talk" },
+        { act: "walk", from: [19.4, streetZ + 16.8], to: [18.4, streetZ + 15.2], speed: 1.15 },
+        { act: "wait", pos: [18.4, streetZ + 15.2], yaw: Math.PI / 2, dur: 4.5, mode: "idle" },
+        { act: "walk", from: [18.4, streetZ + 15.2], to: [xPark, zS], speed: 1.25 },
+        { act: "walk", from: [xPark, zS], to: [xMainL, zS], speed: 1.38 },
+        { act: "walk", from: [xMainL, zS], to: [xMainL, zN], cross: "ns", speed: 2.35 },
+        { act: "walk", from: [xMainL, zN], to: [xMainR, zN], speed: 1.25 },
+        { act: "walk", from: [xMainR, zN], to: [xMainR, zS], cross: "ns", speed: 2.35 },
+        { act: "walk", from: [xMainR, zS], to: [xPark, zS], speed: 1.38 },
+        { act: "walk", from: [xPark, zS], to: [19.4, streetZ + 16.8], speed: 1.22 },
+      ],
+      initIdx: 0,
+    },
+    {
+      index: 50,
+      steps: [
+        { act: "wait", pos: [21.6, streetZ + 17.5], yaw: 1.2, dur: 4.8, mode: "idle" },
+        { act: "walk", from: [21.6, streetZ + 17.5], to: [xPark, zS], speed: 1.25 },
+        { act: "walk", from: [xPark, zS], to: [xEW, zS], speed: 1.38 },
+        { act: "walk", from: [xEW, zS], to: [xEW, zN], cross: "ns", speed: 2.35 },
+        { act: "walk", from: [xEW, zN], to: [xEW, zNS], speed: 1.35 },
+        { act: "walk", from: [xEW, zNS], to: [xEW, zNN], cross: "ns", speed: 2.35 },
+        { act: "walk", from: [xEW, zNN], to: [15.2, zNN], speed: 1.35 },
+        { act: "wait", pos: [15.2, zNN], yaw: 0, dur: 3.8, mode: "talk" },
+        { act: "walk", from: [15.2, zNN], to: [xEW, zNN], speed: 1.35 },
+        { act: "walk", from: [xEW, zNN], to: [xEW, zNS], cross: "ns", speed: 2.35 },
+        { act: "walk", from: [xEW, zNS], to: [xEW, zN], speed: 1.35 },
+        { act: "walk", from: [xEW, zN], to: [xEW, zS], cross: "ns", speed: 2.35 },
+        { act: "walk", from: [xEW, zS], to: [xPark, zS], speed: 1.36 },
+        { act: "walk", from: [xPark, zS], to: [21.6, streetZ + 17.5], speed: 1.22 },
+      ],
+      initIdx: 3,
+    },
+    // Người đi bộ dạo trọn 4 khối phố (Tây-Nam → Tây-Bắc → Đông-Bắc → Đông-Nam) luôn qua vạch rồi đi tiếp
+    {
+      index: 51,
+      steps: [
+        { act: "walk", from: [xWW, zN], to: [xWW, zNS], speed: 1.42 },
+        { act: "walk", from: [xWW, zNS], to: [xWW, zNN], cross: "ns", speed: 2.35 },
+        { act: "walk", from: [xWW, zNN], to: [xWE, zNN], cross: "ew", speed: 2.35 },
+        { act: "walk", from: [xWE, zNN], to: [xEW, zNN], speed: 1.42 },
+        { act: "walk", from: [xEW, zNN], to: [xEE, zNN], cross: "ew", speed: 2.35 },
+        { act: "walk", from: [xEE, zNN], to: [xEE, zNS], cross: "ns", speed: 2.35 },
+        { act: "walk", from: [xEE, zNS], to: [xEE, zN], speed: 1.42 },
+        { act: "walk", from: [xEE, zN], to: [xEE, zS], cross: "ns", speed: 2.35 },
+        { act: "walk", from: [xEE, zS], to: [xEW, zS], cross: "ew", speed: 2.35 },
+        { act: "walk", from: [xEW, zS], to: [xWE, zS], speed: 1.42 },
+        { act: "walk", from: [xWE, zS], to: [xWW, zS], cross: "ew", speed: 2.35 },
+        { act: "walk", from: [xWW, zS], to: [xWW, zN], cross: "ns", speed: 2.35 },
+      ],
+      initIdx: 7,
+    },
+    {
+      index: 52,
+      steps: [
+        { act: "walk", from: [xMainR, zN], to: [xWE, zN], speed: 1.38 },
+        { act: "walk", from: [xWE, zN], to: [xWW, zN], cross: "ew", speed: 2.35 },
+        { act: "walk", from: [xWW, zN], to: [xWW, zS], cross: "ns", speed: 2.35 },
+        { act: "walk", from: [xWW, zS], to: [xWE, zS], cross: "ew", speed: 2.35 },
+        { act: "walk", from: [xWE, zS], to: [xMainR, zS], speed: 1.38 },
+        { act: "walk", from: [xMainR, zS], to: [xMainR, zN], cross: "ns", speed: 2.35 },
+      ],
+      initIdx: 1,
+    },
+    {
+      index: 53,
+      steps: [
+        { act: "walk", from: [xWE, zNN], to: [xWE, zNS], cross: "ns", speed: 2.35 },
+        { act: "walk", from: [xWE, zNS], to: [xWE, zN], speed: 1.36 },
+        { act: "walk", from: [xWE, zN], to: [xWE, zS], cross: "ns", speed: 2.35 },
+        { act: "walk", from: [xWE, zS], to: [xEW, zS], speed: 1.38 },
+        { act: "walk", from: [xEW, zS], to: [xEW, zN], cross: "ns", speed: 2.35 },
+        { act: "walk", from: [xEW, zN], to: [xEW, zNS], speed: 1.36 },
+        { act: "walk", from: [xEW, zNS], to: [xEW, zNN], cross: "ns", speed: 2.35 },
+        { act: "walk", from: [xEW, zNN], to: [xWE, zNN], speed: 1.38 },
+      ],
+      initIdx: 3,
+    },
+  ];
+
+  const urbanNPCs = citizensSpec.map((spec) =>
+    createScheduledNPC(
+      mkRig(spec.index, { parcel: spec.parcel, topColor: spec.topColor }),
+      spec.steps,
+      spec.initIdx || 0,
+      0,
+    ));
 
   let prevT = 0;
 
@@ -467,8 +822,8 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
       const nsSig = phase < 10.5 ? "red" : phase < 16.5 ? "green" : "yellow";
       const pedGoNS = phase >= 10.8 && phase <= 16.2;
       const pedGoEW = phase >= 0.6 && phase <= 8.0;
-      const pedStartNS = phase >= 10.8 && phase <= 13.0;
-      const pedStartEW = phase >= 0.6 && phase <= 5.5;
+      const pedStartNS = phase >= 10.8 && phase <= 12.9;
+      const pedStartEW = phase >= 0.6 && phase <= 4.8;
 
       for (const l of lights) {
         const sig = l.sigAxis === "ew" ? ewSig : nsSig;
@@ -488,22 +843,14 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
       if (!motion) {
         for (const v of vehicles) {
           v.pos = v.initPos;
+          v.stopTimer = 0;
+          v.stopCooldown = 0;
           if (v.axis === "x") v.root.position.x = v.pos;
           else v.root.position.z = v.pos;
           v.tailMat.emissiveIntensity = 0.75;
+          if (v.policeLightMat) v.policeLightMat.emissiveIntensity = 0.9;
         }
-        for (const sw of sidewalkWalkers) {
-          if (sw.isHD) animateHDHuman(sw, 0, 0, false, "idle");
-          else animateWalkerRig(sw, 0, false);
-        }
-        for (const cr of crossers) {
-          const p = cr.from0 ? cr.p0 : cr.p1;
-          if (cr.axis === "z") cr.rig.root.position.z = p;
-          else cr.rig.root.position.x = p;
-          cr.rig.root.rotation.y = cr.initRotY;
-          if (cr.rig.isHD) animateHDHuman(cr.rig, 0, 0, false, "idle");
-          else animateWalkerRig(cr.rig, 0, false);
-        }
+        for (const npc of urbanNPCs) stepScheduledNPC(npc, 0, 0, false);
         prevT = t;
         return;
       }
@@ -511,11 +858,30 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
       const dt = prevT ? Math.min(0.06, Math.max(0.001, t - prevT)) : 0.016;
       prevT = t;
 
-      // Động học xe cộ trên cả 4 tuyến đường
+      // Động học phương tiện (dừng vạch đèn đỏ, giữ khoảng cách an toàn, xe buýt tự ghé trạm đón khách)
       for (const v of vehicles) {
         let desired = v.maxV;
         const sig = v.sigAxis === "ew" ? ewSig : nsSig;
         let redHold = false;
+
+        if (v.stopCooldown > 0) v.stopCooldown = Math.max(0, v.stopCooldown - dt);
+        if (v.stopTimer > 0) {
+          v.stopTimer = Math.max(0, v.stopTimer - dt);
+          desired = 0;
+          redHold = true;
+          if (v.stopTimer === 0) v.stopCooldown = 14.0;
+        } else if (v.busStopX !== undefined && v.stopCooldown <= 0) {
+          const distStop = (v.busStopX - v.pos) * v.dir;
+          if (distStop > -0.6 && distStop < 8.5) {
+            if (distStop <= 0.65) {
+              v.stopTimer = 3.8;
+              desired = 0;
+              redHold = true;
+            } else {
+              desired = Math.min(desired, (distStop / 5.5) * v.maxV);
+            }
+          }
+        }
 
         if (sig !== "green") {
           for (const sl of v.stopLines) {
@@ -556,53 +922,11 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
         for (const w of v.wheels) w.rotation.z -= dSpin;
         if (v.mixer && v.speed > 0.05) v.mixer.update(dt * (v.speed / 3.8));
         v.tailMat.emissiveIntensity = braking ? 2.8 : 0.75;
+        if (v.policeLightMat) v.policeLightMat.emissiveIntensity = Math.sin(t * 14) > 0 ? 3.2 : 0.25;
       }
 
-      for (const sw of sidewalkWalkers) {
-        if (sw.isHD) animateHDHuman(sw, t, dt, true);
-        else animateWalkerRig(sw, t, true);
-      }
-
-      // Người qua đường tại các vạch kẻ ngã tư & nút chính (-Z tiến tới đúng chiều, không đi lùi!)
-      for (const cr of crossers) {
-        const w = cr.rig;
-        const pGo = cr.pedGroup === "ns" ? pedGoNS : pedGoEW;
-        const canStart = cr.pedGroup === "ns" ? pedStartNS : pedStartEW;
-        if (cr.progress >= 1 && !pGo) {
-          cr.dir *= -1;
-          cr.progress = 0;
-        }
-        const movingCross = (canStart && cr.progress < 1) || (cr.progress > 0.01 && cr.progress < 1);
-        const yaw = cr.axis === "z" ? (cr.dir > 0 ? Math.PI : 0) : (cr.dir > 0 ? -Math.PI / 2 : Math.PI / 2);
-        w.root.rotation.y = yaw;
-        if (movingCross) {
-          cr.progress = Math.min(1, cr.progress + dt * 0.26);
-          const u = cr.dir > 0 ? cr.progress : 1 - cr.progress;
-          const p = cr.p0 + (cr.p1 - cr.p0) * u;
-          if (cr.axis === "z") w.root.position.z = p;
-          else w.root.position.x = p;
-        }
-        if (w.isHD) {
-          animateHDHuman(w, t, dt, true, movingCross ? "walk" : "idle");
-        } else {
-          if (movingCross) {
-            const stride = Math.sin(t * 5.8 + cr.index);
-            w.body.position.y = 0.835 + Math.abs(Math.cos(t * 5.8 + cr.index)) * 0.032;
-            w.leftLeg.rotation.x = stride * 0.44;
-            w.rightLeg.rotation.x = -stride * 0.44;
-            w.leftArm.rotation.x = -stride * 0.36;
-            w.rightArm.rotation.x = stride * 0.36;
-          } else {
-            w.body.position.y = 0.835;
-            w.leftLeg.rotation.x = w.rightLeg.rotation.x = 0;
-            w.leftArm.rotation.x = w.rightArm.rotation.x = 0.06;
-            w.head.rotation.y = Math.sin(t * 1.1 + cr.index) * 0.25;
-          }
-          const blinkPhase = (t + cr.index * 1.5) % 4.1;
-          const blink = blinkPhase < 0.14 ? Math.sin((blinkPhase / 0.14) * Math.PI) : 0;
-          for (const lid of w.eyelids) lid.rotation.x = 0.56 - blink * 0.84;
-        }
-      }
+      const gateCheck = (crossAxis) => (crossAxis === "ns" ? pedStartNS : pedStartEW);
+      for (const npc of urbanNPCs) stepScheduledNPC(npc, t, dt, true, gateCheck);
     },
   };
 }

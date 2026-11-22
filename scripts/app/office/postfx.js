@@ -234,7 +234,7 @@ void main() {
 
   // Làm sắc vi chi tiết (chỉ áp cho vùng lấy nét rõ, không làm gắt vùng bokeh)
   vec3 blurAvg = (cNW + cNE + cSW + cSE) * 0.25;
-  col = max(vec3(0.0), col + (col - blurAvg) * (0.16 * (1.0 - coc)));
+  col = max(vec3(0.0), col + (col - blurAvg) * (0.21 * (1.0 - coc)));
 
   // Nhân SSAO bóng tiếp xúc sâu
   float ao = texture2D(tAo, vUv).r;
@@ -273,6 +273,9 @@ void main() {
   vec3 tint = uSunset > 0.5 ? vec3(1.06, 0.99, 0.9) : (uDark > 0.5 ? vec3(0.98, 1.0, 1.05) : vec3(1.015, 1.005, 0.99));
   col *= tint;
   col = aces(col * uExposure);
+  vec3 splitTint = mix(vec3(0.95, 0.98, 1.04), vec3(1.03, 1.0, 0.96), smoothstep(0.15, 0.75, luma(col)));
+  col = clamp(col * splitTint, 0.0, 1.0);
+  col = mix(col, col * col * (3.0 - 2.0 * col), 0.12);
   col = toSRGB(col);
 
   // Viền ống kính điện ảnh cực nhẹ + dither chống dải màu bầu trời
