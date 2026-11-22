@@ -120,7 +120,7 @@ function buildTrafficCar(THREE, natureAssets, mats, color, hdAssets) {
     tl.position.set(-2.22, 0.72, 0);
     tl.scale.set(0.06, 0.09, 1.38);
     root.add(tl);
-    return { root, wheels: [], tailMat, halfLen: 2.35, wheelR: 0.32 };
+    return { root, wheels: [], mixer: null, tailMat, halfLen: 2.35, wheelR: 0.32 };
   }
 
   const paintMat = mats.physical(color, { roughness: 0.15, metalness: 0.72, clearcoat: 1.0, clearcoatRoughness: 0.05 });
@@ -162,7 +162,25 @@ function buildTrafficCar(THREE, natureAssets, mats, color, hdAssets) {
     root.add(wg);
     wheels.push(wg);
   }
-  return { root, wheels, tailMat, halfLen: 2.35, wheelR: 0.32 };
+  return { root, wheels, mixer: null, tailMat, halfLen: 2.35, wheelR: 0.32 };
+}
+
+function buildTrafficTruck(THREE, natureAssets, mats, color, hdAssets) {
+  const truckParsed = hdAssets && hdAssets.get("truck");
+  if (!truckParsed) return buildTrafficCar(THREE, natureAssets, mats, color, hdAssets);
+  const g = natureAssets.geos;
+  const root = new THREE.Group();
+  addShadow(THREE, root, natureAssets, mats, 5.6, 2.45);
+  const inst = instantiateGLB(THREE, truckParsed, { targetLength: 5.2 });
+  const sz = new THREE.Box3().setFromObject(inst.group).getSize(new THREE.Vector3());
+  if (sz.z > sz.x) inst.group.rotation.y = Math.PI / 2;
+  root.add(inst.group);
+  const tailMat = mats.freshStandard("#ef4444", { roughness: 0.12, emissive: "#ef4444", emissiveIntensity: 0.75 });
+  const tl = new THREE.Mesh(g.unitBox, tailMat);
+  tl.position.set(-2.55, 0.82, 0);
+  tl.scale.set(0.06, 0.1, 1.5);
+  root.add(tl);
+  return { root, wheels: [], mixer: inst.mixer || null, tailMat, halfLen: 2.75, wheelR: 0.4 };
 }
 
 // ---------------------------------------------------------------- Xe máy / tay ga kèm người lái đội mũ bảo hiểm
@@ -306,7 +324,7 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
 
   const vehicleSpecs = [
     // Đại lộ chính Nam (Eastbound +X)
-    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.75, pos: -38.0, maxV: 5.2, kind: "car", col: "#f1f5f9", stopLines: mainEastStop },
+    { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.75, pos: -38.0, maxV: 4.5, kind: "truck", col: "#f1f5f9", stopLines: mainEastStop },
     { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.2, pos: -16.0, maxV: 4.5, kind: "moto", col: "#dc2626", j: "#1d4ed8", h: "#f8fafc", stopLines: mainEastStop },
     { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 1.75, pos: 12.0, maxV: 5.0, kind: "car", col: "#0284c7", stopLines: mainEastStop },
     { axis: "x", sigAxis: "ew", dir: 1, lane: mainRoadZ + 2.25, pos: 26.0, maxV: 4.6, kind: "moto", col: "#0f766e", j: "#334155", h: "#111827", stopLines: mainEastStop },
@@ -323,7 +341,7 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
     { axis: "x", sigAxis: "ew", dir: 1, lane: northRoadZ + 1.55, pos: -32.0, maxV: 4.8, kind: "car", col: "#e2e8f0", stopLines: northEastStop },
     { axis: "x", sigAxis: "ew", dir: 1, lane: northRoadZ + 1.55, pos: 14.0, maxV: 4.7, kind: "moto", col: "#0284c7", j: "#0f172a", h: "#f8fafc", stopLines: northEastStop },
     { axis: "x", sigAxis: "ew", dir: 1, lane: northRoadZ + 1.55, pos: eastRoadX + 18.0, maxV: 4.9, kind: "car", col: "#1d4ed8", stopLines: northEastStop },
-    { axis: "x", sigAxis: "ew", dir: -1, lane: northRoadZ - 1.55, pos: eastRoadX + 24.0, maxV: 4.9, kind: "car", col: "#0f766e", stopLines: northWestStop },
+    { axis: "x", sigAxis: "ew", dir: -1, lane: northRoadZ - 1.55, pos: eastRoadX + 24.0, maxV: 4.5, kind: "truck", col: "#0f766e", stopLines: northWestStop },
     { axis: "x", sigAxis: "ew", dir: -1, lane: northRoadZ - 1.55, pos: 22.0, maxV: 4.6, kind: "moto", col: "#b91c1c", j: "#1e293b", h: "#facc15", stopLines: northWestStop },
     { axis: "x", sigAxis: "ew", dir: -1, lane: northRoadZ - 1.55, pos: -26.0, maxV: 4.8, kind: "car", col: "#64748b", stopLines: northWestStop },
     // Đại lộ nhánh Tây (Bắc-Nam, qua ngã tư Tây-Bắc & Tây-Nam)
@@ -334,7 +352,7 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
     { axis: "z", sigAxis: "ns", dir: -1, lane: westRoadX + 1.2, pos: 14.0, maxV: 4.4, kind: "moto", col: "#0f766e", j: "#c2410c", h: "#f8fafc", stopLines: nsNorthStop },
     { axis: "z", sigAxis: "ns", dir: -1, lane: westRoadX + 1.65, pos: -24.0, maxV: 4.7, kind: "car", col: "#b91c1c", stopLines: nsNorthStop },
     // Đại lộ nhánh Đông (Bắc-Nam, qua ngã tư Đông-Bắc & Đông-Nam)
-    { axis: "z", sigAxis: "ns", dir: 1, lane: eastRoadX - 1.65, pos: -28.0, maxV: 4.9, kind: "car", col: "#94a3b8", stopLines: nsSouthStop },
+    { axis: "z", sigAxis: "ns", dir: 1, lane: eastRoadX - 1.65, pos: -28.0, maxV: 4.4, kind: "truck", col: "#94a3b8", stopLines: nsSouthStop },
     { axis: "z", sigAxis: "ns", dir: 1, lane: eastRoadX - 1.2, pos: 9.0, maxV: 4.5, kind: "moto", col: "#1e3a8a", j: "#334155", h: "#facc15", stopLines: nsSouthStop },
     { axis: "z", sigAxis: "ns", dir: 1, lane: eastRoadX - 1.65, pos: mainRoadZ + 20.0, maxV: 4.7, kind: "car", col: "#15803d", stopLines: nsSouthStop },
     { axis: "z", sigAxis: "ns", dir: -1, lane: eastRoadX + 1.65, pos: mainRoadZ + 32.0, maxV: 4.8, kind: "car", col: "#f1f5f9", stopLines: nsNorthStop },
@@ -343,9 +361,11 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
   ];
 
   const vehicles = vehicleSpecs.map((s) => {
-    const v = s.kind === "car"
-      ? buildTrafficCar(THREE, natureAssets, mats, s.col, hdAssets)
-      : buildMotorbike(THREE, tAssets, natureAssets, mats, s.col, s.j, s.h);
+    const v = s.kind === "truck"
+      ? buildTrafficTruck(THREE, natureAssets, mats, s.col, hdAssets)
+      : s.kind === "car"
+        ? buildTrafficCar(THREE, natureAssets, mats, s.col, hdAssets)
+        : buildMotorbike(THREE, tAssets, natureAssets, mats, s.col, s.j, s.h);
     if (s.axis === "x") {
       v.root.position.set(s.pos, 0, s.lane);
       v.root.rotation.y = s.dir > 0 ? 0 : Math.PI;
@@ -506,6 +526,7 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
         else v.root.position.z = v.pos;
         const dSpin = (v.speed * dt) / v.wheelR;
         for (const w of v.wheels) w.rotation.z -= dSpin;
+        if (v.mixer && v.speed > 0.05) v.mixer.update(dt * (v.speed / 3.8));
         v.tailMat.emissiveIntensity = braking ? 2.8 : 0.75;
       }
 

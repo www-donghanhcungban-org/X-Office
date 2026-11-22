@@ -476,12 +476,37 @@ export function buildSurroundingCity(THREE, cityAssets, natureAssets, sgAssets, 
   fJet.scale.set(0.14, 0.78, 0.14);
   root.add(basin, fWater, fPed, fTier, fJet);
   // Ghế công viên + cây xanh + hoa công viên
-  putBox(THREE, root, g.unitBox, woodMat, 17.8, 0.45, streetZ + 15.2, 1.7, 0.1, 0.52);
-  putBox(THREE, root, g.unitBox, woodMat, 23.4, 0.45, streetZ + 19.6, 1.7, 0.1, 0.52);
+  const benchParsed = hdAssets && hdAssets.get("bench");
+  const shrubParsed = hdAssets && hdAssets.get("shrub");
+  const planterParsed = hdAssets && hdAssets.get("planter_box");
+  for (const [bx, bz, ry] of [[17.8, streetZ + 15.2, 0], [23.4, streetZ + 19.6, Math.PI]]) {
+    if (benchParsed) {
+      const inst = instantiateGLB(THREE, benchParsed, { targetLength: 1.75 });
+      inst.group.position.set(bx, 0, bz);
+      inst.group.rotation.y = ry;
+      root.add(inst.group);
+    } else {
+      putBox(THREE, root, g.unitBox, woodMat, bx, 0.45, bz, 1.7, 0.1, 0.52);
+    }
+  }
   root.add(buildTree(THREE, natureAssets, mats, { x: 17.6, y: streetZ + 20.4, color: "#2f855a", scale: 0.92 }, anim));
   root.add(buildTree(THREE, natureAssets, mats, { x: 23.6, y: streetZ + 14.4, color: "#3b8f4f", scale: 0.88 }, anim));
   root.add(buildFlowerbed(THREE, natureAssets, mats, 17.8, streetZ + 13.4, "#f43f5e"));
   root.add(buildFlowerbed(THREE, natureAssets, mats, 23.4, streetZ + 21.0, "#facc15"));
+  if (shrubParsed) {
+    for (const [sx, sz, h] of [[17.5, streetZ + 13.8, 0.85], [23.5, streetZ + 20.6, 0.9]]) {
+      const inst = instantiateGLB(THREE, shrubParsed, { targetHeight: h });
+      inst.group.position.set(sx, 0, sz);
+      root.add(inst.group);
+    }
+  }
+  if (planterParsed) {
+    for (const [px, pz] of [[18.6, streetZ + 12.6], [22.6, streetZ + 12.6]]) {
+      const inst = instantiateGLB(THREE, planterParsed, { targetLength: 1.25 });
+      inst.group.position.set(px, 0, pz);
+      root.add(inst.group);
+    }
+  }
 
   // Trạm dừng xe buýt kính hiện đại ngay rìa ngoài vỉa hè Nam (chừa thoáng toàn bộ lối người đi bộ)
   const busX = 19.5, busZ = streetZ + 11.7;
@@ -571,6 +596,39 @@ export function buildSurroundingCity(THREE, cityAssets, natureAssets, sgAssets, 
     root.add(buildTree(THREE, natureAssets, mats, { x: eastRoadX + 4.4, y: z, color: "#2f855a", scale: 0.88 }, anim));
     addCityLamp(-10.8, z + 4.2);
     addCityLamp(eastRoadX + 4.2, z + 4.2);
+  }
+
+  // Nội thất đường phố HD: bảng menu quán cà phê, thùng rác, trụ cứu hoả, tủ điện, cọc tiêu & cục nóng điều hoà
+  const placeCityHD = (key, opt, x, y, z, ry = 0) => {
+    const parsed = hdAssets && hdAssets.get(key);
+    if (!parsed) return;
+    const inst = instantiateGLB(THREE, parsed, opt);
+    inst.group.position.set(x, y, z);
+    if (ry) inst.group.rotation.y = ry;
+    root.add(inst.group);
+  };
+  for (const [cx, cz, ry] of [[5.6, streetZ + 12.2, 0.25], [26.0, streetZ + 12.2, -0.25]]) {
+    placeCityHD("chalkboard", { targetHeight: 1.05 }, cx, 0, cz, ry);
+  }
+  for (const [tx, tz] of [[22.2, streetZ + 11.6], [-9.6, streetZ + 1.4], [eastRoadX + 3.6, streetZ + 1.4]]) {
+    placeCityHD("trash_can", { targetHeight: 0.88 }, tx, 0, tz);
+  }
+  for (const [fx, fz] of [[-1.8, streetZ + 1.9], [eastRoadX - 4.2, streetZ + 1.9], [25.8, streetZ + 10.2]]) {
+    placeCityHD("fire_hydrant", { targetHeight: 0.78 }, fx, 0, fz);
+  }
+  for (const [ux, uz] of [[-10.8, -5.0], [eastRoadX + 4.8, streetZ + 12.0]]) {
+    placeCityHD("utility_box", { targetHeight: 1.35 }, ux, 0, uz);
+  }
+  for (const [kx, kz] of [[eastRoadX - 4.8, streetZ + 9.6], [eastRoadX - 4.0, streetZ + 9.6]]) {
+    placeCityHD("traffic_cone", { targetHeight: 0.68 }, kx, 0, kz);
+  }
+  for (const [ax, ay, az, ry] of [
+    [11.8, 3.2, sfZ - 3.95, Math.PI],
+    [36.2, 3.2, sfZ - 3.95, Math.PI],
+    [w1X + 4.7, 3.4, 17.6, Math.PI / 2],
+    [e1X - 3.85, 3.4, 17.0, -Math.PI / 2],
+  ]) {
+    placeCityHD("aircon", { targetLength: 0.85 }, ax, ay, az, ry);
   }
 
   // ---------------------------------------------------------------- 7. Đường chân trời thành phố xa (Skyline silhouette hòa sương mờ tự nhiên)

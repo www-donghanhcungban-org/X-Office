@@ -443,18 +443,23 @@ export function createHDAssetManager(THREE, onReady) {
       manifest = m;
       const entries = Object.entries(m).filter(([, v]) => typeof v === "string" && v.endsWith(".glb"));
       if (!entries.length) return;
-      await Promise.all(entries.map(async ([key, file]) => {
-        try {
-          const parsed = await loadGLB(THREE, "/hd-assets/" + file);
-          if (disposed) {
-            parsed.dispose();
-            return;
+      let cursor = 0;
+      async function worker() {
+        while (cursor < entries.length && !disposed) {
+          const [key, file] = entries[cursor++];
+          try {
+            const parsed = await loadGLB(THREE, "/hd-assets/" + file);
+            if (disposed) {
+              parsed.dispose();
+              return;
+            }
+            models.set(key, parsed);
+          } catch {
+            /* bỏ qua từng model lẻ nếu lỗi, giữ nguyên hình học dự phòng */
           }
-          models.set(key, parsed);
-        } catch {
-          /* bỏ qua từng model lẻ nếu lỗi, giữ nguyên hình học dự phòng */
         }
-      }));
+      }
+      await Promise.all(Array.from({ length: Math.min(8, entries.length) }, worker));
       if (!disposed && models.size && onReady) onReady();
     })
     .catch(() => {

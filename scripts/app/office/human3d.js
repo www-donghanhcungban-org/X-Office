@@ -1,19 +1,19 @@
 // Nhân vật 3D điêu khắc + ghế công thái học + khớp chuyển động theo trạng thái agent (Three.js PBR).
 // Hệ toạ độ cục bộ: gốc (0, 0, 0) là mặt sàn tâm ghế, nhân vật quay mặt về hướng -z (phía bàn & màn hình).
 
-const SKIN = ["#f1c29b", "#e0a97b", "#c58652", "#f5cfa9", "#8c5530", "#f8d8be", "#a46a4a"];
-const HAIR = ["#1f1510", "#4e2e1c", "#111827", "#8d5524", "#3b3f46", "#6b2d18", "#9ca3af"];
+const SKIN = ["#eab68e", "#dca072", "#c88656", "#e4ae84", "#b57449", "#e0a97b", "#9c623d"];
+const HAIR = ["#1f1510", "#4e2e1c", "#111827", "#8d5524", "#3b3f46", "#6b2d18", "#2c1d13"];
 const IRIS = ["#2b1a10", "#3d2817", "#1f3a52", "#3b4d2b", "#18181b"];
 const OUTFIT = [
-  { top: "#2563eb", inner: "#f8fafc", pants: "#1e293b", blazer: true },
-  { top: "#15803d", inner: "#f8fafc", pants: "#334155", blazer: false },
-  { top: "#6d28d9", inner: "#f8fafc", pants: "#1e293b", blazer: true },
-  { top: "#be123c", inner: "#fff1f2", pants: "#1f2937", blazer: false },
-  { top: "#0f766e", inner: "#f8fafc", pants: "#334155", blazer: true },
-  { top: "#c2410c", inner: "#fffbeb", pants: "#1e293b", blazer: false },
-  { top: "#3730a3", inner: "#eef2ff", pants: "#111827", blazer: true },
-  { top: "#0369a1", inner: "#f8fafc", pants: "#27272a", blazer: false },
-  { top: "#9d174d", inner: "#fdf2f8", pants: "#1f2937", blazer: true },
+  { top: "#2563eb", inner: "#e2e8f0", pants: "#1e293b", blazer: true },
+  { top: "#15803d", inner: "#e2e8f0", pants: "#334155", blazer: false },
+  { top: "#6d28d9", inner: "#e2e8f0", pants: "#1e293b", blazer: true },
+  { top: "#be123c", inner: "#e2e8f0", pants: "#1f2937", blazer: false },
+  { top: "#0f766e", inner: "#e2e8f0", pants: "#334155", blazer: true },
+  { top: "#c2410c", inner: "#e2e8f0", pants: "#1e293b", blazer: false },
+  { top: "#3730a3", inner: "#e2e8f0", pants: "#111827", blazer: true },
+  { top: "#0369a1", inner: "#e2e8f0", pants: "#27272a", blazer: false },
+  { top: "#9d174d", inner: "#e2e8f0", pants: "#1f2937", blazer: true },
 ];
 
 // Tạo lưới đầu giải phẫu điêu khắc (hốc mắt, cung mày, gò má, sống mũi liền khối, xương hàm & cằm thon)
@@ -183,16 +183,16 @@ export function buildHumanRig(THREE, assets, mats, opts) {
   const outfit = OUTFIT[i % OUTFIT.length];
   const isAgent = Boolean(seat && seat.label);
 
-  const skinMat = mats.physical(skinCol, { roughness: 0.56, metalness: 0.0, sheen: 0.38, sheenRoughness: 0.72, sheenColor: "#ffb396" });
-  const hairMat = mats.physical(hairCol, { roughness: 0.44, metalness: 0.08, clearcoat: 0.24, sheen: 0.36, sheenColor: "#e2e8f0", tex: "hair", normal: 0.55 });
-  const topMat = mats.physical(outfit.top, { roughness: 0.88, metalness: 0.02, sheen: 0.52, sheenRoughness: 0.76, sheenColor: "#f8fafc", tex: "fabric", normal: 0.35, roughMap: true });
-  const innerMat = mats.physical(outfit.inner, { roughness: 0.84, metalness: 0.01, sheen: 0.4, sheenRoughness: 0.8, tex: "fabric", normal: 0.25, roughMap: true });
-  const pantsMat = mats.physical(outfit.pants, { roughness: 0.9, metalness: 0.02, sheen: 0.45, sheenRoughness: 0.78, tex: "fabric", normal: 0.3, roughMap: true });
+  const skinMat = mats.physical(skinCol, { roughness: 0.62, metalness: 0.0, sheen: 0.14, sheenRoughness: 0.8, sheenColor: "#d99272" });
+  const hairMat = mats.physical(hairCol, { roughness: 0.52, metalness: 0.05, clearcoat: 0.1, sheen: 0.12, tex: "hair", normal: 0.45 });
+  const topMat = mats.physical(outfit.top, { roughness: 0.86, metalness: 0.02, sheen: 0.12, sheenRoughness: 0.85 });
+  const innerMat = mats.physical(outfit.inner, { roughness: 0.84, metalness: 0.01, sheen: 0.08 });
+  const pantsMat = mats.physical(outfit.pants, { roughness: 0.86, metalness: 0.02, sheen: 0.12, sheenRoughness: 0.85 });
   const chairMat = mats.physical(theme.chair, { roughness: 0.82, metalness: 0.04, sheen: 0.48, sheenRoughness: 0.75, tex: "fabric", normal: 0.35, roughMap: true });
   const chairDark = mats.standard("#1e293b", { roughness: 0.38, metalness: 0.42 });
   const chromeMat = mats.standard("#e2e8f0", { roughness: 0.14, metalness: 0.94 });
   const shoeMat = mats.physical(i % 2 ? "#1e293b" : "#442c1e", { roughness: 0.34, metalness: 0.06, clearcoat: 0.48 });
-  const soleMat = mats.standard("#f1f5f9", { roughness: 0.68, metalness: 0.02 });
+  const soleMat = mats.standard("#cbd5e1", { roughness: 0.68, metalness: 0.02 });
   const whiteMat = mats.physical("#ffffff", { roughness: 0.06, metalness: 0.0, clearcoat: 1.0, clearcoatRoughness: 0.04 });
   const darkMat = mats.standard("#0f172a", { roughness: 0.2, metalness: 0.15 });
   const lipMat = mats.physical("#bd6960", { roughness: 0.38, clearcoat: 0.3 });
@@ -339,7 +339,7 @@ export function buildHumanRig(THREE, assets, mats, opts) {
 
   // Đầu điêu khắc phủ vân da mặt 512px (ửng hồng má, bóng hốc mắt, sống mũi, vi kết cấu da)
   const faceMat = mats.physical("#ffffff", {
-    roughness: 0.54, metalness: 0.0, sheen: 0.4, sheenRoughness: 0.7, sheenColor: "#ffb396", tex: "face:" + skinCol,
+    roughness: 0.62, metalness: 0.0, sheen: 0.14, sheenRoughness: 0.8, sheenColor: "#d99272", tex: "face:" + skinCol,
   });
   const skull = new THREE.Mesh(g.head, faceMat);
   skull.position.set(0, 0.085, 0);
@@ -675,14 +675,14 @@ export function buildWalkerRig(THREE, assets, mats, opts) {
   const irisCol = IRIS[(i * 2 + 1) % IRIS.length];
   const outfit = opts.outfit || OUTFIT[(i + 2) % OUTFIT.length];
 
-  const skinMat = mats.physical(skinCol, { roughness: 0.56, sheen: 0.38, sheenRoughness: 0.72, sheenColor: "#ffb396" });
-  const faceMat = mats.physical("#ffffff", { roughness: 0.54, sheen: 0.4, sheenRoughness: 0.7, sheenColor: "#ffb396", tex: "face:" + skinCol });
-  const hairMat = mats.physical(hairCol, { roughness: 0.44, metalness: 0.08, clearcoat: 0.24, sheen: 0.36, tex: "hair", normal: 0.55 });
-  const topMat = mats.physical(outfit.top, { roughness: 0.88, sheen: 0.5, tex: "fabric", normal: 0.35, roughMap: true });
-  const innerMat = mats.physical(outfit.inner, { roughness: 0.84, sheen: 0.4, tex: "fabric", roughMap: true });
-  const pantsMat = mats.physical(outfit.pants, { roughness: 0.9, sheen: 0.45, tex: "fabric", normal: 0.3, roughMap: true });
+  const skinMat = mats.physical(skinCol, { roughness: 0.62, sheen: 0.14, sheenRoughness: 0.8, sheenColor: "#d99272" });
+  const faceMat = mats.physical("#ffffff", { roughness: 0.62, sheen: 0.14, sheenRoughness: 0.8, sheenColor: "#d99272", tex: "face:" + skinCol });
+  const hairMat = mats.physical(hairCol, { roughness: 0.52, metalness: 0.05, clearcoat: 0.1, sheen: 0.12, tex: "hair", normal: 0.45 });
+  const topMat = mats.physical(outfit.top, { roughness: 0.86, metalness: 0.02, sheen: 0.12, sheenRoughness: 0.85 });
+  const innerMat = mats.physical(outfit.inner, { roughness: 0.84, metalness: 0.01, sheen: 0.08 });
+  const pantsMat = mats.physical(outfit.pants, { roughness: 0.86, metalness: 0.02, sheen: 0.12, sheenRoughness: 0.85 });
   const shoeMat = mats.physical(i % 2 ? "#1e293b" : "#442c1e", { roughness: 0.34, clearcoat: 0.48 });
-  const soleMat = mats.standard("#f1f5f9", { roughness: 0.68 });
+  const soleMat = mats.standard("#cbd5e1", { roughness: 0.68 });
   const whiteMat = mats.physical("#ffffff", { roughness: 0.06, clearcoat: 1.0 });
   const irisMat = mats.physical("#ffffff", { roughness: 0.06, clearcoat: 1.0, tex: "iris:" + irisCol });
   const lipMat = mats.physical("#bd6960", { roughness: 0.38, clearcoat: 0.3 });
@@ -800,7 +800,7 @@ export function buildWalkerRig(THREE, assets, mats, opts) {
     hand.position.set(side * 0.01, -0.51, -0.06);
     arm.add(cap, upper, fore, hand);
     if (holdCup && side > 0) {
-      const cup = new THREE.Mesh(g.neck, mats.physical("#ffffff", { roughness: 0.15, clearcoat: 0.85 }));
+      const cup = new THREE.Mesh(g.neck, mats.physical("#d6d3d1", { roughness: 0.22, clearcoat: 0.65 }));
       cup.position.set(0.01, -0.5, -0.14);
       cup.scale.set(0.8, 0.9, 0.8);
       arm.add(cup);

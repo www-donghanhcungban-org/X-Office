@@ -639,9 +639,7 @@ class SmokeAndErrorTest(unittest.TestCase):
             try:
                 self.assertEqual(srv_empty.static.get("/hd-assets/manifest.json"), (b"{}", "application/json"))
                 self.assertEqual(srv_full.static.get("/hd-assets/car.glb"), (b"glTF", "model/gltf-binary"))
-                self.assertEqual(
-                    srv_full.static.get("/hd-assets/scene.splat"), (b"SPLAT", "application/octet-stream")
-                )
+                self.assertEqual(srv_full.static.get("/hd-assets/scene.splat"), (b"SPLAT", "application/octet-stream"))
             finally:
                 srv_empty.server_close()
                 srv_full.server_close()
