@@ -3,7 +3,7 @@
 // - Ô tô sơn bóng clearcoat & xe máy kèm người lái đội mũ bảo hiểm chạy dọc hết cả 4 tuyến đường (Đông-Tây & Bắc-Nam).
 // - Xe tự giữ khoảng cách an toàn, dừng đúng vạch trắng đèn đỏ ở mọi ngã tư và sáng đèn phanh HDR.
 // - Người đi bộ dạo trên vỉa hè cả 4 tuyến phố và qua đường đúng nhịp đèn đỏ tại nút chính + các ngã tư.
-import { buildWalkerRig, animateWalkerRig } from "./human3d.js";
+import { buildWalkerRig, animateWalkerRig, buildHDHuman, animateHDHuman } from "./human3d.js";
 import { instantiateGLB } from "./glb.js";
 
 const CYCLE = 18.0; // 0–8.5s ĐT Xanh/BN Đỏ · 8.5–10.5s ĐT Vàng/BN Đỏ · 10.5–16.5s ĐT Đỏ/BN Xanh · 16.5–18s ĐT Đỏ/BN Vàng
@@ -81,20 +81,25 @@ function buildTrafficLight(THREE, tAssets, mats, x, z, dirZ, rotY, sigAxis) {
       const lm = new THREE.Mesh(g.lamp, mat);
       lm.position.set(sx, ly, dirZ * 2.15);
       lm.scale.set(0.65, 1, 1);
-      root.add(lm);
+      const visor = new THREE.Mesh(g.unitBox, hood);
+      visor.position.set(sx * 1.38, ly + 0.08, dirZ * 2.15);
+      visor.scale.set(0.14, 0.04, 0.24);
+      root.add(lm, visor);
     }
   }
 
   const pBox = new THREE.Mesh(g.unitBox, hood);
   pBox.position.set(-dirZ * 0.16, 2.35, 0);
-  pBox.scale.set(0.26, 0.52, 0.24);
+  pBox.scale.set(0.26, 0.52, 0.28);
   root.add(pBox);
 
-  const pRed = new THREE.Mesh(g.pedLamp, pedRedMat);
-  pRed.position.set(-dirZ * 0.16, 2.48, dirZ * 0.11);
-  const pGrn = new THREE.Mesh(g.pedLamp, pedGrnMat);
-  pGrn.position.set(-dirZ * 0.16, 2.22, dirZ * 0.11);
-  root.add(pRed, pGrn);
+  for (const pz of [dirZ * 0.125, -dirZ * 0.125]) {
+    const pRed = new THREE.Mesh(g.pedLamp, pedRedMat);
+    pRed.position.set(-dirZ * 0.16, 2.48, pz);
+    const pGrn = new THREE.Mesh(g.pedLamp, pedGrnMat);
+    pGrn.position.set(-dirZ * 0.16, 2.22, pz);
+    root.add(pRed, pGrn);
+  }
 
   return { root, sigAxis, redMat, yelMat, grnMat, pedRedMat, pedGrnMat };
 }
@@ -243,8 +248,8 @@ function buildMotorbike(THREE, tAssets, natureAssets, mats, bodyColor, jacketCol
 
   const rider = new THREE.Group();
   root.add(rider);
-  const jacketMat = mats.physical(jacketColor, { roughness: 0.78, sheen: 0.45, tex: "fabric" });
-  const pantsMat = mats.standard("#1e293b", { roughness: 0.85, tex: "fabric" });
+  const jacketMat = mats.physical(jacketColor, { roughness: 0.82, sheen: 0.12 });
+  const pantsMat = mats.standard("#1e293b", { roughness: 0.86 });
   const helmetMat = mats.physical(helmetColor, { roughness: 0.14, clearcoat: 1.0, clearcoatRoughness: 0.05 });
   const visorMat = mats.physical("#0f172a", { roughness: 0.08, clearcoat: 1.0 });
 
@@ -290,24 +295,27 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
   const ewMin = -64.0, ewMax = eastRoadX + 58.0, ewSpan = ewMax - ewMin;
   const nsMin = -52.0, nsMax = streetZ + 50.0, nsSpan = nsMax - nsMin;
 
-  // 1. Hệ thống cột đèn tín hiệu đồng bộ 2 pha tại nút chính & cả 4 ngã tư
+  // 1. Hệ thống 18 cột đèn tín hiệu đủ 4 góc tại cả 4 ngã tư & nút qua đường chính (tay vươn luôn vươn ra lòng đường!)
   const lightSpecs = [
     // Nút qua đường chính trước sảnh X-Office (Đông-Tây)
     [8.2, streetZ + 2.12, 1, 0, "ew"],
     [1.9, streetZ + 9.68, -1, 0, "ew"],
-    // Ngã tư Tây-Nam (westRoadX, mainRoadZ)
-    [westRoadX + 3.7, mainRoadZ - 3.7, 1, 0, "ew"],
-    [westRoadX - 3.7, mainRoadZ + 3.7, -1, Math.PI / 2, "ns"],
-    // Ngã tư Đông-Nam (eastRoadX, mainRoadZ)
-    [eastRoadX - 3.7, mainRoadZ + 3.7, -1, 0, "ew"],
-    [eastRoadX + 3.7, mainRoadZ - 3.7, 1, Math.PI / 2, "ns"],
-    // Ngã tư Tây-Bắc (westRoadX, northRoadZ)
-    [westRoadX + 3.7, northRoadZ - 3.5, 1, 0, "ew"],
-    [westRoadX - 3.7, northRoadZ + 3.5, -1, Math.PI / 2, "ns"],
-    // Ngã tư Đông-Bắc (eastRoadX, northRoadZ)
-    [eastRoadX - 3.7, northRoadZ + 3.5, -1, 0, "ew"],
-    [eastRoadX + 3.7, northRoadZ - 3.5, 1, Math.PI / 2, "ns"],
   ];
+  for (const [ix, iz] of [
+    [westRoadX, mainRoadZ],
+    [eastRoadX, mainRoadZ],
+    [westRoadX, northRoadZ],
+    [eastRoadX, northRoadZ],
+  ]) {
+    const hw = 3.75;
+    const hd = iz === mainRoadZ ? 3.85 : 3.55;
+    lightSpecs.push(
+      [ix - hw, iz - hd, 1, Math.PI / 2, "ns"],   // Tây-Bắc: tay vươn +X ra làn Nam
+      [ix + hw, iz + hd, -1, Math.PI / 2, "ns"],  // Đông-Nam: tay vươn -X ra làn Bắc
+      [ix + hw, iz - hd, 1, 0, "ew"],             // Đông-Bắc: tay vươn +Z ra làn Tây
+      [ix - hw, iz + hd, -1, 0, "ew"],            // Tây-Nam: tay vươn -Z ra làn Đông
+    );
+  }
   const lights = lightSpecs.map(([lx, lz, dirZ, rotY, sigAxis]) => {
     const l = buildTrafficLight(THREE, tAssets, mats, lx, lz, dirZ, rotY, sigAxis);
     root.add(l.root);
@@ -393,9 +401,8 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
     };
   });
 
-  // 3. Người đi bộ dạo trên vỉa hè cả 4 tuyến đường bao quanh khu phố (dùng mô hình xương .glb nếu có)
-  const humanParsed = hdAssets && hdAssets.get("human");
-  const glbWalkers = [];
+  // 3. Người đi bộ dạo trên vỉa hè cả 4 tuyến đường bao quanh khu phố (dùng nhân vật Ready Player Me HD khi có)
+  const STREET_SHIRTS = ["#2563eb", "#be123c", "#15803d", "#0f766e", "#c2410c", "#6d28d9", "#0369a1", "#b45309"];
   const sidewalkWalkers = [];
   [
     { index: 41, path: [[9.5, streetZ + 1.15], [W + 1.5, streetZ + 1.15]], x: 16.0, z: streetZ + 1.15, holdCup: true, speed: 0.78 },
@@ -406,39 +413,48 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
     { index: 48, path: [[-11.3, 1.0], [-11.3, streetZ - 1.5]], x: -11.3, z: 10.0, holdCup: true, speed: 0.76 },
     { index: 49, path: [[eastRoadX + 4.5, streetZ - 1.5], [eastRoadX + 4.5, 1.0]], x: eastRoadX + 4.5, z: 14.0, holdCup: false, speed: 0.73 },
   ].forEach((spec, idx) => {
-    if (humanParsed && idx < 3) {
-      const inst = instantiateGLB(THREE, humanParsed, { targetHeight: 1.72 });
-      inst.group.position.set(spec.x, 0, spec.z);
-      root.add(inst.group);
-      const [p0, p1] = spec.path;
-      const dist = Math.max(1, Math.hypot(p1[0] - p0[0], p1[1] - p0[1]));
-      glbWalkers.push({ inst, p0, p1, dist, speed: (spec.speed || 0.75) * 1.4, phase: idx * 3.1 });
-    } else {
-      const w = buildWalkerRig(THREE, humanAssets, mats, spec);
-      root.add(w.root);
-      sidewalkWalkers.push(w);
-    }
+    const hd = buildHDHuman(THREE, hdAssets, mats, {
+      ...spec,
+      mode: "walk",
+      femaleWalk: idx % 2 === 1,
+      topColor: STREET_SHIRTS[idx % STREET_SHIRTS.length],
+    });
+    const w = hd || buildWalkerRig(THREE, humanAssets, mats, spec);
+    root.add(w.root);
+    sidewalkWalkers.push(w);
   });
 
-  // 4. Người đi bộ băng qua vạch trắng tại nút chính & các ngã tư (tuân thủ đèn đỏ từng hướng!)
+  // 4. Người đi bộ băng qua vạch trắng tại nút chính & 4 ngã tư (luôn quay mặt đúng hướng -Z tiến tới & dứt khoát trước đèn xanh xe!)
   const crossers = [
     // Nút chính trước X-Office (băng qua đại lộ theo chiều Bắc-Nam)
     { index: 45, axis: "z", pedGroup: "ns", fixed: 4.3, p0: streetZ + 1.65, p1: streetZ + 10.25, from0: true },
     { index: 46, axis: "z", pedGroup: "ns", fixed: 5.75, p0: streetZ + 1.65, p1: streetZ + 10.25, from0: false },
-    // Ngã tư Tây-Nam (1 người băng đại lộ Nam, 1 người băng đường nhánh Tây)
+    // Ngã tư Tây-Nam
     { index: 50, axis: "z", pedGroup: "ns", fixed: westRoadX - 4.4, p0: mainRoadZ - 4.4, p1: mainRoadZ + 4.4, from0: true },
     { index: 51, axis: "x", pedGroup: "ew", fixed: mainRoadZ + 4.6, p0: westRoadX - 4.2, p1: westRoadX + 4.2, from0: false },
-    // Ngã tư Đông-Nam (1 người băng đại lộ Nam, 1 người băng đường nhánh Đông)
+    // Ngã tư Đông-Nam
     { index: 52, axis: "z", pedGroup: "ns", fixed: eastRoadX + 4.4, p0: mainRoadZ - 4.4, p1: mainRoadZ + 4.4, from0: false },
     { index: 53, axis: "x", pedGroup: "ew", fixed: mainRoadZ + 4.6, p0: eastRoadX - 4.2, p1: eastRoadX + 4.2, from0: true },
+    // Ngã tư Tây-Bắc & Đông-Bắc
+    { index: 54, axis: "z", pedGroup: "ns", fixed: westRoadX - 4.4, p0: northRoadZ - 3.8, p1: northRoadZ + 3.8, from0: true },
+    { index: 55, axis: "z", pedGroup: "ns", fixed: eastRoadX + 4.4, p0: northRoadZ - 3.8, p1: northRoadZ + 3.8, from0: false },
   ].map((c) => {
     const startP = c.from0 ? c.p0 : c.p1;
     const x = c.axis === "z" ? c.fixed : startP;
     const z = c.axis === "z" ? startP : c.fixed;
-    const rotY = c.axis === "z" ? (c.from0 ? 0 : Math.PI) : (c.from0 ? Math.PI / 2 : -Math.PI / 2);
-    const w = buildWalkerRig(THREE, humanAssets, mats, { index: c.index, x, z, rotY });
+    const initDir = c.from0 ? 1 : -1;
+    const rotY = c.axis === "z" ? (initDir > 0 ? Math.PI : 0) : (initDir > 0 ? -Math.PI / 2 : Math.PI / 2);
+    const w = buildHDHuman(THREE, hdAssets, mats, {
+      index: c.index,
+      x,
+      z,
+      rotY,
+      mode: "idle",
+      femaleWalk: c.index % 2 === 1,
+      topColor: STREET_SHIRTS[c.index % STREET_SHIRTS.length],
+    }) || buildWalkerRig(THREE, humanAssets, mats, { index: c.index, x, z, rotY });
     root.add(w.root);
-    return { rig: w, ...c, progress: 0, dir: c.from0 ? 1 : -1 };
+    return { rig: w, ...c, progress: 0, dir: initDir, initDir, initRotY: rotY };
   });
 
   let prevT = 0;
@@ -449,17 +465,24 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
       const phase = (motion ? t : 3.0) % CYCLE;
       const ewSig = phase < 8.5 ? "green" : phase < 10.5 ? "yellow" : "red";
       const nsSig = phase < 10.5 ? "red" : phase < 16.5 ? "green" : "yellow";
-      const pedGoNS = phase >= 11.0 && phase <= 16.5;
+      const pedGoNS = phase >= 10.8 && phase <= 16.2;
       const pedGoEW = phase >= 0.6 && phase <= 8.0;
+      const pedStartNS = phase >= 10.8 && phase <= 13.0;
+      const pedStartEW = phase >= 0.6 && phase <= 5.5;
 
       for (const l of lights) {
         const sig = l.sigAxis === "ew" ? ewSig : nsSig;
         const pGo = l.sigAxis === "ew" ? pedGoNS : pedGoEW;
-        l.redMat.emissiveIntensity = sig === "red" ? 2.4 : 0.04;
-        l.yelMat.emissiveIntensity = sig === "yellow" ? 2.3 : 0.04;
-        l.grnMat.emissiveIntensity = sig === "green" ? 2.2 : 0.04;
-        l.pedGrnMat.emissiveIntensity = pGo ? 2.1 : 0.04;
-        l.pedRedMat.emissiveIntensity = pGo ? 0.04 : 2.0;
+        l.redMat.color.set(sig === "red" ? "#ef4444" : "#181c24");
+        l.redMat.emissiveIntensity = sig === "red" ? 2.8 : 0.02;
+        l.yelMat.color.set(sig === "yellow" ? "#f59e0b" : "#181c24");
+        l.yelMat.emissiveIntensity = sig === "yellow" ? 2.6 : 0.02;
+        l.grnMat.color.set(sig === "green" ? "#22c55e" : "#181c24");
+        l.grnMat.emissiveIntensity = sig === "green" ? 2.5 : 0.02;
+        l.pedGrnMat.color.set(pGo ? "#22c55e" : "#181c24");
+        l.pedGrnMat.emissiveIntensity = pGo ? 2.3 : 0.02;
+        l.pedRedMat.color.set(pGo ? "#181c24" : "#ef4444");
+        l.pedRedMat.emissiveIntensity = pGo ? 0.02 : 2.3;
       }
 
       if (!motion) {
@@ -469,17 +492,17 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
           else v.root.position.z = v.pos;
           v.tailMat.emissiveIntensity = 0.75;
         }
-        for (const sw of sidewalkWalkers) animateWalkerRig(sw, 0, false);
-        for (const gw of glbWalkers) {
-          if (gw.inst.mixer) {
-            gw.inst.mixer.setTime(0.25);
-          }
+        for (const sw of sidewalkWalkers) {
+          if (sw.isHD) animateHDHuman(sw, 0, 0, false, "idle");
+          else animateWalkerRig(sw, 0, false);
         }
         for (const cr of crossers) {
           const p = cr.from0 ? cr.p0 : cr.p1;
           if (cr.axis === "z") cr.rig.root.position.z = p;
           else cr.rig.root.position.x = p;
-          animateWalkerRig(cr.rig, 0, false);
+          cr.rig.root.rotation.y = cr.initRotY;
+          if (cr.rig.isHD) animateHDHuman(cr.rig, 0, 0, false, "idle");
+          else animateWalkerRig(cr.rig, 0, false);
         }
         prevT = t;
         return;
@@ -492,13 +515,18 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
       for (const v of vehicles) {
         let desired = v.maxV;
         const sig = v.sigAxis === "ew" ? ewSig : nsSig;
+        let redHold = false;
 
         if (sig !== "green") {
           for (const sl of v.stopLines) {
             const distToLine = (sl - v.pos) * v.dir - v.halfLen;
-            if (distToLine > -0.35 && distToLine < 8.5) {
-              if (distToLine <= 0.35) desired = 0;
-              else desired = Math.min(desired, (distToLine / 5.5) * v.maxV);
+            if (distToLine > -0.55 && distToLine < 9.5) {
+              if (distToLine <= 0.45) {
+                desired = 0;
+                if (sig === "red" && distToLine > -0.25) redHold = true;
+              } else {
+                desired = Math.min(desired, (distToLine / 5.5) * v.maxV);
+              }
             }
           }
         }
@@ -515,9 +543,9 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
         }
 
         const braking = desired < v.speed - 0.15 || desired < 0.25;
-        const accel = braking ? 7.8 : 3.4;
+        const accel = braking ? 11.5 : 3.6;
         v.speed += Math.sign(desired - v.speed) * Math.min(Math.abs(desired - v.speed), accel * dt);
-        v.speed = Math.max(0, v.speed);
+        v.speed = redHold ? 0 : Math.max(0, v.speed);
         v.pos += v.dir * v.speed * dt;
         if (v.dir > 0 && v.pos > v.max) v.pos = v.min;
         else if (v.dir < 0 && v.pos < v.min) v.pos = v.max;
@@ -530,52 +558,50 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
         v.tailMat.emissiveIntensity = braking ? 2.8 : 0.75;
       }
 
-      for (const sw of sidewalkWalkers) animateWalkerRig(sw, t, true);
-      for (const gw of glbWalkers) {
-        const uRaw = (((t + gw.phase) * gw.speed) / gw.dist) % 2;
-        const forward = uRaw <= 1;
-        const u = forward ? uRaw : 2 - uRaw;
-        const x = gw.p0[0] + (gw.p1[0] - gw.p0[0]) * u;
-        const z = gw.p0[1] + (gw.p1[1] - gw.p0[1]) * u;
-        const dx = (gw.p1[0] - gw.p0[0]) * (forward ? 1 : -1);
-        const dz = (gw.p1[1] - gw.p0[1]) * (forward ? 1 : -1);
-        gw.inst.group.position.set(x, 0, z);
-        gw.inst.group.rotation.y = Math.atan2(dx, dz);
-        if (gw.inst.mixer) gw.inst.mixer.update(dt * 1.15);
+      for (const sw of sidewalkWalkers) {
+        if (sw.isHD) animateHDHuman(sw, t, dt, true);
+        else animateWalkerRig(sw, t, true);
       }
 
-      // Người qua đường tại các vạch kẻ ngã tư & nút chính
+      // Người qua đường tại các vạch kẻ ngã tư & nút chính (-Z tiến tới đúng chiều, không đi lùi!)
       for (const cr of crossers) {
         const w = cr.rig;
         const pGo = cr.pedGroup === "ns" ? pedGoNS : pedGoEW;
+        const canStart = cr.pedGroup === "ns" ? pedStartNS : pedStartEW;
         if (cr.progress >= 1 && !pGo) {
           cr.dir *= -1;
           cr.progress = 0;
         }
-        const movingCross = (pGo && cr.progress < 1) || (cr.progress > 0.02 && cr.progress < 1);
-        const yaw = cr.axis === "z" ? (cr.dir > 0 ? 0 : Math.PI) : (cr.dir > 0 ? Math.PI / 2 : -Math.PI / 2);
+        const movingCross = (canStart && cr.progress < 1) || (cr.progress > 0.01 && cr.progress < 1);
+        const yaw = cr.axis === "z" ? (cr.dir > 0 ? Math.PI : 0) : (cr.dir > 0 ? -Math.PI / 2 : Math.PI / 2);
         w.root.rotation.y = yaw;
         if (movingCross) {
-          cr.progress = Math.min(1, cr.progress + dt * 0.22);
+          cr.progress = Math.min(1, cr.progress + dt * 0.26);
           const u = cr.dir > 0 ? cr.progress : 1 - cr.progress;
           const p = cr.p0 + (cr.p1 - cr.p0) * u;
           if (cr.axis === "z") w.root.position.z = p;
           else w.root.position.x = p;
-          const stride = Math.sin(t * 5.8 + cr.index);
-          w.body.position.y = 0.835 + Math.abs(Math.cos(t * 5.8 + cr.index)) * 0.032;
-          w.leftLeg.rotation.x = stride * 0.44;
-          w.rightLeg.rotation.x = -stride * 0.44;
-          w.leftArm.rotation.x = -stride * 0.36;
-          w.rightArm.rotation.x = stride * 0.36;
-        } else {
-          w.body.position.y = 0.835;
-          w.leftLeg.rotation.x = w.rightLeg.rotation.x = 0;
-          w.leftArm.rotation.x = w.rightArm.rotation.x = 0.06;
-          w.head.rotation.y = Math.sin(t * 1.1 + cr.index) * 0.25;
         }
-        const blinkPhase = (t + cr.index * 1.5) % 4.1;
-        const blink = blinkPhase < 0.14 ? Math.sin((blinkPhase / 0.14) * Math.PI) : 0;
-        for (const lid of w.eyelids) lid.rotation.x = 0.56 - blink * 0.84;
+        if (w.isHD) {
+          animateHDHuman(w, t, dt, true, movingCross ? "walk" : "idle");
+        } else {
+          if (movingCross) {
+            const stride = Math.sin(t * 5.8 + cr.index);
+            w.body.position.y = 0.835 + Math.abs(Math.cos(t * 5.8 + cr.index)) * 0.032;
+            w.leftLeg.rotation.x = stride * 0.44;
+            w.rightLeg.rotation.x = -stride * 0.44;
+            w.leftArm.rotation.x = -stride * 0.36;
+            w.rightArm.rotation.x = stride * 0.36;
+          } else {
+            w.body.position.y = 0.835;
+            w.leftLeg.rotation.x = w.rightLeg.rotation.x = 0;
+            w.leftArm.rotation.x = w.rightArm.rotation.x = 0.06;
+            w.head.rotation.y = Math.sin(t * 1.1 + cr.index) * 0.25;
+          }
+          const blinkPhase = (t + cr.index * 1.5) % 4.1;
+          const blink = blinkPhase < 0.14 ? Math.sin((blinkPhase / 0.14) * Math.PI) : 0;
+          for (const lid of w.eyelids) lid.rotation.x = 0.56 - blink * 0.84;
+        }
       }
     },
   };

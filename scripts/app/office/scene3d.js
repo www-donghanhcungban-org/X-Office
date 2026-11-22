@@ -7,7 +7,7 @@
 import { inkOn, shade } from "./iso.js";
 import { planFor } from "./plans.js";
 import { STATE_TEXT, roomLabelAt, wallSegments } from "./scene.js";
-import { buildHumanRig, animateHumanRig, buildWalkerRig, animateWalkerRig } from "./human3d.js";
+import { buildHumanRig, animateHumanRig, buildWalkerRig, animateWalkerRig, buildHDHuman, animateHDHuman } from "./human3d.js";
 import { buildStreetTraffic } from "./traffic3d.js";
 import { buildSurroundingCity } from "./city3d.js";
 import { instantiateGLB } from "./glb.js";
@@ -1645,6 +1645,7 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
     });
     if (plan.rooms && plan.rooms.length) {
       // Lộ trình kiểm chứng va chạm 100% thông thoáng (tránh trọn hồ bơi, cây, ghế đá, cây Noel/Tết, sofa sảnh & mọi vách ngăn)
+      const OFFICE_SHIRTS = ["#2563eb", "#0f766e", "#6d28d9", "#be123c", "#15803d", "#0369a1"];
       const ambientStaff = [
         {
           index: 31,
@@ -1656,15 +1657,20 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
           path: [[5.8, 4.6], [5.8, 7.3], [3.4, 7.3], [3.4, 8.5], [1.8, 8.5], [3.4, 8.5], [3.4, 7.3], [5.8, 7.3]],
           x: 5.8, z: 5.6, holdCup: false, speed: 0.68,
         },
-        // Nhân viên lễ tân đứng sau quầy & khách đang trao đổi tại sảnh
-        { index: 35, x: 3.7, z: 2.05, rotY: 0, holdCup: false },
-        { index: 36, x: 3.9, z: 4.35, rotY: Math.PI, holdCup: false },
-        // Hai đồng nghiệp trò chuyện tại quầy Pantry
+        // Nhân viên lễ tân đứng sau quầy hướng mặt về khách (+Z = rotY PI) & khách hướng về quầy (-Z = rotY 0)
+        { index: 35, x: 3.7, z: 2.05, rotY: Math.PI, holdCup: false },
+        { index: 36, x: 3.9, z: 4.35, rotY: 0, holdCup: false },
+        // Hai đồng nghiệp trò chuyện đối diện nhau tại quầy Pantry
         { index: 33, x: 31.4, z: 2.55, rotY: -1.35, holdCup: true },
         { index: 34, x: 32.6, z: 2.65, rotY: 1.55, holdCup: false },
       ];
       for (const spec of ambientStaff) {
-        const w = buildWalkerRig(THREE, humanAssets, mats, spec);
+        const w = buildHDHuman(THREE, hdAssets, mats, {
+          ...spec,
+          mode: spec.path ? "walk" : "talk",
+          femaleWalk: spec.index % 2 === 1,
+          topColor: OFFICE_SHIRTS[spec.index % OFFICE_SHIRTS.length],
+        }) || buildWalkerRig(THREE, humanAssets, mats, spec);
         floorRoot.add(w.root);
         walkers.push(w);
       }
@@ -1697,13 +1703,20 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
     buildSeasonWall(THREE, sceneAssets, mats, opts.season, plan, cutaway, anim);
   }
 
-  // Nhân vật dạo phố (chế độ Dạo phố ngang mắt người thứ ba) — mặc sơ mi đen & quần tối như ngoài đường phố
+  // Nhân vật dạo phố (chế độ Dạo phố ngang mắt người thứ ba) — ưu tiên mô hình Ready Player Me áo đen sắc nét + mocap thật
   let hero = null;
+  let heroPrevT = 0;
+  let scenePrevT = 0;
   if (plan.outdoor) {
-    hero = buildWalkerRig(THREE, humanAssets, mats, {
+    hero = buildHDHuman(THREE, hdAssets, mats, {
+      index: 99,
+      variant: "rpm_a",
+      height: 1.76,
+      mode: "idle",
+    }) || buildWalkerRig(THREE, humanAssets, mats, {
       index: 99,
       hair: "#111827",
-      outfit: { top: "#16181d", inner: "#f8fafc", pants: "#18181b" },
+      outfit: { top: "#16181d", inner: "#e2e8f0", pants: "#18181b" },
     });
     hero.root.visible = false;
     root.add(hero.root);
@@ -1720,6 +1733,12 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
       if (!visible) return;
       hero.root.position.set(x, 0, z);
       hero.root.rotation.y = rotY;
+      if (hero.isHD) {
+        const dt = heroPrevT ? Math.min(0.06, Math.max(0.001, (t || 0) - heroPrevT)) : 0.016;
+        heroPrevT = t || 0;
+        animateHDHuman(hero, t || 0, dt, true, moving ? "walk" : "idle");
+        return;
+      }
       if (moving) {
         const stride = Math.sin(walkPhase);
         hero.body.position.y = 0.835 + Math.abs(Math.cos(walkPhase)) * 0.032;
@@ -1787,8 +1806,13 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
       return tags;
     },
     animate(t, motion) {
+      const dt = scenePrevT ? Math.min(0.06, Math.max(0.001, t - scenePrevT)) : 0.016;
+      scenePrevT = t;
       for (const rig of rigs) animateHumanRig(rig, t, motion);
-      for (const w of walkers) animateWalkerRig(w, t, motion);
+      for (const w of walkers) {
+        if (w.isHD) animateHDHuman(w, t, dt, motion, w.curMode || "idle");
+        else animateWalkerRig(w, t, motion);
+      }
       for (const st of agentStations) {
         if (st.orb.visible) {
           const sc = motion ? 1 + Math.sin(t * 4.5 + st.index) * 0.14 : 1;
