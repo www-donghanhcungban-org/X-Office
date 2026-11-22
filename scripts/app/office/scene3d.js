@@ -10,6 +10,7 @@ import { STATE_TEXT, roomLabelAt, wallSegments } from "./scene.js";
 import { buildHumanRig, animateHumanRig, buildWalkerRig, animateWalkerRig } from "./human3d.js";
 import { buildStreetTraffic } from "./traffic3d.js";
 import { buildSurroundingCity } from "./city3d.js";
+import { instantiateGLB } from "./glb.js";
 import {
   buildBench, buildBollard, buildFence, buildFlowerbed, buildInstancedLawn, buildPlant,
   buildPool, buildRock, buildSeasonTree, buildStreetlamp, buildTree, buildUmbrella,
@@ -297,8 +298,17 @@ function addBox(THREE, parent, geo, mat, x, y, z, sx, sy, sz, cast = true, recv 
   return m;
 }
 
+function putHD(THREE, hdAssets, key, instOpts, x, y, z, rotY = 0) {
+  const parsed = hdAssets && hdAssets.get(key);
+  if (!parsed) return null;
+  const inst = instantiateGLB(THREE, parsed, instOpts);
+  inst.group.position.set(x, y, z);
+  if (rotY) inst.group.rotation.y = rotY;
+  return inst.group;
+}
+
 // ---------------------------------------------------------------- Ngoại cảnh: sân cỏ, lối vào, cây cối, bồn hoa, đèn đường
-function buildOutdoor(THREE, sceneAssets, natureAssets, humanAssets, trafficAssets, cityAssets, mats, plan, anim) {
+function buildOutdoor(THREE, sceneAssets, natureAssets, humanAssets, trafficAssets, cityAssets, sgAssets, hdAssets, mats, plan, anim) {
   const group = new THREE.Group();
   const g = sceneAssets.geos;
   const pad = plan.levels ? 6 : 4;
@@ -360,10 +370,16 @@ function buildOutdoor(THREE, sceneAssets, natureAssets, humanAssets, trafficAsse
 
   group.add(buildFlowerbed(THREE, natureAssets, mats, 1.5, plan.D + 0.35, "#f43f5e"));
   group.add(buildFlowerbed(THREE, natureAssets, mats, 7.4, plan.D + 0.35, "#facc15"));
+  for (const px of [1.4, 7.5]) {
+    const pb = putHD(THREE, hdAssets, "planter_box", { targetLength: 1.35 }, px, 0, plan.D + 0.55);
+    if (pb) group.add(pb);
+  }
   group.add(buildRock(THREE, natureAssets, mats, 31.2, 20.4, 0.85));
   group.add(buildRock(THREE, natureAssets, mats, 42.2, 18.8, 0.75));
-  group.add(buildStreetlamp(THREE, natureAssets, mats, { x: 2.5, y: plan.D + 1.4 }));
-  group.add(buildStreetlamp(THREE, natureAssets, mats, { x: 7.4, y: plan.D + 1.4 }));
+  for (const lx of [2.5, 7.4]) {
+    const sl = putHD(THREE, hdAssets, "streetlamp", { targetHeight: 3.8 }, lx, 0, plan.D + 1.4);
+    group.add(sl || buildStreetlamp(THREE, natureAssets, mats, { x: lx, y: plan.D + 1.4 }));
+  }
 
   // Cỏ 3D & hoa dại thật quanh khuôn viên sân vườn (InstancedMesh)
   group.add(buildInstancedLawn(THREE, natureAssets, mats, {
@@ -430,14 +446,14 @@ function buildOutdoor(THREE, sceneAssets, natureAssets, humanAssets, trafficAsse
 
   // Hệ thống giao thông chạy thật: đèn tín hiệu Đỏ/Vàng/Xanh, ô tô, xe máy kèm người lái và người đi bộ
   if (trafficAssets) {
-    const traffic = buildStreetTraffic(THREE, trafficAssets, natureAssets, humanAssets, mats, plan, streetZ);
+    const traffic = buildStreetTraffic(THREE, trafficAssets, natureAssets, humanAssets, mats, plan, streetZ, hdAssets);
     group.add(traffic.root);
     anim.traffics.push(traffic);
   }
 
   // Khu phố đô thị hoàn chỉnh bao quanh 4 phía (nhà phố, quán cà phê, cao ốc kính, công viên, trạm buýt, skyline)
   if (cityAssets) {
-    const city = buildSurroundingCity(THREE, cityAssets, natureAssets, mats, plan, streetZ, anim);
+    const city = buildSurroundingCity(THREE, cityAssets, natureAssets, sgAssets, hdAssets, mats, plan, streetZ, anim);
     group.add(city.root);
     anim.cities.push(city);
   }
@@ -488,7 +504,7 @@ function buildBuilding(THREE, sceneAssets, mats, plan, th) {
 }
 
 // ---------------------------------------------------------------- Kiến trúc phòng: sàn, tường ngoài auto-cutaway, cửa sổ
-function buildArchitecture(THREE, sceneAssets, mats, plan, th, cutaway, anim) {
+function buildArchitecture(THREE, sceneAssets, mats, hdAssets, plan, th, cutaway, anim) {
   const g = sceneAssets.geos;
   const { W, D, H, tile } = plan;
   const floorGroup = new THREE.Group();
@@ -684,26 +700,35 @@ function buildArchitecture(THREE, sceneAssets, mats, plan, th, cutaway, anim) {
     parent.add(ag);
   };
   if (plan.W <= 20) {
-    // Nhóm nhỏ: đồng hồ treo tường có kim giây quay thật + tranh tường bên trái
-    const clk = new THREE.Group();
-    clk.position.set(4.5, 2.7, 0.04);
-    const rim = new THREE.Mesh(g.unitCyl, mats.standard("#334155", { roughness: 0.22, metalness: 0.85 }));
-    rim.rotation.x = Math.PI / 2;
-    rim.scale.set(0.54, 0.05, 0.54);
-    const face = new THREE.Mesh(g.unitCyl, mats.standard("#ffffff", { roughness: 0.28, tex: "clock" }));
-    face.rotation.x = Math.PI / 2;
-    face.position.z = 0.022;
-    face.scale.set(0.48, 0.02, 0.48);
-    const secPivot = new THREE.Group();
-    secPivot.position.z = 0.036;
-    addBox(THREE, secPivot, g.unitBox, mats.standard("#ef4444", { roughness: 0.3 }), 0, 0.08, 0, 0.012, 0.18, 0.008, false, false);
-    if (anim && anim.clockHands) anim.clockHands.push(secPivot);
-    clk.add(rim, face, secPivot);
-    cutaway.back.add(clk);
+    // Nhóm nhỏ: đồng hồ treo tường + tranh tường bên trái
+    const hdClk = putHD(THREE, hdAssets, "wall_clock", { targetHeight: 0.62, groundY: false }, 4.5, 2.7, 0.06);
+    if (hdClk) {
+      cutaway.back.add(hdClk);
+    } else {
+      const clk = new THREE.Group();
+      clk.position.set(4.5, 2.7, 0.04);
+      const rim = new THREE.Mesh(g.unitCyl, mats.standard("#334155", { roughness: 0.22, metalness: 0.85 }));
+      rim.rotation.x = Math.PI / 2;
+      rim.scale.set(0.54, 0.05, 0.54);
+      const face = new THREE.Mesh(g.unitCyl, mats.standard("#ffffff", { roughness: 0.28, tex: "clock" }));
+      face.rotation.x = Math.PI / 2;
+      face.position.z = 0.022;
+      face.scale.set(0.48, 0.02, 0.48);
+      const secPivot = new THREE.Group();
+      secPivot.position.z = 0.036;
+      addBox(THREE, secPivot, g.unitBox, mats.standard("#ef4444", { roughness: 0.3 }), 0, 0.08, 0, 0.012, 0.18, 0.008, false, false);
+      if (anim && anim.clockHands) anim.clockHands.push(secPivot);
+      clk.add(rim, face, secPivot);
+      cutaway.back.add(clk);
+    }
     addArt(cutaway.left, 0.04, 2.35, 6.4, Math.PI / 2, 0, 1.15, 0.88);
     addArt(cutaway.left, 0.04, 2.35, 7.9, Math.PI / 2, 1, 1.15, 0.88);
   } else {
-    // Công ty / Tập đoàn: tranh nghệ thuật phòng Giám đốc, phòng Pantry & tường hành lang + lam gỗ
+    // Công ty / Tập đoàn: tranh nghệ thuật, đồng hồ treo tường, camera an ninh & lam gỗ
+    const hdClk = putHD(THREE, hdAssets, "wall_clock", { targetHeight: 0.62, groundY: false }, 31.2, 2.65, 0.06);
+    if (hdClk) cutaway.back.add(hdClk);
+    const cam = putHD(THREE, hdAssets, "security_cam", { targetLength: 0.36, groundY: false }, 1.2, 3.05, 0.12, -0.35);
+    if (cam) cutaway.back.add(cam);
     addArt(cutaway.back, 8.6, 2.35, 0.04, 0, 0, 0.95, 0.82);
     addArt(cutaway.back, 33.8, 2.35, 0.04, 0, 1, 1.05, 0.82);
     addArt(cutaway.left, 0.04, 2.35, 7.2, Math.PI / 2, 2, 1.25, 0.92);
@@ -762,15 +787,37 @@ function buildArchitecture(THREE, sceneAssets, mats, plan, th, cutaway, anim) {
 }
 
 // ---------------------------------------------------------------- Nội thất văn phòng cao cấp (đọc dữ liệu plans/themes)
-function buildProp(THREE, sceneAssets, natureAssets, mats, p, th, plan, cutaway, anim) {
+function buildProp(THREE, sceneAssets, natureAssets, hdAssets, mats, p, th, plan, cutaway, anim) {
   const g = sceneAssets.geos;
-  if (p.kind === "plant") return buildPlant(THREE, natureAssets, mats, p, anim);
+  if (p.kind === "plant") {
+    const plantVars = [
+      ["potted_plant", 1.35],
+      ["potted_plant_2", 1.25],
+      ["potted_plant_3", 0.65],
+      ["palm_plant", 1.65],
+      ["calathea", 0.85],
+    ];
+    const [pk, ph] = plantVars[Math.abs(Math.round(p.x * 3 + p.y * 5)) % plantVars.length];
+    const parsed = (hdAssets && (hdAssets.get(pk) || hdAssets.get("potted_plant"))) || null;
+    if (parsed) {
+      const inst = instantiateGLB(THREE, parsed, { targetHeight: ph });
+      inst.group.position.set(p.x + 0.35, 0, p.y + 0.35);
+      return inst.group;
+    }
+    return buildPlant(THREE, natureAssets, mats, p, anim);
+  }
   if (p.kind === "tree") return buildTree(THREE, natureAssets, mats, p, anim);
   if (p.kind === "pool") return buildPool(THREE, natureAssets, mats, p, anim);
   if (p.kind === "umbrella") return buildUmbrella(THREE, natureAssets, mats, p);
-  if (p.kind === "bench") return buildBench(THREE, natureAssets, mats, p);
+  if (p.kind === "bench") {
+    return putHD(THREE, hdAssets, "bench", { targetLength: 1.75 }, p.x + 0.8, 0, p.y + 0.4) ||
+      buildBench(THREE, natureAssets, mats, p);
+  }
   if (p.kind === "fence") return buildFence(THREE, natureAssets, mats, p);
-  if (p.kind === "streetlamp") return buildStreetlamp(THREE, natureAssets, mats, p);
+  if (p.kind === "streetlamp") {
+    return putHD(THREE, hdAssets, "streetlamp", { targetHeight: 3.6 }, p.x + 0.25, 0, p.y + 0.25) ||
+      buildStreetlamp(THREE, natureAssets, mats, p);
+  }
 
   const root = new THREE.Group();
 
@@ -787,6 +834,16 @@ function buildProp(THREE, sceneAssets, natureAssets, mats, p, th, plan, cutaway,
 
   if (p.kind === "shelf") {
     const left = p.side === "left";
+    const shelfParsed = hdAssets && hdAssets.get("shelf");
+    if (shelfParsed) {
+      const inst = instantiateGLB(THREE, shelfParsed, { targetHeight: 2.3 });
+      const sz = new THREE.Box3().setFromObject(inst.group).getSize(new THREE.Vector3());
+      const wideAlongZ = sz.z > sz.x;
+      inst.group.position.set(p.x + (left ? 0.35 : 0.7), 0, p.y + (left ? 0.7 : 0.35));
+      inst.group.rotation.y = left ? (wideAlongZ ? 0 : Math.PI / 2) : (wideAlongZ ? Math.PI / 2 : 0);
+      root.add(inst.group);
+      return root;
+    }
     const woodMat = mats.standard(p.color || "#8b5e3c", { roughness: 0.65, tex: "wood", bump: 0.02 });
     const sg = new THREE.Group();
     sg.position.set(p.x + (left ? 0.3 : 0.7), 0, p.y + (left ? 0.7 : 0.3));
@@ -811,6 +868,27 @@ function buildProp(THREE, sceneAssets, natureAssets, mats, p, th, plan, cutaway,
   }
 
   if (p.kind === "sofa") {
+    const sofaParsed = hdAssets && hdAssets.get("sofa");
+    if (sofaParsed) {
+      const inst = instantiateGLB(THREE, sofaParsed, { targetLength: 2.9 });
+      const sz = new THREE.Box3().setFromObject(inst.group).getSize(new THREE.Vector3());
+      if (sz.z > sz.x) inst.group.rotation.y = Math.PI / 2;
+      inst.group.position.set(p.x + 1.6, 0, p.y + 0.6);
+      root.add(inst.group);
+      const ctParsed = p.y > 4 && hdAssets.get("coffee_table");
+      if (ctParsed) {
+        const ct = instantiateGLB(THREE, ctParsed, { targetLength: 1.15 });
+        const cSz = new THREE.Box3().setFromObject(ct.group).getSize(new THREE.Vector3());
+        if (cSz.z > cSz.x) ct.group.rotation.y = Math.PI / 2;
+        ct.group.position.set(p.x + 1.6, 0, p.y + 1.55);
+        root.add(ct.group);
+      }
+      if (p.x < 10) {
+        const arm = putHD(THREE, hdAssets, "armchair", { targetHeight: 0.88 }, p.x - 0.55, 0, p.y + 0.8, Math.PI / 3);
+        if (arm) root.add(arm);
+      }
+      return root;
+    }
     const col = p.color || "#475569";
     const fabMat = mats.standard(col, { roughness: 0.85, tex: "fabric", bump: 0.02 });
     const legMat = mats.standard("#5c3a21", { roughness: 0.65, tex: "wood" });
@@ -866,6 +944,10 @@ function buildProp(THREE, sceneAssets, natureAssets, mats, p, th, plan, cutaway,
   }
 
   if (p.kind === "rack") {
+    if (p.x < 25 && p.y < 2) {
+      const ms = putHD(THREE, hdAssets, "metal_shelf", { targetHeight: 2.1 }, p.x + 3.65, 0, p.y + 1.2);
+      if (ms) root.add(ms);
+    }
     const rg = new THREE.Group();
     rg.position.set(p.x + 0.5, 0, p.y + 0.5);
     const bodyMat = mats.standard(p.color || "#111827", { roughness: 0.42, metalness: 0.55 });
@@ -884,6 +966,27 @@ function buildProp(THREE, sceneAssets, natureAssets, mats, p, th, plan, cutaway,
   }
 
   if (p.kind === "counter") {
+    const cartParsed = p.x > 20 && hdAssets && hdAssets.get("coffee_cart");
+    if (cartParsed) {
+      const inst = instantiateGLB(THREE, cartParsed, { targetLength: 2.35 });
+      const sz = new THREE.Box3().setFromObject(inst.group).getSize(new THREE.Vector3());
+      if (sz.z > sz.x) inst.group.rotation.y = Math.PI / 2;
+      inst.group.position.set(p.x + 1.35, 0, p.y + 0.55);
+      root.add(inst.group);
+      const cab = mats.standard("#6f4e37", { roughness: 0.62, tex: "wood", bump: 0.02 });
+      const top = mats.physical("#f5f0e8", { roughness: 0.18, clearcoat: 0.6, tex: "stone", bump: 0.01 });
+      addBox(THREE, root, g.unitBox, cab, p.x + 3.8, 0.42, p.y + 0.55, 1.7, 0.84, 0.84, true, true);
+      addBox(THREE, root, g.unitBox, top, p.x + 3.8, 0.86, p.y + 0.55, 1.76, 0.05, 0.9, true, true);
+      const kt = putHD(THREE, hdAssets, "kettle", { targetHeight: 0.28 }, p.x + 3.35, 0.885, p.y + 0.55);
+      if (kt) root.add(kt);
+      const mw = putHD(THREE, hdAssets, "microwave", { targetLength: 0.52 }, p.x + 4.12, 0.885, p.y + 0.52);
+      if (mw) root.add(mw);
+      const pm = putHD(THREE, hdAssets, "mug", { targetHeight: 0.11 }, p.x + 3.05, 0.885, p.y + 0.62);
+      if (pm) root.add(pm);
+      const wf = putHD(THREE, hdAssets, "wet_floor_sign", { targetHeight: 0.62 }, p.x + 0.2, 0, p.y + 6.4, 0.35);
+      if (wf) root.add(wf);
+      return root;
+    }
     const cg = new THREE.Group();
     cg.position.set(p.x + 1.7, 0, p.y + 0.5);
     const wood = mats.standard("#6f4e37", { roughness: 0.62, tex: "wood", bump: 0.02 });
@@ -909,11 +1012,35 @@ function buildProp(THREE, sceneAssets, natureAssets, mats, p, th, plan, cutaway,
     const dome = new THREE.Mesh(g.pastryDome, mats.physical("#ffffff", { roughness: 0.06, clearcoat: 1, transparent: true, opacity: 0.28, depthWrite: false }));
     dome.position.set(1.05, 1.16, 0);
     cg.add(dome);
+    const fl = putHD(THREE, hdAssets, "vase_flowers", { targetHeight: 0.48 }, -1.05, 1.12, 0.08);
+    if (fl) cg.add(fl);
+    const lap = putHD(THREE, hdAssets, "laptop", { targetLength: 0.38 }, 0.35, 1.12, 0.05, Math.PI);
+    if (lap) cg.add(lap);
     root.add(cg);
     return root;
   }
 
   if (p.kind === "cafetable") {
+    const ctHD = hdAssets && hdAssets.get("cafetable");
+    const chHD = hdAssets && hdAssets.get("chair");
+    if (ctHD) {
+      const tg = new THREE.Group();
+      tg.position.set(p.x + 0.4, 0, p.y + 0.4);
+      const tbl = instantiateGLB(THREE, ctHD, { targetHeight: 0.74 });
+      tg.add(tbl.group);
+      for (const sx of [-0.76, 0.76]) {
+        if (chHD) {
+          const ch = instantiateGLB(THREE, chHD, { targetHeight: 0.84 });
+          ch.group.position.set(sx, 0, 0);
+          ch.group.rotation.y = sx < 0 ? Math.PI / 2 : -Math.PI / 2;
+          tg.add(ch.group);
+        }
+      }
+      const cm = putHD(THREE, hdAssets, "mug", { targetHeight: 0.11 }, 0.08, 0.74, 0.04);
+      if (cm) tg.add(cm);
+      root.add(tg);
+      return root;
+    }
     const tg = new THREE.Group();
     tg.position.set(p.x + 0.4, 0, p.y + 0.4);
     const iron = mats.standard("#1f2937", { roughness: 0.4, metalness: 0.75 });
@@ -1012,16 +1139,24 @@ function buildProp(THREE, sceneAssets, natureAssets, mats, p, th, plan, cutaway,
   if (p.kind === "bed") {
     const bg = new THREE.Group();
     bg.position.set(p.x + 1.2, 0, p.y + 0.5);
-    const frameMat = mats.standard("#94a3b8", { roughness: 0.42, metalness: 0.45 });
-    addBox(THREE, bg, g.unitBox, frameMat, 0, 0.22, 0, 2.38, 0.44, 0.98, true, true);
-    addBox(THREE, bg, g.unitBox, mats.standard("#e0f2fe", { roughness: 0.88, tex: "fabric" }), 0, 0.52, 0, 2.28, 0.18, 0.9, true, true);
-    addBox(THREE, bg, g.unitBox, mats.standard(th.trim, { roughness: 0.88, tex: "fabric" }), -0.35, 0.62, 0, 1.5, 0.1, 0.92, true, true);
-    const pil = new THREE.Mesh(g.bedPillow, mats.standard("#ffffff", { roughness: 0.9, tex: "fabric" }));
-    pil.position.set(0.75, 0.66, 0);
-    pil.rotation.x = Math.PI / 2;
-    pil.castShadow = true;
-    bg.add(pil);
-    addBox(THREE, bg, g.unitBox, frameMat, 1.15, 0.68, 0, 0.1, 0.68, 1.0, true, true);
+    const bedHD = hdAssets && hdAssets.get("bed");
+    if (bedHD) {
+      const inst = instantiateGLB(THREE, bedHD, { targetLength: 2.25 });
+      const sz = new THREE.Box3().setFromObject(inst.group).getSize(new THREE.Vector3());
+      if (sz.z > sz.x) inst.group.rotation.y = Math.PI / 2;
+      bg.add(inst.group);
+    } else {
+      const frameMat = mats.standard("#94a3b8", { roughness: 0.42, metalness: 0.45 });
+      addBox(THREE, bg, g.unitBox, frameMat, 0, 0.22, 0, 2.38, 0.44, 0.98, true, true);
+      addBox(THREE, bg, g.unitBox, mats.standard("#e0f2fe", { roughness: 0.88, tex: "fabric" }), 0, 0.52, 0, 2.28, 0.18, 0.9, true, true);
+      addBox(THREE, bg, g.unitBox, mats.standard(th.trim, { roughness: 0.88, tex: "fabric" }), -0.35, 0.62, 0, 1.5, 0.1, 0.92, true, true);
+      const pil = new THREE.Mesh(g.bedPillow, mats.standard("#ffffff", { roughness: 0.9, tex: "fabric" }));
+      pil.position.set(0.75, 0.66, 0);
+      pil.rotation.x = Math.PI / 2;
+      pil.castShadow = true;
+      bg.add(pil);
+      addBox(THREE, bg, g.unitBox, frameMat, 1.15, 0.68, 0, 0.1, 0.68, 1.0, true, true);
+    }
     if (p.iv !== false) {
       const chrome = mats.standard("#cbd5e1", { roughness: 0.2, metalness: 0.88 });
       addBox(THREE, bg, g.unitCyl, chrome, -1.48, 0.95, -0.25, 0.05, 1.9, 0.05, true, false);
@@ -1045,11 +1180,22 @@ function buildProp(THREE, sceneAssets, natureAssets, mats, p, th, plan, cutaway,
     addBox(THREE, dg, g.unitBox, mats.standard("#111827", { roughness: 0.3, metalness: 0.4 }), 1.65, 1.24, 0.22, 1.38, 0.78, 0.06, true, false);
     addBox(THREE, dg, g.unitPlane, mats.standard("#ffffff", { roughness: 0.2, tex: "screen:work", emissive: "#ffffff", emissiveIntensity: 0.25 }), 1.65, 1.24, 0.255, 1.3, 0.7, 1, false, false);
     addBox(THREE, dg, g.unitBox, mats.standard("#d97706", { roughness: 0.28, metalness: 0.85 }), 0.65, 0.89, 0.7, 0.52, 0.12, 0.14, true, false);
-    addBox(THREE, dg, g.unitCyl, mats.standard("#b45309", { roughness: 0.25, metalness: 0.88 }), 2.7, 1.04, 0.32, 0.06, 0.42, 0.06, true, false);
-    const sh = new THREE.Mesh(g.lampShade, mats.standard("#fef3c7", { roughness: 0.65, emissive: "#fde68a", emissiveIntensity: 0.65, side: THREE.DoubleSide }));
-    sh.position.set(2.7, 1.3, 0.32);
-    sh.scale.setScalar(0.65);
-    dg.add(sh);
+    const hdLamp = putHD(THREE, hdAssets, "desk_lamp", { targetHeight: 0.48 }, 2.7, 0.83, 0.32, -0.55);
+    if (hdLamp) {
+      dg.add(hdLamp);
+    } else {
+      addBox(THREE, dg, g.unitCyl, mats.standard("#b45309", { roughness: 0.25, metalness: 0.88 }), 2.7, 1.04, 0.32, 0.06, 0.42, 0.06, true, false);
+      const sh = new THREE.Mesh(g.lampShade, mats.standard("#fef3c7", { roughness: 0.65, emissive: "#fde68a", emissiveIntensity: 0.65, side: THREE.DoubleSide }));
+      sh.position.set(2.7, 1.3, 0.32);
+      sh.scale.setScalar(0.65);
+      dg.add(sh);
+    }
+    const vase = putHD(THREE, hdAssets, "vase_flowers", { targetHeight: 0.42 }, 0.45, 0.83, 0.35);
+    if (vase) dg.add(vase);
+    const dm = putHD(THREE, hdAssets, "mug", { targetHeight: 0.11 }, 2.25, 0.83, 0.92);
+    if (dm) dg.add(dm);
+    const guestArm = putHD(THREE, hdAssets, "armchair", { targetHeight: 0.88 }, 1.5, 0, -0.8);
+    if (guestArm) dg.add(guestArm);
     // Ghế giám đốc da đen lưng cao
     const leather = mats.physical("#111827", { roughness: 0.38, clearcoat: 0.28 });
     addBox(THREE, dg, g.unitCyl, leather, 1.5, 0.26, 2.15, 0.92, 0.44, 0.86, true, true);
@@ -1070,16 +1216,24 @@ function buildProp(THREE, sceneAssets, natureAssets, mats, p, th, plan, cutaway,
     for (const lx of [-2.4, 2.4]) addBox(THREE, mg, g.unitCyl, legMat, lx, 0.37, 0, 0.26, 0.74, 0.26, true, true);
     const chairMat = mats.standard(th.chair, { roughness: 0.74, tex: "fabric" });
     const lapMat = mats.standard("#cbd5e1", { roughness: 0.28, metalness: 0.72 });
+    const lapParsed = hdAssets && hdAssets.get("laptop");
     const n = p.seats || 6;
     for (let k = 0; k < n / 2; k++) {
       const cx = -L / 2 + 0.9 + k * (L - 1.8) / Math.max(1, n / 2 - 1);
       for (const side of [-1, 1]) {
         addBox(THREE, mg, g.unitCyl, chairMat, cx, 0.25, side * 1.18, 0.56, 0.42, 0.56, true, true);
         addBox(THREE, mg, g.unitBox, chairMat, cx, 0.72, side * 1.44, 0.54, 0.58, 0.12, true, true);
-        // Laptop mở
-        addBox(THREE, mg, g.unitBox, lapMat, cx, 0.83, side * 0.48, 0.42, 0.025, 0.3, true, false);
-        const lid = addBox(THREE, mg, g.unitBox, lapMat, cx, 0.96, side * 0.34, 0.42, 0.26, 0.025, true, false);
-        lid.rotation.x = side * -0.25;
+        if (lapParsed) {
+          const lap = instantiateGLB(THREE, lapParsed, { targetLength: 0.38 });
+          lap.group.position.set(cx, 0.83, side * 0.46);
+          if (side < 0) lap.group.rotation.y = Math.PI;
+          mg.add(lap.group);
+        } else {
+          // Laptop mở
+          addBox(THREE, mg, g.unitBox, lapMat, cx, 0.83, side * 0.48, 0.42, 0.025, 0.3, true, false);
+          const lid = addBox(THREE, mg, g.unitBox, lapMat, cx, 0.96, side * 0.34, 0.42, 0.26, 0.025, true, false);
+          lid.rotation.x = side * -0.25;
+        }
       }
     }
     addBox(THREE, mg, g.unitCyl, mats.standard("#1f2937", { roughness: 0.35, metalness: 0.5 }), 0, 0.85, 0, 0.42, 0.07, 0.42, true, false);
@@ -1220,7 +1374,7 @@ function buildSeasonWall(THREE, sceneAssets, mats, season, plan, cutaway, anim) 
 }
 
 // ---------------------------------------------------------------- Bàn làm việc hiện đại + 1–2 màn hình IDE + cốc gốm + nhân vật
-function buildWorkstation(THREE, sceneAssets, humanAssets, mats, textures, opts) {
+function buildWorkstation(THREE, sceneAssets, humanAssets, hdAssets, mats, textures, opts) {
   const { x, y, index, seat, theme, season, isAgent } = opts;
   const g = sceneAssets.geos;
   const root = new THREE.Group();
@@ -1332,19 +1486,29 @@ function buildWorkstation(THREE, sceneAssets, humanAssets, mats, textures, opts)
     const pen = addBox(THREE, root, g.unitCyl, mats.standard("#1d4ed8", { roughness: 0.3, metalness: 0.4 }), 0.52, 0.86, 0.56, 0.018, 0.28, 0.018, false, false);
     pen.rotation.set(Math.PI / 2, 0, -0.35);
   } else {
-    addBox(THREE, root, g.unitCyl, mats.standard("#c26a3b", { roughness: 0.75 }), 0.44, 0.88, 0.46, 0.18, 0.12, 0.18, true, true);
-    addBox(THREE, root, g.unitIco, mats.standard("#16a34a", { roughness: 0.55 }), 0.44, 0.99, 0.46, 0.2, 0.16, 0.2, true, false);
+    const miniPlant = putHD(THREE, hdAssets, "potted_plant_3", { targetHeight: 0.24 }, 0.44, 0.82, 0.46);
+    if (miniPlant) {
+      root.add(miniPlant);
+    } else {
+      addBox(THREE, root, g.unitCyl, mats.standard("#c26a3b", { roughness: 0.75 }), 0.44, 0.88, 0.46, 0.18, 0.12, 0.18, true, true);
+      addBox(THREE, root, g.unitIco, mats.standard("#16a34a", { roughness: 0.55 }), 0.44, 0.99, 0.46, 0.2, 0.16, 0.2, true, false);
+    }
   }
 
-  const mugGroup = new THREE.Group();
-  mugGroup.position.set(2.34, 0.82, 0.56);
-  const mug = new THREE.Mesh(g.mug, mats.physical("#f8fafc", { roughness: 0.12, clearcoat: 0.9 }));
-  mug.castShadow = true;
-  const handle = new THREE.Mesh(g.mugHandle, mats.physical("#f8fafc", { roughness: 0.12, clearcoat: 0.9 }));
-  handle.position.set(0.068, 0.085, 0);
-  const coffee = addBox(THREE, mugGroup, g.unitCyl, mats.physical("#2e1609", { roughness: 0.08, clearcoat: 1 }), 0, 0.135, 0, 0.105, 0.01, 0.105, false, false);
-  mugGroup.add(mug, handle, coffee);
-  root.add(mugGroup);
+  const hdMug = putHD(THREE, hdAssets, "mug", { targetHeight: 0.12 }, 2.34, 0.82, 0.56);
+  if (hdMug) {
+    root.add(hdMug);
+  } else {
+    const mugGroup = new THREE.Group();
+    mugGroup.position.set(2.34, 0.82, 0.56);
+    const mug = new THREE.Mesh(g.mug, mats.physical("#f8fafc", { roughness: 0.12, clearcoat: 0.9 }));
+    mug.castShadow = true;
+    const handle = new THREE.Mesh(g.mugHandle, mats.physical("#f8fafc", { roughness: 0.12, clearcoat: 0.9 }));
+    handle.position.set(0.068, 0.085, 0);
+    const coffee = addBox(THREE, mugGroup, g.unitCyl, mats.physical("#2e1609", { roughness: 0.08, clearcoat: 1 }), 0, 0.135, 0, 0.105, 0.01, 0.105, false, false);
+    mugGroup.add(mug, handle, coffee);
+    root.add(mugGroup);
+  }
 
   // Quả cầu trạng thái phát sáng góc bàn
   const orbCol = STATE_COLOR[seat.state] || "#94a3b8";
@@ -1400,7 +1564,7 @@ function buildWorkstation(THREE, sceneAssets, humanAssets, mats, textures, opts)
 }
 
 // ---------------------------------------------------------------- Dựng trọn cảnh 3D bền vững
-export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natureAssets, trafficAssets, cityAssets, opts) {
+export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natureAssets, trafficAssets, cityAssets, sgAssets, hdAssets, opts) {
   const th = opts.theme;
   const glowOn = opts.quality !== "low";
   const plan = planFor(opts.scale || "team", opts.layout || "open");
@@ -1414,29 +1578,40 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
   const rigs = [];
   const agentStations = [];
 
-  if (plan.outdoor) root.add(buildOutdoor(THREE, sceneAssets, natureAssets, humanAssets, trafficAssets, cityAssets, mats, plan, anim));
+  if (plan.outdoor) root.add(buildOutdoor(THREE, sceneAssets, natureAssets, humanAssets, trafficAssets, cityAssets, sgAssets, hdAssets, mats, plan, anim));
   if (plan.levels) root.add(buildBuilding(THREE, sceneAssets, mats, plan, th));
 
   const floorRoot = new THREE.Group();
   floorRoot.position.y = zb;
   root.add(floorRoot);
   floorRoot.add(cutaway.left, cutaway.back, cutaway.ceiling);
-  floorRoot.add(buildArchitecture(THREE, sceneAssets, mats, plan, th, cutaway, anim));
+  floorRoot.add(buildArchitecture(THREE, sceneAssets, mats, hdAssets, plan, th, cutaway, anim));
 
   const props = plan.props || th.props;
   for (const p of props) {
-    const obj = buildProp(THREE, sceneAssets, natureAssets, mats, {
+    const obj = buildProp(THREE, sceneAssets, natureAssets, hdAssets, mats, {
       ...p, dark, glowOn, iv: p.kind === "bed" && plan.props ? false : p.iv,
     }, th, plan, cutaway, anim);
     if (obj) floorRoot.add(obj);
   }
-  // Bồn hoa rực rỡ + đèn trụ + thảm cỏ 3D & hoa dại thật ngay trong khu Vườn & hồ bơi
+  // Bồn hoa rực rỡ + đèn trụ + thảm cỏ 3D + cây bụi HD & bàn dã ngoại ngay trong khu Vườn & hồ bơi
   if (plan.rooms && plan.rooms.some((r) => r.id === "garden")) {
     floorRoot.add(buildFlowerbed(THREE, natureAssets, mats, 30.8, 9.2, "#f43f5e"));
     floorRoot.add(buildFlowerbed(THREE, natureAssets, mats, 31.2, 13.0, "#facc15"));
     floorRoot.add(buildFlowerbed(THREE, natureAssets, mats, 40.4, 18.8, "#a855f7"));
     floorRoot.add(buildBollard(THREE, natureAssets, mats, 32.1, 14.4));
     floorRoot.add(buildBollard(THREE, natureAssets, mats, 41.2, 14.4));
+    for (const [key, opt, gx, gz, ry] of [
+      ["shrub", { targetHeight: 0.95 }, 30.8, 10.6, 0.3],
+      ["shrub", { targetHeight: 0.9 }, 42.8, 13.8, -0.5],
+      ["fern", { targetHeight: 0.65 }, 31.2, 14.2, 0.8],
+      ["fern", { targetHeight: 0.6 }, 41.6, 15.2, -0.4],
+      ["calathea", { targetHeight: 0.78 }, 34.5, 20.2, 0],
+      ["picnic_table", { targetLength: 1.75 }, 35.6, 16.6, 0],
+    ]) {
+      const gh = putHD(THREE, hdAssets, key, opt, gx, 0, gz, ry);
+      if (gh) floorRoot.add(gh);
+    }
     floorRoot.add(buildInstancedLawn(THREE, natureAssets, mats, {
       x0: 30.4, x1: 43.6, y0: 8.4, y1: 21.6, count: 360, flowers: 44,
     }, [
@@ -1449,7 +1624,7 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
   const seats = opts.seats || [];
   plan.desks.forEach(([x, y], i) => {
     const seat = seats[i] || { label: "", state: "idle" };
-    const st = buildWorkstation(THREE, sceneAssets, humanAssets, mats, textures, {
+    const st = buildWorkstation(THREE, sceneAssets, humanAssets, hdAssets, mats, textures, {
       x, y, index: i, seat, theme: th, season: opts.season, isAgent: Boolean(seat.label),
     });
     floorRoot.add(st.root);
@@ -1462,7 +1637,7 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
   if (opts.npc !== false) {
     plan.extraDesks.forEach(([x, y], k) => {
       const seated = npcAt(k);
-      const st = buildWorkstation(THREE, sceneAssets, humanAssets, mats, textures, {
+      const st = buildWorkstation(THREE, sceneAssets, humanAssets, hdAssets, mats, textures, {
         x, y, index: k + 5, seat: { state: seated ? "npc" : "idle", label: "" }, theme: th, season: opts.season, isAgent: false,
       });
       floorRoot.add(st.root);
@@ -1522,11 +1697,43 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
     buildSeasonWall(THREE, sceneAssets, mats, opts.season, plan, cutaway, anim);
   }
 
+  // Nhân vật dạo phố (chế độ Dạo phố ngang mắt người thứ ba) — mặc sơ mi đen & quần tối như ngoài đường phố
+  let hero = null;
+  if (plan.outdoor) {
+    hero = buildWalkerRig(THREE, humanAssets, mats, {
+      index: 99,
+      hair: "#111827",
+      outfit: { top: "#16181d", inner: "#f8fafc", pants: "#18181b" },
+    });
+    hero.root.visible = false;
+    root.add(hero.root);
+  }
+
   return {
     root,
     plan,
     zb,
     cutaway,
+    setHero(visible, x, z, rotY, walkPhase, moving, t) {
+      if (!hero) return;
+      hero.root.visible = Boolean(visible);
+      if (!visible) return;
+      hero.root.position.set(x, 0, z);
+      hero.root.rotation.y = rotY;
+      if (moving) {
+        const stride = Math.sin(walkPhase);
+        hero.body.position.y = 0.835 + Math.abs(Math.cos(walkPhase)) * 0.032;
+        hero.leftLeg.rotation.x = stride * 0.44;
+        hero.rightLeg.rotation.x = -stride * 0.44;
+        hero.leftArm.rotation.x = -stride * 0.34;
+        hero.rightArm.rotation.x = stride * 0.34;
+      } else {
+        hero.body.position.y = 0.835;
+        hero.leftLeg.rotation.x = hero.rightLeg.rotation.x = 0;
+        hero.leftArm.rotation.x = hero.rightArm.rotation.x = 0.06;
+        hero.chest.scale.y = 1 + Math.sin((t || 0) * 2.1) * 0.015;
+      }
+    },
     updateSeats(nextSeats) {
       (nextSeats || []).slice(0, agentStations.length).forEach((s, i) => agentStations[i].update(s));
     },
@@ -1628,6 +1835,7 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
       }
     },
     dispose() {
+      for (const ct of anim.cities) if (ct.dispose) ct.dispose();
       mats.dispose();
     },
   };

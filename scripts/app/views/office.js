@@ -87,6 +87,11 @@ export async function render(main, { api, h, error }) {
   const zoomIn = h("button", { type: "button", class: "office-btn", "aria-label": "Phóng to" }, "+");
   const resetView = h("button", { type: "button", class: "office-btn", title: "Về góc nhìn mặc định" }, "Về giữa");
   const projBtn = h("button", { type: "button", class: "office-btn", "aria-pressed": "true", hidden: true }, "Phối cảnh 3D");
+  const walkBtn = h("button", { type: "button", class: "office-btn", "aria-pressed": "false", hidden: true }, "Dạo phố");
+  const importBtn = h("button", { type: "button", class: "office-btn", hidden: true }, "Nạp .GLB/.SPLAT");
+  const assetInput = h("input", {
+    type: "file", accept: ".glb,.splat", hidden: true, tabindex: "-1", "aria-label": "Nạp tệp 3D GLB hoặc SPLAT",
+  });
   const fullBtn = h("button", { type: "button", class: "office-btn" }, "Toàn màn hình");
   const refresh = h("button", { type: "button" }, "Làm mới");
   // tabindex 0: canvas 2D nhận focus để dời góc nhìn bằng phím mũi tên (thay cho kéo chuột — WCAG 2.1.1).
@@ -110,7 +115,7 @@ export async function render(main, { api, h, error }) {
       h("span", null, rendererLabel, rendererSel), h("span", null, scaleLabel, scaleSel), h("span", null, layoutLabel, layoutSel),
       h("span", null, themeLabel, themeSel), h("span", null, seasonLabel, seasonSel), h("span", null, lightLabel, lightSel), h("span", null, qualityLabel, qualitySel),
       h("span", null, namesBox, namesLabel), h("span", null, npcBox, npcLabel), h("span", null, motionBox, motionLabel),
-      h("span", { class: "office-actions" }, zoomOut, zoomVal, zoomIn, resetView, projBtn, fullBtn, refresh)),
+      h("span", { class: "office-actions" }, zoomOut, zoomVal, zoomIn, resetView, projBtn, walkBtn, importBtn, assetInput, fullBtn, refresh)),
     rooms, msg, rmsg, stage, keys, counters, summary,
     legend,
     h("h2", null, "Ai đang làm gì"),
@@ -230,8 +235,15 @@ export async function render(main, { api, h, error }) {
     view.pan = { x: 0, y: 0 };
     for (const b of rooms.querySelectorAll("button")) b.setAttribute("aria-pressed", String(pressed(b.dataset.room)));
     dirty = true;
-    if (three) three.resetPan?.();
-    if (three) three.dirty = true;
+    if (three) {
+      if (three.walkMode?.()) {
+        three.setWalkMode(false);
+        walkBtn.setAttribute("aria-pressed", "false");
+        label();
+      }
+      three.resetPan?.();
+      three.dirty = true;
+    }
   }
 
   // Nút phòng đang được nhìn: "Toàn cảnh" chỉ khi không nhìn phòng NÀO và không nhìn bàn nào (WCAG 4.1.2).
@@ -303,13 +315,18 @@ export async function render(main, { api, h, error }) {
         rmsg.replaceChildren();
         canvas.hidden = true;
         projBtn.hidden = false;
+        walkBtn.hidden = false;
+        importBtn.hidden = false;
         lightSel.disabled = false;
         projBtn.setAttribute("aria-pressed", String(three.perspective()));
+        walkBtn.setAttribute("aria-pressed", String(three.walkMode()));
         three.canvas.setAttribute("aria-label", canvas.getAttribute("aria-label") || "Văn phòng");
       } catch (e) {
         three = null;
         prefs.renderer = rendererSel.value = "2d";
         projBtn.hidden = true;
+        walkBtn.hidden = true;
+        importBtn.hidden = true;
         lightSel.disabled = true;
         persist(); // không thử lại 3D mỗi lần mở màn
         rmsg.replaceChildren(h("p", { class: "state error", role: "alert" },
@@ -320,6 +337,9 @@ export async function render(main, { api, h, error }) {
       three = null;
       hoverHud.hidden = true;
       projBtn.hidden = true;
+      walkBtn.hidden = true;
+      importBtn.hidden = true;
+      walkBtn.setAttribute("aria-pressed", "false");
       lightSel.disabled = true;
       canvas.hidden = false;
     } else {
@@ -350,7 +370,9 @@ export async function render(main, { api, h, error }) {
       : "Văn phòng — chưa có dữ liệu agent (đang tải hoặc máy chủ lỗi)."; // không khai "không ai đang làm" khi chưa biết
     canvas.setAttribute("aria-label", text);
     keys.textContent = three
-      ? "Khi khung cảnh có focus: mũi tên xoay 360°; kéo chuột để xoay · cuộn để phóng/thu · chuột phải/Shift+kéo để dời · bấm nhân viên/phòng để tới."
+      ? (three.walkMode?.()
+        ? "Chế độ Dạo phố: W/A/S/D hoặc mũi tên để đi dạo · kéo chuột để nhìn quanh · cuộn chuột để chỉnh khoảng cách · bấm Toàn cảnh để thoát."
+        : "Khi khung cảnh có focus: mũi tên xoay 360°; kéo chuột để xoay · cuộn để phóng/thu · chuột phải/Shift+kéo để dời · bấm nhân viên/phòng để tới.")
       : "Khi khung cảnh có focus: mũi tên dời góc nhìn · + / − phóng to, thu nhỏ · 0 về giữa; kéo chuột để dời.";
     if (three) {
       three.canvas.setAttribute("aria-label", text);
@@ -410,6 +432,43 @@ export async function render(main, { api, h, error }) {
     const next = !three.perspective();
     three.setPerspective(next);
     projBtn.setAttribute("aria-pressed", String(next));
+  });
+  walkBtn.addEventListener("click", () => {
+    if (!three) return;
+    const next = !three.walkMode();
+    if (next) {
+      if (prefs.scale === "team") {
+        scaleSel.value = prefs.scale = "company";
+        roomButtons();
+        count();
+      }
+      if (prefs.light === "auto") lightSel.value = prefs.light = "sunset";
+      persist();
+      three.setWalkMode(true);
+      projBtn.setAttribute("aria-pressed", "true");
+      three.canvas.focus();
+    } else {
+      three.setWalkMode(false);
+    }
+    walkBtn.setAttribute("aria-pressed", String(next));
+    label();
+  });
+  importBtn.addEventListener("click", () => {
+    if (three) assetInput.click();
+  });
+  assetInput.addEventListener("change", async () => {
+    const file = assetInput.files && assetInput.files[0];
+    assetInput.value = "";
+    if (!file || !three) return;
+    try {
+      const info = await three.loadUserAsset(file);
+      const txt = info.kind === "splat"
+        ? `Đã nạp cảnh 3D Gaussian Splatting (${info.count.toLocaleString("vi-VN")} điểm) từ ${file.name}.`
+        : `Đã nạp mô hình 3D thật (.glb) từ ${file.name}.`;
+      rmsg.replaceChildren(h("p", { class: "muted", role: "status" }, txt));
+    } catch (e) {
+      rmsg.replaceChildren(h("p", { class: "state error", role: "alert" }, "Không nạp được tệp 3D: " + ((e && e.message) || e)));
+    }
   });
   if (!document.fullscreenEnabled || !stage.requestFullscreen) fullBtn.hidden = true;
   fullBtn.addEventListener("click", () => {

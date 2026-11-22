@@ -29,3 +29,5 @@ tests/xt-tmp-home-*/
 # Dữ liệu coverage (cổng test ghi rồi gộp)
 .coverage
 .coverage.*
+# Gói tài nguyên 3D HD (.glb / .splat) ngoài Git cho X-Office
+.xoffice-hd/

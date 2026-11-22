@@ -162,6 +162,9 @@ uniform float uAoStrength;
 uniform float uBloomStrength;
 uniform float uDark;
 uniform float uSunset;
+uniform vec2 uSunUv;
+uniform float uSunVis;
+uniform float uWalkMode;
 varying vec2 vUv;
 
 float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
@@ -241,6 +244,31 @@ void main() {
   vec3 bloom = texture2D(tBloom, vUv).rgb;
   col += bloom * uBloomStrength;
 
+  // Sương mờ khí quyển theo chiều sâu & Tia nắng ngược khối (Volumetric Sun Shafts) khi đứng Dạo phố / Hoàng hôn
+  float linD = linDepth(texture2D(tDepth, vUv).r);
+  if (uWalkMode > 0.5) {
+    float haze = smoothstep(28.0, 145.0, linD) * (uDark > 0.5 ? 0.35 : (uSunset > 0.5 ? 0.42 : 0.25));
+    vec3 hazeCol = uDark > 0.5 ? vec3(0.06, 0.09, 0.18) : (uSunset > 0.5 ? vec3(0.95, 0.68, 0.48) : vec3(0.76, 0.86, 0.97));
+    col = mix(col, hazeCol, haze);
+  }
+  if (uSunVis > 0.01 && uDark < 0.5) {
+    vec2 deltaUv = (vUv - uSunUv) * (1.0 / 14.0) * 0.85;
+    vec2 sUv = vUv;
+    float illum = 1.0;
+    float shafts = 0.0;
+    for (int i = 0; i < 14; i++) {
+      sUv -= deltaUv;
+      if (sUv.x >= 0.0 && sUv.x <= 1.0 && sUv.y >= 0.0 && sUv.y <= 1.0) {
+        float sd = texture2D(tDepth, sUv).r;
+        float skyMask = smoothstep(0.9965, 0.9995, sd);
+        shafts += skyMask * illum;
+      }
+      illum *= 0.9;
+    }
+    vec3 shaftCol = uSunset > 0.5 ? vec3(1.0, 0.62, 0.26) : vec3(1.0, 0.92, 0.72);
+    col += shaftCol * (shafts / 14.0) * uSunVis * (uSunset > 0.5 ? 0.46 : 0.2);
+  }
+
   // Cân bằng màu kiến trúc theo thời điểm trong ngày (Nắng sáng / Hoàng hôn vàng / Đêm neon)
   vec3 tint = uSunset > 0.5 ? vec3(1.06, 0.99, 0.9) : (uDark > 0.5 ? vec3(0.98, 1.0, 1.05) : vec3(1.015, 1.005, 0.99));
   col *= tint;
@@ -319,6 +347,9 @@ export function createPostFX(THREE, renderer) {
     uBloomStrength: { value: 0.28 },
     uDark: { value: 0 },
     uSunset: { value: 0 },
+    uSunUv: { value: new THREE.Vector2(0.25, 0.65) },
+    uSunVis: { value: 0 },
+    uWalkMode: { value: 0 },
   });
 
   const mkRT = (w, h, type, withDepth = false) => {
@@ -449,6 +480,9 @@ export function createPostFX(THREE, renderer) {
         compMat.uniforms.uBloomStrength.value = opts.dark ? 0.42 : (opts.sunset ? 0.3 : 0.24);
         compMat.uniforms.uDark.value = opts.dark ? 1 : 0;
         compMat.uniforms.uSunset.value = opts.sunset ? 1 : 0;
+        compMat.uniforms.uWalkMode.value = opts.walkMode ? 1 : 0;
+        compMat.uniforms.uSunVis.value = opts.sunVis || 0;
+        if (opts.sunUv) compMat.uniforms.uSunUv.value.copy(opts.sunUv);
         pass(compMat, null);
         renderer.toneMapping = prevTM;
       } catch {
