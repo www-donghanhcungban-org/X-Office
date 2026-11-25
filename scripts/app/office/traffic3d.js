@@ -1113,10 +1113,10 @@ export function buildStreetTraffic(THREE, tAssets, natureAssets, humanAssets, ma
       const phase = (motion ? t : 3.0) % CYCLE;
       const ewSig = phase < 8.5 ? "green" : phase < 10.5 ? "yellow" : "red";
       const nsSig = phase < 10.5 ? "red" : phase < 16.5 ? "green" : "yellow";
-      const pedGoNS = phase >= 10.8 && phase <= 16.2;
-      const pedGoEW = phase >= 0.6 && phase <= 8.0;
-      const pedStartNS = phase >= 10.8 && phase <= 12.9;
-      const pedStartEW = phase >= 0.6 && phase <= 4.8;
+      const pedGoNS = phase >= 10.6 && phase <= 17.6;
+      const pedGoEW = phase >= 0.4 && phase <= 9.8;
+      const pedStartNS = phase >= 10.6 && phase <= 15.6;
+      const pedStartEW = phase >= 0.4 && phase <= 7.8;
 
       for (const l of lights) {
         const sig = l.sigAxis === "ew" ? ewSig : nsSig;

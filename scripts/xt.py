@@ -6426,6 +6426,7 @@ def _pr_title_history(base: Path, revision_range: str) -> List[Tuple[str, str, s
     result = _git(
         base,
         "log",
+        "--no-merges",
         "-z",
         "--no-patch",
         "--no-notes",

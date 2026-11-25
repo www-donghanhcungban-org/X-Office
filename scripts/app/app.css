@@ -277,3 +277,48 @@ pre.md { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 60vh; overf
 .office-work, .office-ok { color: var(--ok); }
 .office-fail, .office-bad { color: var(--danger); }
 .office-wait { color: var(--accent); }
+.office-bim-hud {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 2;
+  width: min(21.5rem, calc(100% - 1.5rem));
+  padding: 0.65rem 0.8rem;
+  border-radius: 0.65rem;
+  border: 1px solid #334155;
+  background: rgba(15, 23, 42, 0.92);
+  color: #f8fafc;
+  font-size: 0.76rem;
+  pointer-events: none;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+}
+.office-bim-hud[hidden] { display: none; }
+.office-bim-title {
+  font-weight: 700;
+  font-size: 0.72rem;
+  letter-spacing: 0.03em;
+  color: #cbd5e1;
+  margin-bottom: 0.35rem;
+}
+.office-bim-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.22rem 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.16);
+}
+.office-bim-team { color: #94a3b8; margin-left: 0.3rem; font-size: 0.72rem; }
+.office-bim-pill {
+  padding: 0.08rem 0.45rem;
+  border-radius: 0.35rem;
+  background: #1e293b;
+  color: #e2e8f0;
+  font-weight: 600;
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+.office-bim-pill[data-st="work"] { background: #14532d; color: #bbf7d0; }
+.office-bim-pill[data-st="wait"] { background: #78350f; color: #fde68a; }
+.office-bim-pill[data-st="done"] { background: #0c4a6e; color: #bae6fd; }
+@media (max-width: 720px) { .office-bim-hud { display: none; } }

@@ -318,15 +318,24 @@ export function createWorldPhysics() {
 
       for (const v of vehicles.values()) {
         if (Math.abs(v.dirX) > 0.5) {
-          if (v.z + v.halfW + 1.1 < minZ || v.z - v.halfW - 1.1 > maxZ) continue;
+          if (v.z + v.halfW + 0.9 < minZ || v.z - v.halfW - 0.9 > maxZ) continue;
           const ahead = (midX - v.x) * v.dirX;
-          const stopDist = v.halfLen + 2.2 + Math.max(9.0, v.speed * 2.8);
-          if (ahead > -(v.halfLen + 2.2) && ahead < stopDist) return false;
+          // Xe đã dừng chờ đèn đỏ trước vạch (v.speed < 0.45): chỉ chặn nếu thân xe thực sự đang nằm đè lên vạch kẻ đường!
+          if (v.speed < 0.45) {
+            if (Math.abs(ahead) < v.halfLen + 0.75) return false;
+            continue;
+          }
+          const stopDist = v.halfLen + 1.4 + v.speed * 2.2;
+          if (ahead > -(v.halfLen + 1.0) && ahead < stopDist) return false;
         } else {
-          if (v.x + v.halfW + 1.1 < minX || v.x - v.halfW - 1.1 > maxX) continue;
+          if (v.x + v.halfW + 0.9 < minX || v.x - v.halfW - 0.9 > maxX) continue;
           const ahead = (midZ - v.z) * v.dirZ;
-          const stopDist = v.halfLen + 2.2 + Math.max(9.0, v.speed * 2.8);
-          if (ahead > -(v.halfLen + 2.2) && ahead < stopDist) return false;
+          if (v.speed < 0.45) {
+            if (Math.abs(ahead) < v.halfLen + 0.75) return false;
+            continue;
+          }
+          const stopDist = v.halfLen + 1.4 + v.speed * 2.2;
+          if (ahead > -(v.halfLen + 1.0) && ahead < stopDist) return false;
         }
       }
       return true;

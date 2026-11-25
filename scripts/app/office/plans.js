@@ -6,6 +6,7 @@ export const SCALES = [
   { id: "team", name: "Nhóm nhỏ — 1 phòng" },
   { id: "company", name: "Công ty — nhiều phòng" },
   { id: "corp", name: "Tập đoàn — toà nhà" },
+  { id: "bim", name: "Tổ hợp BIM — 5 khối kính" },
 ];
 
 // [trục, vị trí, từ, đến, [cửa: [từ, đến]…]] — "x": vách chạy dọc x tại y = vị trí; "y": chạy dọc y tại x = vị trí.
@@ -113,9 +114,115 @@ function company(layout) {
   };
 }
 
+// Tổ hợp BIM 46×27: quảng trường mở gồm 5 khối nhà kính khung thép tối màu + bệ hologram Mô hình liên hợp 12 tầng ở giữa.
+const BW = 46, BD = 27;
+const BIM_ROOMS = [
+  { id: "ceo", name: "Phòng CEO", x: 2.5, y: 2.0, w: 11.5, d: 8.2, floor: "#946243", banner: "PHÒNG CEO", doorSide: "front" },
+  { id: "bim_mgr", name: "BIM Manager", x: 31.5, y: 2.0, w: 12.0, d: 8.2, floor: "#28559a", banner: "BIM MANAGER", doorSide: "front" },
+  { id: "fed", name: "Mô hình liên hợp", x: 18.0, y: 7.4, w: 10.0, d: 6.8, floor: "#1e293b", circular: true },
+  { id: "arch", name: "Kiến trúc", x: 1.5, y: 15.6, w: 13.0, d: 9.8, floor: "#28689c", banner: "TEAM KIẾN TRÚC", doorSide: "back" },
+  { id: "struct", name: "Kết cấu", x: 16.5, y: 15.6, w: 13.0, d: 9.8, floor: "#9e472a", banner: "TEAM KẾT CẤU", doorSide: "back" },
+  { id: "mep", name: "MEP", x: 31.5, y: 15.6, w: 13.0, d: 9.8, floor: "#286a4b", banner: "TEAM MEP", doorSide: "back" },
+];
+
+// 5 bàn phụ trách chính (CEO, BIM Manager, trưởng nhóm Kiến trúc / Kết cấu / MEP) + 6 bàn kỹ sư chuyên môn ngồi đủ 11 vị trí.
+const BIM_DESKS = [
+  [6.8, 4.5],
+  [36.1, 4.5],
+  [6.6, 19.3],
+  [21.6, 19.3],
+  [36.6, 19.3],
+];
+const BIM_EXTRA_DESKS = [
+  [3.4, 19.3],
+  [9.8, 19.3],
+  [18.4, 19.3],
+  [24.8, 19.3],
+  [33.4, 19.3],
+  [39.8, 19.3],
+];
+const BIM_SPECIALISTS = [
+  "Mặt bằng",
+  "Chi tiết",
+  "Móng",
+  "Tính toán",
+  "HVAC",
+  "Điện · PCCC",
+];
+const BIM_AGENT_ROLES = [
+  "CEO · Con người",
+  "BIM Manager",
+  "Mặt đứng",
+  "Khung",
+  "Cấp thoát nước",
+];
+
+const BIM_PROPS = [
+  // Bệ tròn trung tâm phát sáng + Mô hình liên hợp toà nhà văn phòng 12 tầng
+  { kind: "bim_pad", x: 23.0, y: 10.8, r: 4.3 },
+  // Màn hình bản vẽ chuyên ngành lớn treo trong từng khối kính + kệ sách Phòng CEO
+  { kind: "shelf", x: 3.1, y: 2.35, color: "#6b4226" },
+  { kind: "bim_screen", x: 34.4, y: 2.22, w: 5.8, mode: "cde" },
+  { kind: "bim_screen", x: 5.1, y: 15.82, w: 5.8, mode: "arch" },
+  { kind: "bim_screen", x: 20.1, y: 15.82, w: 5.8, mode: "struct" },
+  { kind: "bim_screen", x: 35.1, y: 15.82, w: 5.8, mode: "mep" },
+  // Chậu cây nội thất trong 5 khối kính
+  { kind: "plant", x: 3.1, y: 8.8 }, { kind: "plant", x: 12.8, y: 2.6 },
+  { kind: "plant", x: 32.2, y: 2.6 }, { kind: "plant", x: 42.2, y: 8.8 },
+  { kind: "plant", x: 2.1, y: 16.3 }, { kind: "plant", x: 13.2, y: 16.3 },
+  { kind: "plant", x: 17.1, y: 16.3 }, { kind: "plant", x: 28.2, y: 16.3 },
+  { kind: "plant", x: 32.1, y: 16.3 }, { kind: "plant", x: 43.2, y: 16.3 },
+  // Cây bóng mát trên quảng trường kiến trúc giữa các khối nhà kính
+  { kind: "tree", x: 14.8, y: 2.4, color: "#3b8f4f" },
+  { kind: "tree", x: 28.6, y: 2.4, color: "#2f855a" },
+  { kind: "tree", x: 0.2, y: 11.4, color: "#3b8f4f" },
+  { kind: "tree", x: 43.8, y: 11.4, color: "#2f855a" },
+  { kind: "tree", x: 14.3, y: 24.4, color: "#3b8f4f" },
+  { kind: "tree", x: 29.8, y: 24.4, color: "#2f855a" },
+];
+
+function bimCampus(layout) {
+  const extraWalls = layout === "private"
+    ? [
+      ["y", 6.5, 17.2, 23.8, [[21.4, 22.8]]],
+      ["y", 9.7, 17.2, 23.8, [[21.4, 22.8]]],
+      ["y", 21.5, 17.2, 23.8, [[21.4, 22.8]]],
+      ["y", 24.7, 17.2, 23.8, [[21.4, 22.8]]],
+      ["y", 36.5, 17.2, 23.8, [[21.4, 22.8]]],
+      ["y", 39.7, 17.2, 23.8, [[21.4, 22.8]]],
+    ]
+    : layout === "connected"
+      ? [
+        ["y", 8.1, 17.4, 23.4, [[20.0, 22.2]]],
+        ["y", 23.1, 17.4, 23.4, [[20.0, 22.2]]],
+        ["y", 38.1, 17.4, 23.4, [[20.0, 22.2]]],
+      ]
+      : [];
+  return {
+    W: BW,
+    D: BD,
+    H: 3.6,
+    tile: 2,
+    outdoor: true,
+    levels: 0,
+    pavilions: true,
+    windows: [],
+    leftWindows: [],
+    desks: BIM_DESKS,
+    extraDesks: BIM_EXTRA_DESKS,
+    extraLabels: BIM_SPECIALISTS,
+    agentRoles: BIM_AGENT_ROLES,
+    rooms: BIM_ROOMS,
+    props: BIM_PROPS,
+    walls: extraWalls,
+    season: [15.0, 9.4],
+  };
+}
+
 export function planFor(scale, layout) {
   if (scale === "company") return company(layout);
   if (scale === "corp") return { ...company(layout), levels: 4, levelH: 4.4 };
+  if (scale === "bim") return bimCampus(layout);
   return { ...TEAM, walls: TEAM_WALLS[layout] || [] };
 }
 

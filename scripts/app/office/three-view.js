@@ -24,7 +24,12 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
   const canvas = document.createElement("canvas");
   canvas.className = "office-canvas office-3d";
   canvas.setAttribute("role", "img");
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, failIfMajorPerformanceCaveat: false });
+  const renderer = new THREE.WebGLRenderer({
+    canvas,
+    antialias: true,
+    powerPreference: "high-performance",
+    failIfMajorPerformanceCaveat: false,
+  });
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -536,9 +541,18 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
     },
     draw(opts) {
       const glowOn = opts.quality !== "low";
+      const ultra = opts.quality === "ultra";
       const shadows = glowOn;
       renderer.shadowMap.enabled = shadows;
       sun.castShadow = shadows;
+      const wantShadow = ultra ? 4096 : 2048;
+      if (shadows && sun.shadow.mapSize.x !== wantShadow) {
+        sun.shadow.mapSize.set(wantShadow, wantShadow);
+        if (sun.shadow.map) {
+          sun.shadow.map.dispose();
+          sun.shadow.map = null;
+        }
+      }
 
       const themeDark = Boolean(opts.theme.edge || opts.theme.id === "night" || opts.theme.id === "library");
       const lightPref = opts.light || "auto";
@@ -764,8 +778,9 @@ export function createThreeView(stage, onTagClick, onHover, onZoom) {
           focusDist: walk.active ? walk.dist : curDist,
           dofStrength,
           exposure: dark ? 1.18 : sunset ? 1.08 : 1.05,
-          aoStrength: dark ? 0.54 : (walk.active ? 0.74 : 0.64),
+          aoStrength: dark ? 0.54 : (walk.active ? 0.74 : (ultra ? 0.72 : 0.64)),
           aoRadius: walk.active ? 1.15 : ((opts.scale || "team") === "team" ? 0.9 : 1.5),
+          ultra,
         });
       } else {
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
