@@ -764,6 +764,146 @@ function drawBrandSign(ctx, w, h, variant = "portal") {
   ctx.restore();
 }
 
+// Biển tên nóc từng khối kính Tổ hợp BIM (nền xanh navy đậm, viền vàng kim, chữ trắng in hoa sắc nét)
+function drawPodSign(ctx, w, h, label) {
+  const bg = ctx.createLinearGradient(0, 0, w, h);
+  bg.addColorStop(0, "#0b172d");
+  bg.addColorStop(0.5, "#14294b");
+  bg.addColorStop(1, "#0b162a");
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, w, h);
+
+  ctx.strokeStyle = "#e0b65a";
+  ctx.lineWidth = 10;
+  ctx.strokeRect(12, 12, w - 24, h - 24);
+  ctx.strokeStyle = "rgba(125,211,252,0.34)";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(24, 24, w - 48, h - 48);
+
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.shadowColor = "rgba(0,0,0,0.65)";
+  ctx.shadowBlur = 12;
+  ctx.shadowOffsetY = 4;
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "800 72px 'Segoe UI', system-ui, -apple-system, sans-serif";
+  ctx.fillText(label || "BIM POD", w / 2, h * 0.52);
+  ctx.restore();
+}
+
+// Màn hình lớn chuyên ngành BIM trên vách kính (CDE · Kiến trúc · Kết cấu · MEP)
+function drawBimWallScreen(ctx, w, h, mode) {
+  ctx.fillStyle = "#091224";
+  ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = "#122038";
+  ctx.fillRect(0, 0, w, 46);
+  ctx.strokeStyle = "#334155";
+  ctx.lineWidth = 4;
+  ctx.strokeRect(4, 4, w - 8, h - 8);
+
+  // Lưới toạ độ kỹ thuật mảnh
+  ctx.strokeStyle = "rgba(148,163,184,0.13)";
+  ctx.lineWidth = 1.5;
+  for (let x = 48; x < w; x += 48) {
+    ctx.beginPath(); ctx.moveTo(x, 46); ctx.lineTo(x, h); ctx.stroke();
+  }
+  for (let y = 86; y < h; y += 44) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+  }
+
+  const title = mode === "arch" ? "BIM ARCHITECTURE · MẶT BẰNG & MẶT ĐỨNG 12F"
+    : mode === "struct" ? "BIM STRUCTURE · LƯỚI CỘT & NỘI LỰC KHUNG"
+      : mode === "mep" ? "BIM MEP · SƠ ĐỒ HVAC · CẤP THOÁT NƯỚC · PCCC"
+        : "BIM CDE · KIỂM TRA XUNG ĐỘT & PHỐI HỢP MÔ HÌNH";
+  const accent = mode === "arch" ? "#38bdf8" : mode === "struct" ? "#f97316" : mode === "mep" ? "#34d399" : "#60a5fa";
+  ctx.fillStyle = accent;
+  ctx.fillRect(18, 14, 18, 18);
+  ctx.fillStyle = "#e2e8f0";
+  ctx.font = "700 22px 'Segoe UI', system-ui, sans-serif";
+  ctx.fillText(title, 48, 31);
+
+  if (mode === "arch") {
+    // Bản vẽ mặt bằng & mặt đứng kiến trúc CAD xanh cyan
+    ctx.strokeStyle = "#38bdf8";
+    ctx.lineWidth = 3.5;
+    ctx.strokeRect(54, 78, 390, 260);
+    ctx.strokeRect(110, 120, 140, 175);
+    ctx.strokeRect(275, 120, 145, 95);
+    ctx.strokeStyle = "#bae6fd";
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 5; i++) {
+      ctx.beginPath(); ctx.arc(160 + i * 52, 235, 22, 0, Math.PI * 0.5); ctx.stroke();
+    }
+    // Mặt đứng tháp 12 tầng bên phải
+    ctx.strokeStyle = "#7dd3fc";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(510, 68, 200, 285);
+    for (let f = 1; f < 12; f++) {
+      const fy = 68 + f * (285 / 12);
+      ctx.beginPath(); ctx.moveTo(510, fy); ctx.lineTo(710, fy); ctx.stroke();
+    }
+  } else if (mode === "struct") {
+    // Lưới kết cấu khung chịu lực & biểu đồ ứng suất đỏ/cam/vàng
+    const cols = 8, rows = 5;
+    const gx0 = 60, gy0 = 76, gw = 640, gh = 268;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const hot = (r + c) % 3 === 0 ? "rgba(239,68,68,0.42)" : (r + c) % 2 ? "rgba(249,115,22,0.34)" : "rgba(250,204,21,0.22)";
+        ctx.fillStyle = hot;
+        ctx.fillRect(gx0 + c * (gw / cols) + 3, gy0 + r * (gh / rows) + 3, gw / cols - 6, gh / rows - 6);
+      }
+    }
+    ctx.strokeStyle = "#fb923c";
+    ctx.lineWidth = 3.5;
+    for (let c = 0; c <= cols; c++) {
+      const x = gx0 + c * (gw / cols);
+      ctx.beginPath(); ctx.moveTo(x, gy0); ctx.lineTo(x, gy0 + gh); ctx.stroke();
+    }
+    for (let r = 0; r <= rows; r++) {
+      const y = gy0 + r * (gh / rows);
+      ctx.beginPath(); ctx.moveTo(gx0, y); ctx.lineTo(gx0 + gw, y); ctx.stroke();
+    }
+  } else if (mode === "mep") {
+    // Tuyến ống gió HVAC xanh ngọc, cấp thoát nước xanh dương, PCCC đỏ
+    const pipes = [
+      ["#34d399", 110, [60, 110, 310, 110, 310, 195, 700, 195]],
+      ["#38bdf8", 180, [60, 235, 220, 235, 220, 145, 560, 145, 560, 290, 710, 290]],
+      ["#f59e0b", 260, [60, 315, 420, 315, 420, 240, 710, 240]],
+      ["#ef4444", 90, [140, 82, 660, 82]],
+    ];
+    for (const [col, , pts] of pipes) {
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 7;
+      ctx.beginPath();
+      ctx.moveTo(pts[0], pts[1]);
+      for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]);
+      ctx.stroke();
+      ctx.fillStyle = "#ffffff";
+      for (let i = 0; i < pts.length; i += 2) {
+        ctx.beginPath(); ctx.arc(pts[i], pts[i + 1], 6, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+  } else {
+    // Dashboard CDE & Clash Detection của BIM Manager
+    ctx.fillStyle = "#172554";
+    ctx.fillRect(42, 74, 290, 270);
+    ctx.strokeStyle = "#60a5fa";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(115, 102, 140, 215);
+    for (let f = 1; f < 10; f++) {
+      ctx.beginPath(); ctx.moveTo(115, 102 + f * 21.5); ctx.lineTo(255, 102 + f * 21.5); ctx.stroke();
+    }
+    const bars = [["#38bdf8", 0.92], ["#f97316", 0.84], ["#34d399", 0.78], ["#facc15", 0.96]];
+    bars.forEach(([col, u], idx) => {
+      ctx.fillStyle = "#1e293b";
+      ctx.fillRect(370, 88 + idx * 62, 340, 32);
+      ctx.fillStyle = col;
+      ctx.fillRect(370, 88 + idx * 62, Math.round(340 * u), 32);
+    });
+  }
+}
+
 // Vỉa hè bê tông cắt khe giãn nở
 function drawSidewalk(ctx, s) {
   ctx.fillStyle = "#d9d6cf";
@@ -964,6 +1104,28 @@ export function createTextureBank(THREE, onReady) {
       const tex = new THREE.CanvasTexture(canvas);
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = isTower ? 16 : 8;
+      tex.needsUpdate = true;
+      cache.set(kind, tex);
+      return tex;
+    }
+    if (kind.startsWith("podSign:")) {
+      const label = kind.slice(8);
+      const [canvas, ctx] = makeCanvas(1024, 224);
+      drawPodSign(ctx, 1024, 224, label);
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = 8;
+      tex.needsUpdate = true;
+      cache.set(kind, tex);
+      return tex;
+    }
+    if (kind.startsWith("bimScreen:")) {
+      const mode = kind.slice(10) || "cde";
+      const [canvas, ctx] = makeCanvas(768, 384);
+      drawBimWallScreen(ctx, 768, 384, mode);
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = 8;
       tex.needsUpdate = true;
       cache.set(kind, tex);
       return tex;

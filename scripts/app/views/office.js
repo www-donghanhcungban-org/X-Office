@@ -15,6 +15,19 @@ const LIGHTS = [
   { id: "sunset", name: "Hoàng hôn vàng (HDRI)" },
   { id: "night", name: "Ban đêm (HDRI)" },
 ];
+const QUALITIES = [
+  { id: "ultra", name: "Siêu nét (GPU tối đa)" },
+  { id: "high", name: "Cao" },
+  { id: "low", name: "Thấp (máy yếu)" },
+];
+const BIM_WORKFLOW = [
+  ["BEP & thiết lập CDE", "BIM Manager", 1],
+  ["Mô hình Kiến trúc", "Team KT", 2],
+  ["Mô hình Kết cấu", "Team KC", 3],
+  ["Mô hình MEP", "Team MEP", 4],
+  ["Kiểm tra xung đột", "BIM Manager", 1],
+  ["Báo cáo & phê duyệt", "CEO", 0],
+];
 
 function loadPrefs() {
   try {
@@ -64,7 +77,7 @@ export async function render(main, { api, h, error }) {
   // Giá trị đã lưu không còn trong danh sách (bản cũ/sửa tay) → mặc định: ô chọn, mặt bằng và luật hiệu năng (chỉ nhóm nhỏ
   // bật quầng sáng/bóng) cùng thấy một quy mô.
   for (const [k, list, d] of [["scale", SCALES, "team"], ["layout", LAYOUTS, "open"], ["theme", THEMES, "night"],
-    ["season", SEASONS, "auto"], ["light", LIGHTS, "auto"], ["renderer", RENDERERS, "2d"]]) {
+    ["season", SEASONS, "auto"], ["light", LIGHTS, "auto"], ["quality", QUALITIES, "high"], ["renderer", RENDERERS, "2d"]]) {
     if (!list.some((o) => o.id === prefs[k])) prefs[k] = d;
   }
   if (reduce) prefs.motion = false; // hệ thống xin giảm chuyển động thắng lựa chọn đã lưu; bật lại tay chỉ cho phiên này
@@ -74,8 +87,7 @@ export async function render(main, { api, h, error }) {
   const [themeLabel, themeSel] = select(h, "office-theme", "Kiểu văn phòng", THEMES, prefs.theme);
   const [seasonLabel, seasonSel] = select(h, "office-season", "Mùa", SEASONS, prefs.season);
   const [lightLabel, lightSel] = select(h, "office-light", "Ánh sáng", LIGHTS, prefs.light);
-  const [qualityLabel, qualitySel] = select(h, "office-quality", "Chất lượng",
-    [{ id: "high", name: "Cao" }, { id: "low", name: "Thấp (máy yếu)" }], prefs.quality);
+  const [qualityLabel, qualitySel] = select(h, "office-quality", "Chất lượng", QUALITIES, prefs.quality);
   const [namesBox, namesLabel] = check(h, "office-names", "Nhãn tên", prefs.names);
   const [motionBox, motionLabel] = check(h, "office-motion", "Chuyển động", prefs.motion);
   const [npcBox, npcLabel] = check(h, "office-npc", "Nhân viên minh hoạ", prefs.npc);
@@ -97,7 +109,8 @@ export async function render(main, { api, h, error }) {
   // tabindex 0: canvas 2D nhận focus để dời góc nhìn bằng phím mũi tên (thay cho kéo chuột — WCAG 2.1.1).
   const canvas = h("canvas", { class: "office-canvas", role: "img", tabindex: "0", "aria-label": "Văn phòng đang tải" });
   const hoverHud = h("div", { class: "office-hover", "aria-hidden": "true", hidden: true });
-  const stage = h("div", { class: "office-stage" }, canvas, hoverHud);
+  const bimHud = h("div", { class: "office-bim-hud", "aria-hidden": "true", hidden: true });
+  const stage = h("div", { class: "office-stage" }, canvas, hoverHud, bimHud);
   // Gợi ý phím hiển thị cho canvas có focus (cả 2D và 3D trỏ tới qua aria-describedby).
   const keys = h("p", { class: "muted office-keys", id: "office-keys" });
   canvas.setAttribute("aria-describedby", "office-keys");
@@ -155,7 +168,23 @@ export async function render(main, { api, h, error }) {
       : [h("li", { class: "muted" }, "Chưa có lần chạy Gate nào (loop record).")]));
     summary.textContent = "Vòng: " + d.loop.verdict + " · task mở " + d.tasks.open + ", xong " + d.tasks.done + ".";
     count();
+    syncBimHud();
     label();
+  }
+
+  function syncBimHud() {
+    const show = prefs.scale === "bim" && !(three && three.walkMode && three.walkMode());
+    bimHud.hidden = !show;
+    if (!show) return;
+    const rows = BIM_WORKFLOW.map(([title, team, seatIdx]) => {
+      const s = data.seats[seatIdx];
+      const st = s ? s.state : "idle";
+      const txt = st === "work" || st === "fail" ? "Đang chạy" : st === "wait" ? "Cần người" : st === "done" ? "Xong" : "Chờ";
+      return h("div", { class: "office-bim-row" },
+        h("span", null, title, h("span", { class: "office-bim-team" }, team)),
+        h("span", { class: "office-bim-pill", "data-st": st === "fail" ? "work" : st }, txt));
+    });
+    bimHud.replaceChildren(h("div", { class: "office-bim-title" }, "VIỆC ĐANG CHẠY · DỰ ÁN VĂN PHÒNG 12 TẦNG"), ...rows);
   }
 
   // Hộp lỗi API: cùng thông điệp với lần đang hiện thì giữ nguyên (poll 10 s không bắt trình đọc màn hình đọc lại role=alert);
@@ -191,7 +220,8 @@ export async function render(main, { api, h, error }) {
   let cssW = 800, cssH = 540;
 
   function size() {
-    dpr = prefs.quality === "low" ? 1 : Math.min(2, window.devicePixelRatio || 1);
+    const rawDpr = window.devicePixelRatio || 1;
+    dpr = prefs.quality === "low" ? 1 : prefs.quality === "ultra" ? Math.min(2.5, rawDpr * 1.35) : Math.min(2, rawDpr);
     const full = document.fullscreenElement === stage;
     cssW = Math.max(280, stage.clientWidth || 800);
     cssH = full ? Math.max(300, stage.clientHeight || window.innerHeight) : Math.round(Math.max(300, Math.min(680, cssW * 0.68)));
@@ -221,6 +251,7 @@ export async function render(main, { api, h, error }) {
         : "Mỗi người trong cảnh là một agent của vòng, có nhãn tên.";
     if (!loaded) {
       counters.textContent = "Chưa có dữ liệu agent (đang tải hoặc máy chủ lỗi).";
+      syncBimHud();
       return;
     }
     const working = data.seats.filter((s) => s.state === "work" || s.state === "fail").length;
@@ -356,7 +387,7 @@ export async function render(main, { api, h, error }) {
       if (three) three.dispose();
       return;
     }
-    const budget = prefs.quality === "low" ? 1000 / 15 : 1000 / 30;
+    const budget = prefs.quality === "low" ? 1000 / 15 : prefs.quality === "ultra" ? 0 : 1000 / 30;
     if ((prefs.motion && now - last >= budget) || dirty || (three && three.dirty)) {
       last = now;
       frame(now / 1000);
@@ -404,6 +435,7 @@ export async function render(main, { api, h, error }) {
     prefs.names = namesBox.checked;
     prefs.motion = motionBox.checked;
     count(); // sau khi gán ĐỦ lựa chọn — chú thích theo "Nhãn tên" vừa đổi, không lệch một nhịp
+    syncBimHud();
     persist();
     await useRenderer();
     label();
@@ -451,6 +483,7 @@ export async function render(main, { api, h, error }) {
       three.setWalkMode(false);
     }
     walkBtn.setAttribute("aria-pressed", String(next));
+    syncBimHud();
     label();
   });
   importBtn.addEventListener("click", () => {

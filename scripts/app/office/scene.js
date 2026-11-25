@@ -23,6 +23,20 @@ function box(x, y, z, w, d, h, color, extra) {
 // ---------------------------------------------------------------- phòng: tường, sàn, cửa sổ
 function drawRoom(iso, th, plan) {
   const { W, D, H, tile } = plan;
+  if (plan.pavilions) {
+    // Nền quảng trường đá sáng mở cho Tổ hợp BIM 5 khối kính (không dựng tường bao kín xung quanh)
+    for (let i = 0; i < W; i += tile) {
+      for (let j = 0; j < D; j += tile) {
+        const c = (i / tile + j / tile) % 2 ? "#e5dfd3" : "#ece7dc";
+        iso.panel({ plane: "floor", c: 0, a: i, b: j, w: Math.min(tile, W - i), h: Math.min(tile, D - j), color: c });
+      }
+    }
+    for (const r of plan.rooms) {
+      if (!r.floor || r.circular) continue;
+      iso.panel({ plane: "floor", c: 0.008, a: r.x, b: r.y, w: r.w, h: r.d, color: r.floor });
+    }
+    return;
+  }
   iso.box(box(-0.3, -0.3, 0, 0.3, D + 0.3, H, th.wall, { side: shade(th.wall, -0.08), top: shade(th.wall, -0.2), wall: "left" }));
   iso.box(box(0, -0.3, 0, W, 0.3, H, th.wall, { front: th.wall, top: shade(th.wall, -0.2), wall: "back" }));
   for (let i = 0; i < W; i += tile) {
@@ -357,9 +371,48 @@ function poolProps(p, out) {
   out.push(box(p.x + p.w - 1.8, p.y + p.d * 0.2, 0.01, 0.35, 0.25, 0.04, "#7dd3fc", { glow: "#38bdf8" }));
 }
 
+function bimPad(p, out, _th, t, motion) {
+  const r = p.r || 4.2;
+  out.push(box(p.x - r, p.y - r, 0, r * 2, r * 2, 0.14, "#0ea5e9", { shape: "cyl", top: "#38bdf8", glow: "#38bdf8" }));
+  out.push(box(p.x - r + 0.28, p.y - r + 0.28, 0.14, (r - 0.28) * 2, (r - 0.28) * 2, 0.06, "#111827", { shape: "cyl", top: "#1e293b" }));
+  // Mô hình liên hợp toà nhà 12 tầng phát sáng giữa bệ tròn
+  const bob = motion ? Math.sin(t * 2.2) * 0.08 : 0;
+  out.push(box(p.x - 0.85, p.y - 0.65, 0.35 + bob, 1.7, 1.3, 2.35, "rgba(56,189,248,0.34)", { top: "#7dd3fc", glow: "#38bdf8", bias: 0.25 }));
+  out.push(box(p.x - 0.28, p.y - 0.28, 0.38 + bob, 0.56, 0.56, 2.28, "#34d399", { bias: 0.28 }));
+}
+
+function bimScreen(p, out) {
+  const w = p.w || 5.4;
+  const col = p.mode === "arch" ? "#0284c7" : p.mode === "struct" ? "#ea580c" : p.mode === "mep" ? "#10b981" : "#2563eb";
+  out.push(box(p.x, p.y, 1.15, w, 0.12, 1.95, "#0f172a", { front: shade(col, -0.35), glow: col }));
+}
+
+function pavilionFrames(plan, out) {
+  const frame = "#1e293b";
+  const glass = "rgba(186,230,253,0.22)";
+  for (const r of plan.rooms) {
+    if (r.circular) continue;
+    const { x, y, w, d } = r;
+    const h = plan.H;
+    // Khung cột góc & dầm đỉnh thép đen mảnh cho từng khối kính
+    for (const [cx, cy] of [[x, y], [x + w - 0.14, y], [x, y + d - 0.14], [x + w - 0.14, y + d - 0.14]]) {
+      out.push(box(cx, cy, 0, 0.14, 0.14, h, frame));
+    }
+    out.push(box(x, y, h - 0.12, w, 0.14, 0.12, frame));
+    out.push(box(x, y + d - 0.14, h - 0.12, w, 0.14, 0.12, frame));
+    out.push(box(x, y, h - 0.12, 0.14, d, 0.12, frame));
+    out.push(box(x + w - 0.14, y, h - 0.12, 0.14, d, 0.12, frame));
+    out.push(box(x + 0.14, y, 0.05, w - 0.28, 0.06, h - 0.2, glass, { front: glass, top: glass, side: glass }));
+    if (r.banner) {
+      const bw = Math.min(w * 0.56, 6.2);
+      out.push(box(x + (w - bw) / 2, y - 0.05, h + 0.12, bw, 0.18, 0.92, "#0f1d35", { top: "#e0b65a", front: "#162a4a" }));
+    }
+  }
+}
+
 const BOX_PROPS = {
   plant, shelf, sofa, lamp, rack, counter, cafetable, console: consoleDesk, holo, cooler, bed,
-  bigdesk, meeting, tree, bench, umbrella, fence, streetlamp, pool: poolProps,
+  bigdesk, meeting, tree, bench, umbrella, fence, streetlamp, pool: poolProps, bim_pad: bimPad, bim_screen: bimScreen,
 };
 
 function flatProp(iso, p, th, plan, t, motion) {
@@ -683,6 +736,7 @@ function seasonProps(season, out, t, motion, [x, y]) {
 }
 
 function seasonWall(iso, season, t, motion, plan) {
+  if (plan.pavilions) return;
   if (season === "noel") {
     const nx = Math.round(plan.W * 1.1), ny = Math.round(plan.D);
     for (let k = 0; k < nx + ny; k++) {
@@ -783,15 +837,18 @@ export function compose(sink, opts, sorted = true) {
     for (let k = start; k < floorItems.length; k++) floorItems[k].pick = pick;
     heads.push({ seat, at });
   });
+  const extraHeads = [];
   if (opts.npc !== false) {
     plan.extraDesks.forEach(([x, y], k) => {
       const npc = { state: "npc", label: "" };
-      if (npcAt(k)) {
+      if (npcAt(k, plan)) {
         deskBoxes(th, x, y, npc, floorItems, t, motion);
-        person(th, x, y, k + 5, npc, floorItems, t, motion, season);
+        const at = person(th, x, y, k + 5, npc, floorItems, t, motion, season);
+        if (plan.extraLabels && plan.extraLabels[k]) extraHeads.push({ text: plan.extraLabels[k], at });
       } else deskBoxes(th, x, y, { state: "idle" }, floorItems, t, motion);
     });
   }
+  if (plan.pavilions) pavilionFrames(plan, floorItems);
   seasonProps(season, floorItems, t, motion, plan.season);
   layoutWalls(plan.walls, th, floorItems);
   for (const b of floorItems) items.push({ ...b, z: b.z + zb });
@@ -806,6 +863,9 @@ export function compose(sink, opts, sorted = true) {
     const order = [...plan.rooms].sort((a, b) => (b.id === opts.focus) - (a.id === opts.focus));
     for (const r of order) top.tag(...roomLabelAt(r), "▸ " + r.name, th.trim, inkOn(th.trim), null, "room", r.id);
   }
+  extraHeads.forEach(({ text, at }) => {
+    if (opts.names !== false) top.tag(at.x, at.y, at.z, text, "#1e293b", "#f8fafc", "#475569", "spec", "");
+  });
   heads.forEach(({ seat, at }, i) => {
     if (opts.names !== false) top.tag(at.x, at.y, at.z, seat.label, bg, fg, border, "agent", String(i));
     if (!QUIET.has(seat.state)) {
@@ -826,13 +886,14 @@ export function roomLabelAt(r) {
 }
 
 // Bàn phụ thứ k có nhân viên minh hoạ không — MỘT quy tắc cho cả compose (vẽ) lẫn npcSeated (bộ đếm).
-function npcAt(k) {
+function npcAt(k, plan) {
+  if (plan && plan.pavilions) return true;
   return rnd(k * 7 + 3) > 0.15;
 }
 
 // Bàn phụ có nhân viên minh hoạ (cùng quy tắc với compose) — để bộ đếm của màn khớp đúng cảnh.
 export function npcSeated(plan) {
-  return plan.extraDesks.filter((_, k) => npcAt(k)).length;
+  return plan.extraDesks.filter((_, k) => npcAt(k, plan)).length;
 }
 
 // Điểm góc của hộp nhìn (cho fitPoints 2D và camera 3D).

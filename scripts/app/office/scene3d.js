@@ -33,7 +33,8 @@ function rnd(i) {
   return v - Math.floor(v);
 }
 
-function npcAt(k) {
+function npcAt(k, plan) {
+  if (plan && plan.pavilions) return true;
   return rnd(k * 7 + 3) > 0.15;
 }
 
@@ -319,8 +320,10 @@ function buildOutdoor(THREE, sceneAssets, natureAssets, humanAssets, trafficAsse
   const g = sceneAssets.geos;
   const pad = plan.levels ? 6 : 4;
   if (physics) {
-    // Khối toà nhà X-Office tầng trệt + hàng rào cây xanh bao quanh (chừa mở lối đi đá sảnh x = 3..7)
-    physics.addBox("outdoor", -0.2, -0.2, plan.W + 0.2, plan.D + 0.2, "xoffice_bldg");
+    // Khối toà nhà X-Office tầng trệt (trừ Tổ hợp BIM mở cho phép đi bộ thẳng vào quảng trường) + hàng rào cây xanh bao quanh
+    if (!plan.pavilions) {
+      physics.addBox("outdoor", -0.2, -0.2, plan.W + 0.2, plan.D + 0.2, "xoffice_bldg");
+    }
     physics.addBox("outdoor", 7.35, plan.D + pad - 1.35, plan.W + pad - 0.65, plan.D + pad - 0.65, "yard_fence");
     physics.addBox("outdoor", plan.W + pad - 1.35, -1.0, plan.W + pad - 0.65, plan.D + pad - 0.65, "yard_fence");
     physics.addBox("outdoor", -1.0, plan.D + pad - 1.35, 2.85, plan.D + pad - 0.65, "yard_fence");
@@ -621,8 +624,174 @@ function buildBuilding(THREE, sceneAssets, mats, plan, th) {
   return group;
 }
 
+// ---------------------------------------------------------------- Tổ hợp BIM: quảng trường đá mở + 5 khối kính khung thép tối màu
+function buildPavilionCampus(THREE, sceneAssets, mats, plan, th, physics) {
+  const g = sceneAssets.geos;
+  const { W, D, H } = plan;
+  const floorGroup = new THREE.Group();
+
+  // Quảng trường bê tông đá mài sáng hiện đại (polygonOffset ưu tiên trên thảm cỏ nền ở mọi khoảng cách camera)
+  const plazaA = mats.physical("#ebe6dc", {
+    roughness: 0.78, metalness: 0.02, clearcoat: 0.08, clearcoatRoughness: 0.5, tex: "stone", normal: 0.35, roughMap: true,
+    polygonOffset: true, offsetFactor: -2, offsetUnits: -2,
+  });
+  const plazaB = mats.physical("#e2ddd1", {
+    roughness: 0.8, metalness: 0.02, clearcoat: 0.08, clearcoatRoughness: 0.52, tex: "stone", normal: 0.35, roughMap: true,
+    polygonOffset: true, offsetFactor: -2, offsetUnits: -2,
+  });
+  const step = 4;
+  for (let i = 0; i < W; i += step) {
+    for (let j = 0; j < D; j += step) {
+      const tw = Math.min(step, W - i), td = Math.min(step, D - j);
+      const m = new THREE.Mesh(g.unitPlane, ((Math.round(i / step) + Math.round(j / step)) % 2) ? plazaB : plazaA);
+      m.rotation.x = -Math.PI / 2;
+      m.position.set(i + tw / 2, 0.032, j + td / 2);
+      m.scale.set(tw, td, 1);
+      m.receiveShadow = true;
+      floorGroup.add(m);
+    }
+  }
+  addBox(THREE, floorGroup, g.unitBox, mats.standard("#d6d3d1", { roughness: 0.68 }), W / 2, -0.1, D / 2, W + 0.5, 0.26, D + 0.5, false, true);
+
+  const steelMat = mats.standard("#151d28", { roughness: 0.28, metalness: 0.84 });
+  const goldMat = mats.standard("#e0b65a", { roughness: 0.24, metalness: 0.88 });
+  const glassMat = mats.physical("#e0f2fe", {
+    roughness: 0.06, metalness: 0.04, clearcoat: 1.0, clearcoatRoughness: 0.06, transparent: true, opacity: 0.14, depthWrite: false,
+  });
+  const roofGlassMat = mats.physical("#e0f2fe", {
+    roughness: 0.08, metalness: 0.04, clearcoat: 1.0, transparent: true, opacity: 0.05, depthWrite: false,
+  });
+
+  const regWall = (x0, z0, x1, z1) => {
+    if (!physics) return;
+    physics.addBox("indoor", x0, z0, x1, z1, "pod_wall");
+    physics.addBox("outdoor", x0, z0, x1, z1, "pod_wall");
+  };
+
+  for (const r of plan.rooms) {
+    if (r.circular) continue;
+    const { x, y, w, d } = r;
+    const isWood = r.id === "ceo";
+    const podFloorMat = mats.physical(r.floor, {
+      roughness: isWood ? 0.62 : 0.56,
+      metalness: 0.04,
+      clearcoat: 0.34,
+      clearcoatRoughness: 0.24,
+      tex: isWood ? "wood" : "tileFloor",
+      normal: 0.42,
+      roughMap: true,
+      polygonOffset: true,
+      offsetFactor: -3,
+      offsetUnits: -4,
+    });
+    // Thềm sàn nổi nhẹ cho từng khối văn phòng kính
+    addBox(THREE, floorGroup, g.unitBox, steelMat, x + w / 2, 0.045, y + d / 2, w + 0.12, 0.04, d + 0.12, false, true);
+    const fl = new THREE.Mesh(g.unitPlane, podFloorMat);
+    fl.rotation.x = -Math.PI / 2;
+    fl.position.set(x + w / 2, 0.072, y + d / 2);
+    fl.scale.set(w, d, 1);
+    fl.receiveShadow = true;
+    floorGroup.add(fl);
+
+    // Mái kính cường lực siêu trong + dầm khung thép bao đỉnh khối kính
+    const rf = new THREE.Mesh(g.unitPlane, roofGlassMat);
+    rf.rotation.x = -Math.PI / 2;
+    rf.position.set(x + w / 2, H - 0.04, y + d / 2);
+    rf.scale.set(w - 0.1, d - 0.1, 1);
+    floorGroup.add(rf);
+
+    addBox(THREE, floorGroup, g.unitBox, steelMat, x + w / 2, H - 0.06, y, w + 0.12, 0.12, 0.12, true, false);
+    addBox(THREE, floorGroup, g.unitBox, steelMat, x + w / 2, H - 0.06, y + d, w + 0.12, 0.12, 0.12, true, false);
+    addBox(THREE, floorGroup, g.unitBox, steelMat, x, H - 0.06, y + d / 2, 0.12, 0.12, d + 0.12, true, false);
+    addBox(THREE, floorGroup, g.unitBox, steelMat, x + w, H - 0.06, y + d / 2, 0.12, 0.12, d + 0.12, true, false);
+
+    // 4 cột góc + đố đứng chia nhịp kính chuẩn kiến trúc Miesian
+    const xPosts = [x, x + w / 3, x + (2 * w) / 3, x + w];
+    for (const px of xPosts) {
+      addBox(THREE, floorGroup, g.unitBox, steelMat, px, H / 2, y, 0.09, H, 0.09, true, false);
+      addBox(THREE, floorGroup, g.unitBox, steelMat, px, H / 2, y + d, 0.09, H, 0.09, true, false);
+    }
+    for (const pz of [y + d / 2]) {
+      addBox(THREE, floorGroup, g.unitBox, steelMat, x, H / 2, pz, 0.08, H, 0.08, true, false);
+      addBox(THREE, floorGroup, g.unitBox, steelMat, x + w, H / 2, pz, 0.08, H, 0.08, true, false);
+    }
+
+    // Hai vách kính bên trái & bên phải kín
+    addBox(THREE, floorGroup, g.unitBox, glassMat, x, H / 2, y + d / 2, 0.04, H - 0.12, d - 0.1, false, false);
+    addBox(THREE, floorGroup, g.unitBox, glassMat, x + w, H / 2, y + d / 2, 0.04, H - 0.12, d - 0.1, false, false);
+    regWall(x - 0.14, y, x + 0.14, y + d);
+    regWall(x + w - 0.14, y, x + w + 0.14, y + d);
+
+    // Cửa mở rộng 2.8m hướng thẳng ra quảng trường trung tâm (Mô hình liên hợp)
+    const doorW = 2.8;
+    const cx = x + w / 2;
+    const segW = (w - doorW) / 2;
+    const buildSpanX = (atZ, hasDoor) => {
+      if (!hasDoor) {
+        addBox(THREE, floorGroup, g.unitBox, glassMat, cx, H / 2, atZ, w - 0.1, H - 0.12, 0.04, false, false);
+        regWall(x, atZ - 0.14, x + w, atZ + 0.14);
+        return;
+      }
+      addBox(THREE, floorGroup, g.unitBox, glassMat, x + segW / 2, H / 2, atZ, segW, H - 0.12, 0.04, false, false);
+      addBox(THREE, floorGroup, g.unitBox, glassMat, x + w - segW / 2, H / 2, atZ, segW, H - 0.12, 0.04, false, false);
+      addBox(THREE, floorGroup, g.unitBox, glassMat, cx, H - 0.48, atZ, doorW, 0.84, 0.04, false, false);
+      addBox(THREE, floorGroup, g.unitBox, steelMat, cx - doorW / 2, H / 2, atZ, 0.08, H, 0.09, true, false);
+      addBox(THREE, floorGroup, g.unitBox, steelMat, cx + doorW / 2, H / 2, atZ, 0.08, H, 0.09, true, false);
+      addBox(THREE, floorGroup, g.unitBox, steelMat, cx, 2.66, atZ, doorW + 0.1, 0.07, 0.09, false, false);
+      regWall(x, atZ - 0.14, cx - doorW / 2, atZ + 0.14);
+      regWall(cx + doorW / 2, atZ - 0.14, x + w, atZ + 0.14);
+    };
+    buildSpanX(y, r.doorSide === "back");
+    buildSpanX(y + d, r.doorSide === "front");
+
+    // Bảng tên nóc khối nhà kính nền xanh navy viền vàng kim (PHÒNG CEO · BIM MANAGER · TEAM KIẾN TRÚC · TEAM KẾT CẤU · TEAM MEP)
+    if (r.banner) {
+      const signW = Math.min(w * 0.62, 6.8);
+      const signH = 1.34;
+      const signY = H + 0.76;
+      const signZ = y + 0.05;
+      for (const sx of [-signW * 0.34, signW * 0.34]) {
+        addBox(THREE, floorGroup, g.unitBox, steelMat, cx + sx, H + 0.16, signZ, 0.1, 0.36, 0.1, false, false);
+      }
+      addBox(THREE, floorGroup, g.unitBox, steelMat, cx, signY, signZ, signW + 0.2, signH + 0.16, 0.16, true, true);
+      addBox(THREE, floorGroup, g.unitBox, goldMat, cx, signY + signH / 2 + 0.09, signZ, signW + 0.3, 0.07, 0.2, false, false);
+      const sMat = mats.standard("#ffffff", {
+        roughness: 0.22,
+        metalness: 0.08,
+        tex: "podSign:" + r.banner,
+        emissive: "#ffffff",
+        emissiveMap: true,
+        emissiveIntensity: 0.5,
+      });
+      const front = new THREE.Mesh(g.unitPlane, sMat);
+      front.position.set(cx, signY, signZ + 0.09);
+      front.scale.set(signW, signH, 1);
+      const back = new THREE.Mesh(g.unitPlane, sMat);
+      back.position.set(cx, signY, signZ - 0.09);
+      back.rotation.y = Math.PI;
+      back.scale.set(signW, signH, 1);
+      floorGroup.add(front, back);
+    }
+  }
+
+  // Vách kính ngăn bàn bên trong 3 khối Team khi người dùng đổi sang bố cục "liên thông" hoặc "mỗi người một phòng"
+  if (plan.walls && plan.walls.length) {
+    const railMat = mats.standard("#334155", { roughness: 0.28, metalness: 0.78 });
+    for (const [axis, at, from, to, doors] of plan.walls) {
+      for (const [u, v] of mergeSegments(wallSegments(from, to, doors))) {
+        const len = v - u, mid = (u + v) / 2, isX = axis === "x";
+        addBox(THREE, floorGroup, g.unitBox, glassMat, isX ? mid : at, 1.15, isX ? at : mid, isX ? len : 0.04, 2.1, isX ? 0.04 : len, false, false);
+        addBox(THREE, floorGroup, g.unitBox, railMat, isX ? mid : at, 2.22, isX ? at : mid, isX ? len : 0.08, 0.06, isX ? 0.08 : len, false, false);
+      }
+    }
+  }
+
+  return floorGroup;
+}
+
 // ---------------------------------------------------------------- Kiến trúc phòng: sàn, tường ngoài auto-cutaway, cửa sổ
-function buildArchitecture(THREE, sceneAssets, mats, hdAssets, plan, th, cutaway, anim) {
+function buildArchitecture(THREE, sceneAssets, mats, hdAssets, plan, th, cutaway, anim, physics) {
+  if (plan.pavilions) return buildPavilionCampus(THREE, sceneAssets, mats, plan, th, physics);
   const g = sceneAssets.geos;
   const { W, D, H, tile } = plan;
   const floorGroup = new THREE.Group();
@@ -1500,6 +1669,69 @@ function buildProp(THREE, sceneAssets, natureAssets, hdAssets, mats, p, th, plan
     return null;
   }
 
+  if (p.kind === "bim_pad") {
+    const r = p.r || 4.3;
+    const pg = new THREE.Group();
+    pg.position.set(p.x, 0, p.y);
+    const darkSlate = mats.physical("#111827", { roughness: 0.36, metalness: 0.45, clearcoat: 0.55 });
+    const cyanGlow = mats.standard("#38bdf8", { roughness: 0.14, emissive: "#00e5ff", emissiveIntensity: 1.35 });
+    const innerSlate = mats.physical("#1e293b", { roughness: 0.28, metalness: 0.35, clearcoat: 0.65 });
+    addBox(THREE, pg, g.unitCyl, darkSlate, 0, 0.055, 0, r * 2 + 0.36, 0.11, r * 2 + 0.36, false, true);
+    addBox(THREE, pg, g.unitCyl, cyanGlow, 0, 0.095, 0, r * 2 + 0.04, 0.06, r * 2 + 0.04, false, false);
+    addBox(THREE, pg, g.unitCyl, innerSlate, 0, 0.125, 0, r * 2 - 0.28, 0.05, r * 2 - 0.28, false, true);
+
+    // Mô hình liên hợp Hologram 3D toà nhà văn phòng 12 tầng (Kiến trúc + Kết cấu + MEP) xoay nhẹ ở trung tâm
+    const holo = new THREE.Group();
+    holo.position.y = 0.28;
+    const holoShell = mats.physical("#38bdf8", {
+      roughness: 0.08, metalness: 0.1, clearcoat: 1.0, transparent: true, opacity: 0.2, emissive: "#0ea5e9", emissiveIntensity: 0.55, depthWrite: false,
+    });
+    const slabHolo = mats.standard("#7dd3fc", { roughness: 0.15, emissive: "#38bdf8", emissiveIntensity: 0.95, transparent: true, opacity: 0.72 });
+    const structHolo = mats.standard("#fb923c", { roughness: 0.2, emissive: "#f97316", emissiveIntensity: 0.9 });
+    const mepHolo = mats.standard("#34d399", { roughness: 0.18, emissive: "#10b981", emissiveIntensity: 0.95 });
+    const towerH = 2.64;
+    addBox(THREE, holo, g.unitBox, holoShell, 0, towerH / 2, 0, 1.85, towerH, 1.35, false, false);
+    addBox(THREE, holo, g.unitBox, mepHolo, 0, towerH / 2, 0, 0.38, towerH - 0.08, 0.38, false, false);
+    for (let f = 0; f <= 12; f++) {
+      addBox(THREE, holo, g.unitBox, slabHolo, 0, f * (towerH / 12), 0, 1.92, 0.022, 1.42, false, false);
+    }
+    for (const [cx, cz] of [[-0.86, -0.61], [0.86, -0.61], [-0.86, 0.61], [0.86, 0.61], [0, -0.61], [0, 0.61]]) {
+      addBox(THREE, holo, g.unitBox, structHolo, cx, towerH / 2, cz, 0.045, towerH, 0.045, false, false);
+    }
+    const orbitRing = new THREE.Mesh(g.holoRing, cyanGlow);
+    orbitRing.rotation.x = Math.PI / 2;
+    orbitRing.position.y = 0.08;
+    orbitRing.scale.setScalar(2.4);
+    holo.add(orbitRing);
+    pg.add(holo);
+    anim.spinners.push({ group: holo, baseY: 0.3, phase: 0.5 });
+    root.add(pg);
+    return root;
+  }
+
+  if (p.kind === "bim_screen") {
+    const w = p.w || 5.8;
+    const h = 2.05;
+    const sg = new THREE.Group();
+    sg.position.set(p.x + w / 2, 2.04, p.y);
+    const bezel = mats.standard("#0f172a", { roughness: 0.28, metalness: 0.65 });
+    const faceMat = mats.standard("#ffffff", {
+      roughness: 0.18,
+      metalness: 0.08,
+      tex: "bimScreen:" + (p.mode || "cde"),
+      emissive: "#ffffff",
+      emissiveMap: true,
+      emissiveIntensity: 0.48,
+    });
+    addBox(THREE, sg, g.unitBox, bezel, 0, 0, 0, w, h, 0.08, true, false);
+    const front = new THREE.Mesh(g.unitPlane, faceMat);
+    front.position.set(0, 0, 0.048);
+    front.scale.set(w - 0.18, h - 0.18, 1);
+    sg.add(front);
+    root.add(sg);
+    return root;
+  }
+
   return null;
 }
 
@@ -1747,6 +1979,10 @@ function registerIndoorProp(physics, p) {
   else if (p.kind === "shelf") physics.addBox("indoor", p.x, p.y, p.x + (p.side === "left" ? 0.65 : 1.45), p.y + (p.side === "left" ? 1.45 : 0.65), "shelf");
   else if (p.kind === "console") physics.addBox("indoor", p.x, p.y, p.x + 1.6, p.y + 0.9, "console");
   else if (p.kind === "holo") physics.addCircle("indoor", p.x + 0.7, p.y + 0.7, 0.72, "holo");
+  else if (p.kind === "bim_pad") {
+    physics.addCircle("indoor", p.x, p.y, (p.r || 4.3) + 0.15, "bim_pad");
+    physics.addCircle("outdoor", p.x, p.y, (p.r || 4.3) + 0.15, "bim_pad");
+  }
 }
 
 // ---------------------------------------------------------------- Dựng trọn cảnh 3D bền vững
@@ -1772,7 +2008,7 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
   floorRoot.position.y = zb;
   root.add(floorRoot);
   floorRoot.add(cutaway.left, cutaway.back, cutaway.ceiling);
-  floorRoot.add(buildArchitecture(THREE, sceneAssets, mats, hdAssets, plan, th, cutaway, anim));
+  floorRoot.add(buildArchitecture(THREE, sceneAssets, mats, hdAssets, plan, th, cutaway, anim, physics));
 
   // Đăng ký tường ngoài & tường vách nội thất vào vật lý trong phòng (tự chừa đúng khoảng cửa đi!)
   physics.addBox("indoor", -0.5, -0.5, plan.W + 0.5, 0.2, "wall_n");
@@ -1830,6 +2066,7 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
   const seats = opts.seats || [];
   plan.desks.forEach(([x, y], i) => {
     physics.addBox("indoor", x, y, x + 2.8, y + 1.55, "desk");
+    if (plan.pavilions) physics.addBox("outdoor", x, y, x + 2.8, y + 1.55, "desk");
     const seat = seats[i] || { label: "", state: "idle" };
     const st = buildWorkstation(THREE, sceneAssets, humanAssets, hdAssets, mats, textures, {
       x, y, index: i, seat, theme: th, season: opts.season, isAgent: Boolean(seat.label),
@@ -1839,19 +2076,64 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
     agentStations.push(st);
   });
 
-  // Bàn nhân viên minh hoạ & đồng nghiệp đi dạo / trò chuyện (Công ty / Tập đoàn)
+  // Bàn nhân viên minh hoạ & đồng nghiệp đi dạo / trò chuyện (Công ty / Tập đoàn / Tổ hợp BIM)
   const walkers = [];
   if (opts.npc !== false) {
     plan.extraDesks.forEach(([x, y], k) => {
       physics.addBox("indoor", x, y, x + 2.8, y + 1.55, "desk");
-      const seated = npcAt(k);
+      if (plan.pavilions) physics.addBox("outdoor", x, y, x + 2.8, y + 1.55, "desk");
+      const seated = npcAt(k, plan);
       const st = buildWorkstation(THREE, sceneAssets, humanAssets, hdAssets, mats, textures, {
         x, y, index: k + 5, seat: { state: seated ? "npc" : "idle", label: "" }, theme: th, season: opts.season, isAgent: false,
       });
       floorRoot.add(st.root);
       if (st.rig) rigs.push(st.rig);
     });
-    if (plan.rooms && plan.rooms.length) {
+    if (plan.pavilions) {
+      // Điều phối viên BIM đi kiểm tra Mô hình liên hợp 12 tầng ở quảng trường trung tâm & trao đổi giữa các khối kính
+      const BIM_SHIRTS = ["#2563eb", "#0d9488", "#d97706", "#059669"];
+      const bimWalkers = [
+        {
+          index: 45,
+          holdCup: false,
+          steps: [
+            { act: "wait", pos: [37.5, 11.2], yaw: -Math.PI / 2, dur: 3.4, mode: "idle", look: true },
+            { act: "walk", from: [37.5, 11.2], to: [28.4, 10.8], speed: 0.96 },
+            { act: "wait", pos: [28.4, 10.8], yaw: -Math.PI / 2, dur: 5.2, mode: "talk" },
+            { act: "walk", from: [28.4, 10.8], to: [37.5, 14.4], speed: 0.94 },
+            { act: "wait", pos: [37.5, 14.4], yaw: 0, dur: 3.6, mode: "idle", look: true },
+            { act: "walk", from: [37.5, 14.4], to: [37.5, 11.2], speed: 0.94 },
+          ],
+          initIdx: 1,
+        },
+        {
+          index: 46,
+          holdCup: true,
+          steps: [
+            { act: "wait", pos: [8.2, 11.2], yaw: Math.PI / 2, dur: 3.8, mode: "idle", cup: true, look: true },
+            { act: "walk", from: [8.2, 11.2], to: [17.6, 10.8], speed: 0.92, cup: true },
+            { act: "wait", pos: [17.6, 10.8], yaw: Math.PI / 2, dur: 4.8, mode: "idle", cup: true, look: true },
+            { act: "walk", from: [17.6, 10.8], to: [8.0, 14.4], speed: 0.92, cup: true },
+            { act: "wait", pos: [8.0, 14.4], yaw: 0, dur: 3.4, mode: "idle", cup: true },
+            { act: "walk", from: [8.0, 14.4], to: [8.2, 11.2], speed: 0.92, cup: true },
+          ],
+          initIdx: 2,
+        },
+      ];
+      for (const spec of bimWalkers) {
+        const rig = buildHDHuman(THREE, hdAssets, mats, {
+          index: spec.index,
+          mode: "idle",
+          holdCup: Boolean(spec.holdCup),
+          femaleWalk: spec.index % 2 === 0,
+          topColor: BIM_SHIRTS[spec.index % BIM_SHIRTS.length],
+        }) || buildWalkerRig(THREE, humanAssets, mats, { index: spec.index, holdCup: spec.holdCup });
+        floorRoot.add(rig.root);
+        const npc = createScheduledNPC(rig, spec.steps, spec.initIdx, 0, `bim_${spec.index}`);
+        npc.isScheduled = true;
+        walkers.push(npc);
+      }
+    } else if (plan.rooms && plan.rooms.length) {
       // Nhân viên nội bộ hành động có mục tiêu rõ ràng, giữ khoảng cách vật lý với đồng nghiệp & đồ đạc
       const OFFICE_SHIRTS = ["#2563eb", "#0f766e", "#6d28d9", "#be123c", "#15803d", "#0369a1"];
       const scheduledIndoor = [
@@ -1956,7 +2238,7 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
   // Đồ trang trí mùa Noel / Tết
   if (opts.season === "noel" || opts.season === "tet") {
     floorRoot.add(buildSeasonTree(THREE, natureAssets, mats, opts.season, plan.season, anim));
-    buildSeasonWall(THREE, sceneAssets, mats, opts.season, plan, cutaway, anim);
+    if (!plan.pavilions) buildSeasonWall(THREE, sceneAssets, mats, opts.season, plan, cutaway, anim);
   }
 
   // Nhân vật dạo phố (chế độ Dạo phố ngang mắt người thứ ba) — ưu tiên mô hình Ready Player Me áo đen sắc nét + mocap thật
@@ -2050,6 +2332,13 @@ export function buildOfficeScene(THREE, textures, sceneAssets, humanAssets, natu
         }
       }
       const headZ = zb + 2.02 + (curOpts.season === "noel" ? 0.34 : 0.08);
+      if (curOpts.names !== false && curOpts.npc !== false && plan.extraLabels) {
+        plan.extraDesks.forEach(([ex, ey], k) => {
+          if (plan.extraLabels[k] && npcAt(k, plan)) {
+            tags.push({ x: ex + 1.4, y: ey + 1.32, z: headZ, text: plan.extraLabels[k], bg: "#0f172a", fg: "#f8fafc", border: "#475569", kind: "spec", id: "" });
+          }
+        });
+      }
       (curOpts.seats || []).slice(0, plan.desks.length).forEach((seat, i) => {
         const [dx, dy] = plan.desks[i];
         const ax = dx + 1.4, ay = dy + 1.32;

@@ -580,23 +580,68 @@ export function buildSurroundingCity(THREE, cityAssets, natureAssets, sgAssets, 
   ];
   for (const b of westRow) addBuilding(b);
 
-  // ---------------------------------------------------------------- 5. Ô PHỐ PHÍA ĐÔNG (qua đại lộ nhánh Đông — thấp tầng ở mặt trước, cao dần về Đông-Bắc!)
+  // ---------------------------------------------------------------- 5. Ô PHỐ PHÍA ĐÔNG (qua đại lộ nhánh Đông — kèm Toà văn phòng thứ 2: Tổ hợp BIM kính hiện đại!)
   const e1X = eastRoadX + 10.2;
   const eastRow = [
-    // Góc Đông-Bắc (sau góc nhìn -> cao ốc hiện đại)
+    // Góc Đông-Bắc: cao ốc hiện đại hậu cảnh
     { x: e1X + 0.5, z: -17.5, w: 9.8, d: 10.4, h: 21.0, style: "tower", color: "#273b52", face: "west", seed: 401 },
     { x: e1X + 12.5, z: -17.5, w: 10.4, d: 10.6, h: 26.5, style: "tower", color: "#1e3248", face: "west", seed: 402 },
     { x: e1X + 0.4, z: 2.5, w: 8.6, d: 7.4, h: 12.0, style: "apartment", color: "#f0ece2", accent: "#334155", face: "west", seed: 403, cast: true },
-    // Mặt Đông song song sân vườn (h = 5.0..6.2m nên không che vườn hay hồ bơi ở góc nhìn chuẩn!)
-    { x: e1X + 0.4, z: 10.2, w: 8.4, d: 6.4, h: 5.8, style: "townhouse", color: "#f4e5d6", accent: "#c2410c", face: "west", seed: 404, pitched: true, cast: true },
-    { x: e1X + 0.4, z: 17.0, w: 8.4, d: 6.2, h: 5.2, style: "cafe", color: "#f6efe5", accent: "#15803d", face: "west", seed: 405, signIdx: 2, cast: true },
-    { x: e1X + 0.4, z: 23.8, w: 8.4, d: 6.4, h: 5.6, style: "shophouse", color: "#edf2f7", accent: "#0284c7", face: "west", seed: 406, signIdx: 0, cast: true },
     // Góc Đông-Nam (qua ngã tư đại lộ)
     { x: e1X + 0.4, z: sfZ, w: 8.6, d: 8.0, h: 5.4, style: "shophouse", color: "#f2ece2", accent: "#9a3412", face: "north", seed: 407, signIdx: 3, cast: true },
-    { x: e1X + 13.0, z: 14.0, w: 9.8, d: 10.4, h: 11.2, style: "apartment", color: "#eae7de", accent: "#475569", face: "west", seed: 408 },
     { x: e1X + 13.0, z: sfZ + 12.0, w: 10.0, d: 10.0, h: 12.5, style: "apartment", color: "#e6ecf2", accent: "#334155", face: "north", seed: 409 },
   ];
   for (const b of eastRow) addBuilding(b);
+
+  // Toà văn phòng thứ 2 liền kề bên kia đại lộ nhánh Đông (Z = 8.4..26.2): Tổ hợp BIM — khối văn phòng kính khung thép & bệ hologram xanh
+  {
+    const bx = e1X + 5.8, bz = 17.3, bw = 18.6, bd = 17.2;
+    const plazaMat = mats.standard("#ebe6dc", { roughness: 0.78, tex: "stone" });
+    const podSteel = mats.standard("#151d28", { roughness: 0.28, metalness: 0.84 });
+    const podGold = mats.standard("#e0b65a", { roughness: 0.24, metalness: 0.88 });
+    const podGlass = mats.physical("#dff2fe", { roughness: 0.06, clearcoat: 1.0, transparent: true, opacity: 0.34, depthWrite: false });
+    const cyanRingMat = mats.standard("#38bdf8", { roughness: 0.14, emissive: "#00e5ff", emissiveIntensity: 1.25 });
+    putBox(THREE, root, g.unitBox, plazaMat, bx, 0.06, bz, bw, 0.12, bd, false, true);
+    // Bệ tròn Mô hình liên hợp phát sáng ngay tâm sân văn phòng thứ 2
+    putBox(THREE, root, g.unitCyl, cyanRingMat, bx - 2.2, 0.14, bz, 4.6, 0.06, 4.6, false, false);
+    putBox(THREE, root, g.unitCyl, trimDark, bx - 2.2, 0.17, bz, 4.1, 0.05, 4.1, false, true);
+    putBox(THREE, root, g.unitBox, mats.physical("#38bdf8", { roughness: 0.1, transparent: true, opacity: 0.35, emissive: "#0ea5e9", emissiveIntensity: 0.65 }), bx - 2.2, 1.15, bz, 1.2, 1.9, 0.95, false, false);
+    regCircle(bx - 2.2, bz, 2.4, "bim_annex_pad");
+
+    const annexPods = [
+      [bx - 4.4, bz - 5.4, 7.2, 4.8, 3.6, "#28689c", "TEAM KIẾN TRÚC"],
+      [bx + 4.2, bz - 5.4, 7.2, 4.8, 3.6, "#28559a", "BIM MANAGER"],
+      [bx + 4.6, bz + 0.6, 7.4, 5.0, 3.6, "#9e472a", "TEAM KẾT CẤU"],
+      [bx - 4.2, bz + 5.6, 7.4, 4.8, 3.6, "#286a4b", "TEAM MEP"],
+      [bx + 4.4, bz + 5.8, 7.0, 4.6, 3.6, "#946243", "PHÒNG CEO"],
+    ];
+    for (const [px, pz, pw, pd, ph, flCol, label] of annexPods) {
+      regBox(px - pw / 2 - 0.15, pz - pd / 2 - 0.15, px + pw / 2 + 0.15, pz + pd / 2 + 0.15, "bim_annex");
+      putBox(THREE, root, g.unitBox, mats.standard(flCol, { roughness: 0.62 }), px, 0.14, pz, pw, 0.08, pd, false, true);
+      putBox(THREE, root, g.unitBox, podGlass, px, ph / 2 + 0.1, pz, pw - 0.08, ph, pd - 0.08, false, false);
+      putBox(THREE, root, g.unitBox, podSteel, px, ph + 0.08, pz, pw + 0.12, 0.12, pd + 0.12, true, true);
+      for (const [cx, cz] of [[-pw / 2, -pd / 2], [pw / 2, -pd / 2], [-pw / 2, pd / 2], [pw / 2, pd / 2]]) {
+        putBox(THREE, root, g.unitBox, podSteel, px + cx, ph / 2 + 0.1, pz + cz, 0.1, ph, 0.1, true, false);
+      }
+      const sMat = mats.standard("#ffffff", {
+        roughness: 0.22,
+        tex: "podSign:" + label,
+        emissive: "#ffffff",
+        emissiveMap: true,
+        emissiveIntensity: 0.44,
+      });
+      putBox(THREE, root, g.unitBox, podSteel, px, ph + 0.68, pz, 3.8, 0.78, 0.12, true, false);
+      putBox(THREE, root, g.unitBox, podGold, px, ph + 1.09, pz, 3.9, 0.05, 0.16, false, false);
+      const sf = new THREE.Mesh(g.unitPlane, sMat);
+      sf.position.set(px, ph + 0.68, pz + 0.07);
+      sf.scale.set(3.68, 0.72, 1);
+      const sb = new THREE.Mesh(g.unitPlane, sMat);
+      sb.position.set(px, ph + 0.68, pz - 0.07);
+      sb.rotation.y = Math.PI;
+      sb.scale.set(3.68, 0.72, 1);
+      root.add(sf, sb);
+    }
+  }
 
   // ---------------------------------------------------------------- 6. Hàng cây nhiệt đới dày xanh, cột điện & đường dây võng, xe đỗ ven đường & chi tiết đường phố AAA
   const extraGeos = [];

@@ -278,7 +278,7 @@ class OfficeTest(AppCase):
         scales = page.eval_on_selector_all("#office-scale option", "os => os.map(o => o.value)")
         self.assertEqual(len(themes), 8)
         self.assertEqual(layouts, ["open", "connected", "private"])
-        self.assertEqual(scales, ["team", "company", "corp"])
+        self.assertEqual(scales, ["team", "company", "corp", "bim"])
         frames = "() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))"
         seasons = page.eval_on_selector_all("#office-season option", "os => os.map(o => o.value)")
         self.assertLessEqual({"noel", "tet"}, set(seasons))
@@ -304,8 +304,10 @@ class OfficeTest(AppCase):
         # Dữ liệu mặt bằng (plans.js): 3 quy mô; công ty đủ phòng chức năng; 5 bàn agent thật đứng trước bàn minh hoạ.
         plan = page.evaluate(
             "async () => { const m = await import('/office/plans.js'); const p = m.planFor('company', 'open');"
+            " const b = m.planFor('bim', 'open');"
             " return {scales: m.SCALES.map(s => s.id), rooms: p.rooms.map(r => r.id), desks: p.desks.length,"
-            " extra: p.extraDesks.length, corp: m.planFor('corp', 'open').levels}; }"
+            " extra: p.extraDesks.length, corp: m.planFor('corp', 'open').levels,"
+            " bimRooms: b.rooms.map(r => r.id), bimDesks: [b.desks.length, b.extraDesks.length]}; }"
         )
         self.assertEqual(plan["scales"], scales)
         self.assertEqual(
@@ -313,6 +315,8 @@ class OfficeTest(AppCase):
         )
         self.assertEqual((plan["desks"], plan["extra"]), (5, 23))
         self.assertGreater(plan["corp"], 0)
+        self.assertEqual(set(plan["bimRooms"]), {"ceo", "bim_mgr", "fed", "arch", "struct", "mep"})
+        self.assertEqual(plan["bimDesks"], [5, 6])
         # Quy mô công ty: nút "Tới phòng" đủ 8 phòng + Toàn cảnh; bấm → chỉ nút đó aria-pressed và cảnh đổi; tới bàn →
         # không nút nào pressed (kể cả Toàn cảnh).
         page.select_option("#office-scale", "company")

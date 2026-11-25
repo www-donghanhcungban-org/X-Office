@@ -370,23 +370,25 @@ export function createPostFX(THREE, renderer) {
     return rt;
   };
 
-  let curW = 0, curH = 0;
+  let curW = 0, curH = 0, curUltra = false;
   let sceneRT = null, aoRT = null, aoBlurRT = null;
   let bHalfA = null, bQuarter = null, bEighth = null, bHalfB = null;
   let failed = false;
   const bufSize = new THREE.Vector2();
 
-  function allocate(pw, ph) {
-    if (pw === curW && ph === curH && sceneRT) return;
+  function allocate(pw, ph, ultra = false) {
+    if (pw === curW && ph === curH && ultra === curUltra && sceneRT) return;
     disposeTargets();
     curW = Math.max(2, Math.round(pw));
     curH = Math.max(2, Math.round(ph));
+    curUltra = Boolean(ultra);
     const hw = Math.max(2, curW >> 1), hh = Math.max(2, curH >> 1);
     const qw = Math.max(2, curW >> 2), qh = Math.max(2, curH >> 2);
     const ew = Math.max(2, curW >> 3), eh = Math.max(2, curH >> 3);
+    const aoW = curUltra ? curW : hw, aoH = curUltra ? curH : hh;
     sceneRT = mkRT(curW, curH, hdrType, true);
-    aoRT = mkRT(hw, hh, THREE.UnsignedByteType, false);
-    aoBlurRT = mkRT(hw, hh, THREE.UnsignedByteType, false);
+    aoRT = mkRT(aoW, aoH, THREE.UnsignedByteType, false);
+    aoBlurRT = mkRT(aoW, aoH, THREE.UnsignedByteType, false);
     bHalfA = mkRT(hw, hh, hdrType, false);
     bQuarter = mkRT(qw, qh, hdrType, false);
     bEighth = mkRT(ew, eh, hdrType, false);
@@ -419,7 +421,7 @@ export function createPostFX(THREE, renderer) {
       }
       try {
         renderer.getDrawingBufferSize(bufSize);
-        allocate(bufSize.x, bufSize.y);
+        allocate(bufSize.x, bufSize.y, Boolean(opts.ultra));
 
         // 1. Render cảnh 3D ở không gian tuyến tính HDR (giữ giá trị > 1 cho Bloom)
         const prevTM = renderer.toneMapping;
